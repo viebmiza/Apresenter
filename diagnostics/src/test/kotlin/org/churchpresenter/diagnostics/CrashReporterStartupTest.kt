@@ -1,0 +1,771 @@
+package org.churchpresenter.diagnostics
+
+import io.sentry.SentryLevel
+import io.sentry.SentryOptions
+import java.io.ByteArrayInputStream
+import java.io.File
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
+
+/**
+ * The startup sequence and the Sentry configuration, driven through the two seams that let a test
+ * run the real code: [CrashReporter.startUp] takes the process-global installs as a parameter, and
+ * [CrashReporter.configureOptions] applies to any [SentryOptions] rather than only to the live SDK.
+ */
+class CrashReporterStartupTest {
+
+    private val appDir = File(System.getProperty("user.home"), ".churchpresenter")
+    private val crashDir = File(appDir, "crash-reports")
+    private val runningFile = File(appDir, ".running")
+    private val crashCountFile = File(appDir, ".crash_count")
+    private val crashKindFile = File(appDir, ".crash_kind")
+    private val installIdFile = File(appDir, ".install_id")
+
+    /** Collects what `startUp` would have installed on the JVM, so the test can run it instead. */
+    private var handler: Thread.UncaughtExceptionHandler? = null
+    private var onExit: Runnable? = null
+    private val order = mutableListOf<String>()
+
+    /** The exit code the installed handler asked for, or null if it never called [exit]. */
+    private var exitCode: Int? = null
+
+    private fun startUp(analyticsReportingEnabled: Boolean, build: BuildIdentity = BuildIdentity()) =
+        CrashReporter.startUp(
+            analyticsReportingEnabled,
+            build,
+            setUncaughtHandler = { handler = it; order += "handler" },
+            addShutdownHook = { onExit = it; order += "shutdown" },
+            exit = { exitCode = it },
+        )
+
+    @BeforeTest
+    fun freshState() {
+        crashDir.deleteRecursively()
+        runningFile.delete()
+        crashCountFile.delete()
+        crashKindFile.delete()
+        installIdFile.delete()
+    }
+
+    @AfterTest
+    fun cleanup() {
+        crashDir.deleteRecursively()
+        runningFile.delete()
+        crashCountFile.delete()
+        crashKindFile.delete()
+        CrashReporter.videoBackgroundsDisabled = false
+    }
+
+    /** Puts the machine in the state a second consecutive crash of [kind] would leave behind. */
+    private fun secondCrashPending(kind: CrashKind?) {
+        appDir.mkdirs()
+        runningFile.createNewFile()
+        crashCountFile.writeText("1")
+        if (kind != null) crashKindFile.writeText(kind.name)
+    }
+
+    // ── startUp ─────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `a first launch creates the crash directory and takes the run lock`() {
+        startUp(analyticsReportingEnabled = false)
+
+        assertTrue(crashDir.isDirectory, "the write path depends on this existing")
+        assertTrue(runningFile.exists(), "the lock is what a later run reads as 'crashed'")
+        assertFalse(CrashReporter.didCrashLastRun)
+        assertEquals(0, CrashReporter.consecutiveCrashes)
+        assertFalse(CrashReporter.videoBackgroundsDisabled)
+    }
+
+    @Test
+    fun `a leftover run lock is read as a crash and counted`() {
+        appDir.mkdirs()
+        runningFile.createNewFile()
+
+        startUp(analyticsReportingEnabled = false)
+
+        assertTrue(CrashReporter.didCrashLastRun)
+        assertEquals(1, CrashReporter.consecutiveCrashes)
+        assertFalse(CrashReporter.videoBackgroundsDisabled, "one crash is not yet the threshold")
+        assertEquals("1", crashCountFile.readText().trim(), "the count has to survive the restart")
+    }
+
+    @Test
+    fun `a second consecutive crash disables video backgrounds`() {
+        // No recorded kind: the JVM went down without unwinding, which is exactly what a native VLC
+        // fault does. This is the case the guard was built for, so it must still fire.
+        secondCrashPending(kind = null)
+
+        startUp(analyticsReportingEnabled = false)
+
+        assertEquals(2, CrashReporter.consecutiveCrashes)
+        assertTrue(
+            CrashReporter.videoBackgroundsDisabled,
+            "repeated crashes must turn off the most likely cause without the user doing anything",
+        )
+    }
+
+    @Test
+    fun `a second crash of an unrelated kind still disables video backgrounds`() {
+        secondCrashPending(CrashKind.OTHER)
+
+        startUp(analyticsReportingEnabled = false)
+
+        assertEquals(2, CrashReporter.consecutiveCrashes)
+        assertTrue(CrashReporter.videoBackgroundsDisabled, "only a renderer fault is exempted")
+    }
+
+    @Test
+    fun `a renderer crash is counted but does not disable video backgrounds`() {
+        secondCrashPending(CrashKind.RENDERER)
+
+        startUp(analyticsReportingEnabled = false)
+
+        assertEquals(2, CrashReporter.consecutiveCrashes, "it was still a crash, and the count says so")
+        assertFalse(
+            CrashReporter.videoBackgroundsDisabled,
+            "a GPU driver fault is not video decoding; turning off VLC hides the cause and costs a feature",
+        )
+    }
+
+    @Test
+    fun `re-enabling video backgrounds clears the guard on disk as well as in memory`() {
+        secondCrashPending(kind = null)
+        startUp(analyticsReportingEnabled = false)
+        assertTrue(CrashReporter.videoBackgroundsDisabled, "the fixture has to have tripped the guard")
+
+        CrashReporter.reEnableVideoBackgrounds()
+
+        assertFalse(CrashReporter.videoBackgroundsDisabled, "the override takes effect in this session")
+        assertEquals(
+            "0",
+            crashCountFile.readText().trim(),
+            "the count is what re-arms the guard next launch, so the override has to reset it too",
+        )
+    }
+
+    @Test
+    fun `the recorded kind is consumed, so a later crash that records nothing is not judged by it`() {
+        secondCrashPending(CrashKind.RENDERER)
+        startUp(analyticsReportingEnabled = false)
+        assertFalse(CrashReporter.videoBackgroundsDisabled)
+        assertFalse(crashKindFile.exists(), "a kind survives exactly one startup")
+
+        // A hard kill now: the lock is left behind, but nothing recorded what failed.
+        runningFile.createNewFile()
+        startUp(analyticsReportingEnabled = false)
+
+        assertTrue(
+            CrashReporter.videoBackgroundsDisabled,
+            "a stale RENDERER must not go on exempting crashes it had nothing to do with",
+        )
+    }
+
+    @Test
+    fun `an unreadable kind reads as no kind rather than as an exemption`() {
+        secondCrashPending(kind = null)
+        crashKindFile.writeText("GRAPHICS_ISH")
+
+        startUp(analyticsReportingEnabled = false)
+
+        assertTrue(CrashReporter.videoBackgroundsDisabled, "an unrecognised value degrades to the old behaviour")
+    }
+
+    // ── Classifying what failed ─────────────────────────────────────────────────
+
+    @Test
+    fun `a skiko throwable is a renderer fault`() {
+        assertEquals(
+            CrashKind.RENDERER,
+            CrashReporter.classifyCrash(org.jetbrains.skiko.RenderException("swapBuffers")),
+        )
+    }
+
+    @Test
+    fun `a skia throwable is a renderer fault`() {
+        assertEquals(
+            CrashKind.RENDERER,
+            CrashReporter.classifyCrash(org.jetbrains.skia.SkiaException("surface")),
+        )
+    }
+
+    @Test
+    fun `a renderer fault wrapped in something else is still a renderer fault`() {
+        val wrapped = RuntimeException("while presenting", org.jetbrains.skiko.RenderException("swapBuffers"))
+
+        assertEquals(CrashKind.RENDERER, CrashReporter.classifyCrash(wrapped))
+    }
+
+    @Test
+    fun `an ordinary throwable is not a renderer fault`() {
+        assertEquals(CrashKind.OTHER, CrashReporter.classifyCrash(IllegalStateException("kaboom")))
+        assertEquals(CrashKind.OTHER, CrashReporter.classifyCrash(null))
+    }
+
+    @Test
+    fun `a cause cycle terminates instead of hanging the crash handler`() {
+        val first = RuntimeException("first")
+        val second = RuntimeException("second", first)
+        first.initCause(second)
+
+        assertEquals(CrashKind.OTHER, CrashReporter.classifyCrash(first))
+    }
+
+    // ── A development build's own output changing under it ─────────────────────
+
+    private fun thrownAt(throwable: Throwable, vararg classNames: String) = throwable.apply {
+        stackTrace = classNames.map { StackTraceElement(it, "run", "$it.kt", 1) }.toTypedArray()
+    }
+
+    /** What a rebuild under a running app throws: one of our classes no longer on the classpath. */
+    private fun ourClassGone() = thrownAt(
+        NoClassDefFoundError("org/churchpresenter/songs/SongEditorRequest"),
+        "org.churchpresenter.app.churchpresenter.BibleAndSongsPaneWiringKt",
+        "androidx.compose.runtime.RecomposeScopeImpl",
+    )
+
+    /** And a jar on the classpath rewritten while Compose read a string out of it. */
+    private fun classpathJarRewritten() = thrownAt(
+        java.util.zip.ZipException("invalid LOC header (bad signature)"),
+        "java.util.zip.ZipFile\$ZipFileInputStream",
+        "org.jetbrains.compose.resources.JvmResourceReader",
+    )
+
+    @Test
+    fun `one of our classes gone, or a classpath jar rewritten, is stale build output`() {
+        assertTrue(CrashReporter.isStaleBuildOutput(ourClassGone()))
+        assertTrue(CrashReporter.isStaleBuildOutput(classpathJarRewritten()))
+        assertTrue(
+            CrashReporter.isStaleBuildOutput(RuntimeException("while composing", ourClassGone())),
+            "wrapped is the same thing",
+        )
+    }
+
+    @Test
+    fun `a missing library class, or a broken zip the operator opened, is not`() {
+        val libraryClassGone = thrownAt(NoClassDefFoundError("org/apache/poi/Foo"), "org.apache.poi.Bar")
+        val brokenDeck = thrownAt(
+            java.util.zip.ZipException("invalid LOC header (bad signature)"),
+            "java.util.zip.ZipFile",
+            "org.churchpresenter.presentation.PptxReader",
+        )
+
+        assertFalse(CrashReporter.isStaleBuildOutput(libraryClassGone))
+        assertFalse(CrashReporter.isStaleBuildOutput(brokenDeck))
+        assertFalse(CrashReporter.isStaleBuildOutput(null))
+    }
+
+    @Test
+    fun `a development build does not send a crash from its own output changing`() {
+        startUp(analyticsReportingEnabled = false, BuildIdentity(isRelease = false))
+        val event = io.sentry.SentryEvent(ourClassGone()).apply { level = SentryLevel.FATAL }
+
+        assertNull(CrashReporter.crashAttachingBeforeSend().execute(event, io.sentry.Hint()))
+    }
+
+    @Test
+    fun `a release build still sends it, since no installed copy should ever lose a class`() {
+        startUp(analyticsReportingEnabled = false, BuildIdentity(isRelease = true))
+        val event = io.sentry.SentryEvent(ourClassGone()).apply { level = SentryLevel.FATAL }
+
+        assertEquals(event, CrashReporter.crashAttachingBeforeSend().execute(event, io.sentry.Hint()))
+    }
+
+    @Test
+    fun `the installed handler records what kind of crash it was`() {
+        startUp(analyticsReportingEnabled = false)
+        val handler = assertNotNull(handler)
+
+        handler.uncaughtException(Thread.currentThread(), org.jetbrains.skiko.RenderException("swapBuffers"))
+
+        assertEquals(
+            CrashKind.RENDERER.name,
+            crashKindFile.readText().trim(),
+            "the next run can only exempt the crash if this run wrote down what it was",
+        )
+    }
+
+    @Test
+    fun `a clean previous run resets the count`() {
+        appDir.mkdirs()
+        crashCountFile.writeText("2")
+
+        startUp(analyticsReportingEnabled = false)
+
+        assertEquals(0, CrashReporter.consecutiveCrashes)
+        assertEquals("0", crashCountFile.readText().trim())
+    }
+
+    @Test
+    fun `the handler is installed before the shutdown hook`() {
+        startUp(analyticsReportingEnabled = false)
+
+        // The handler guards the rest of startUp; installing it last would leave that stretch bare.
+        assertEquals(listOf("handler", "shutdown"), order)
+    }
+
+    @Test
+    fun `the installed handler writes a crash log for the failing thread`() {
+        startUp(analyticsReportingEnabled = false)
+        val handler = assertNotNull(handler)
+
+        handler.uncaughtException(Thread.currentThread(), IllegalStateException("kaboom"))
+
+        val logs = crashDir.listFiles()?.filter { it.name.startsWith("crash_") }.orEmpty()
+        assertEquals(1, logs.size, "an uncaught exception is exactly the case a crash log is for")
+        val text = logs.single().readText()
+        assertTrue(text.contains("kaboom"), "the message is the whole point of the log")
+        assertTrue(text.contains(Thread.currentThread().name), "which thread died is triage data")
+    }
+
+    @Test
+    fun `the installed handler ends the process once the crash is on record, rather than leaving it running`() {
+        // #518: the JVM's own default handler only prints to stderr, so nothing ended the process —
+        // and because every output window shares one AWT thread with the main window, a crash there
+        // used to freeze the whole app instead of closing it.
+        startUp(analyticsReportingEnabled = false)
+        val handler = assertNotNull(handler)
+
+        handler.uncaughtException(Thread.currentThread(), IllegalStateException("kaboom"))
+
+        assertEquals(EXIT_CODE_FATAL_CRASH, exitCode, "a distinct code from the clean-exit 0")
+    }
+
+    /** An exception thrown from the AWT clipboard peer, as Windows produces it. */
+    private fun clipboardRefusal() = IllegalStateException("cannot open system clipboard").apply {
+        stackTrace = arrayOf(
+            StackTraceElement("sun.awt.windows.WClipboard", "openClipboard0", null, -2),
+            StackTraceElement("sun.awt.datatransfer.SunClipboard", "setContents", null, -1),
+            StackTraceElement(
+                "androidx.compose.foundation.text.selection.TextFieldSelectionManager",
+                "copy", "TextFieldSelectionManager.kt", 882,
+            ),
+        )
+    }
+
+    @Test
+    fun `a refused clipboard is logged but does not end the process`() {
+        // Sentry CHURCH-PRESENTER-DESKTOP-42. Windows throws this out of `WClipboard` when another
+        // process is holding the clipboard open -- a clipboard manager, a remote-desktop session,
+        // Office -- and it surfaces here because it comes out of Compose's own copy handler, with
+        // no frame of ours to catch it. The event thread is fine afterwards; the copy just did not
+        // happen. Quitting mid-service over a failed Ctrl+C is much the worse of the two outcomes.
+        startUp(analyticsReportingEnabled = false)
+        val handler = assertNotNull(handler)
+
+        handler.uncaughtException(Thread.currentThread(), clipboardRefusal())
+
+        assertNull(exitCode, "a refused clipboard must not end the process")
+        val logs = crashDir.listFiles()?.filter { it.name.startsWith("crash_") }.orEmpty()
+        assertEquals(1, logs.size, "it is still written down, so it can still be found")
+        assertTrue(logs.single().readText().contains("WClipboard"), "and says where it came from")
+    }
+
+    /** The error the Windows shell-folder bridge throws when Explorer will not bind an item. */
+    private fun shellFolderRefusal() = InternalError("Unable to bind a shortcut to parent").apply {
+        stackTrace = arrayOf(
+            StackTraceElement("sun.awt.shell.Win32ShellFolder2\$4", "call", null, -1),
+            StackTraceElement("sun.awt.shell.Win32ShellFolderManager2\$ComInvoker", "invoke", null, -1),
+            StackTraceElement("sun.awt.shell.Win32ShellFolder2", "getIShellFolder", null, -1),
+        )
+    }
+
+    @Test
+    fun `a shell folder Windows will not bind is logged but does not end the process`() {
+        // Sentry CHURCH-PRESENTER-DESKTOP-C7: a stray file in Network Shortcuts, thrown out of a
+        // Swing file list's own loading. The folder lists without it; quitting is the worse outcome.
+        startUp(analyticsReportingEnabled = false)
+        val handler = assertNotNull(handler)
+
+        handler.uncaughtException(Thread.currentThread(), shellFolderRefusal())
+
+        assertNull(exitCode, "a shell folder Windows refused must not end the process")
+        val logs = crashDir.listFiles()?.filter { it.name.startsWith("crash_") }.orEmpty()
+        assertEquals(1, logs.size, "it is still written down, so it can still be found")
+    }
+
+    @Test
+    fun `an internal error from anywhere else still ends the process`() {
+        startUp(analyticsReportingEnabled = false)
+        val handler = assertNotNull(handler)
+
+        handler.uncaughtException(Thread.currentThread(), InternalError("Unable to bind a shortcut to parent"))
+
+        assertEquals(EXIT_CODE_FATAL_CRASH, exitCode, "only the shell-folder bridge is the known case")
+    }
+
+    @Test
+    fun `the same exception type from anywhere else still ends the process`() {
+        // The guard is the clipboard peer, not the exception type and not the wording: recovering
+        // from every IllegalStateException is the opposite of what #518 asked for.
+        startUp(analyticsReportingEnabled = false)
+        val handler = assertNotNull(handler)
+
+        handler.uncaughtException(
+            Thread.currentThread(),
+            IllegalStateException("cannot open system clipboard"),
+        )
+
+        assertEquals(
+            EXIT_CODE_FATAL_CRASH,
+            exitCode,
+            "the same message from a frame that is not the clipboard peer is not the known case",
+        )
+    }
+
+    @Test
+    fun `the exit hook releases the run lock so a clean quit is not read as a crash`() {
+        startUp(analyticsReportingEnabled = false)
+        assertTrue(runningFile.exists())
+
+        assertNotNull(onExit).run()
+
+        assertFalse(runningFile.exists())
+    }
+
+    /** [startUp] with the telemetry decision driven, recording whether the init step ran. */
+    private fun startUpRecordingTelemetry(
+        analyticsReportingEnabled: Boolean,
+        telemetryOff: Boolean,
+    ): Boolean {
+        var started = false
+        CrashReporter.startUp(
+            analyticsReportingEnabled,
+            BuildIdentity(),
+            setUncaughtHandler = { handler = it },
+            addShutdownHook = { onExit = it },
+            telemetryOff = telemetryOff,
+            initTelemetry = { started = true },
+        )
+        return started
+    }
+
+    @Test
+    fun `the telemetry switch stops Sentry starting even when analytics is on`() {
+        // sentry.properties carries a real DSN and sits on the test runtime classpath, so without
+        // this the suite reports into the production project — which it did, filing "kaboom" and
+        // "nowhere to write" against a test class. The build sets the switch for every test task.
+        assertFalse(startUpRecordingTelemetry(analyticsReportingEnabled = true, telemetryOff = true))
+    }
+
+    @Test
+    fun `with the switch off, enabling analytics starts telemetry`() {
+        // The shipping case: an operator who opted in must still be reported for.
+        assertTrue(startUpRecordingTelemetry(analyticsReportingEnabled = true, telemetryOff = false))
+    }
+
+    @Test
+    fun `opting out of analytics starts telemetry regardless of the switch`() {
+        assertFalse(startUpRecordingTelemetry(analyticsReportingEnabled = false, telemetryOff = false))
+        assertFalse(startUpRecordingTelemetry(analyticsReportingEnabled = false, telemetryOff = true))
+    }
+
+    @Test
+    fun `the switch does not stop the install id being minted`() {
+        // It identifies the install for the local crash log too, which is written whether or not
+        // anything is sent — so gating it on the switch would change behaviour this fix has no
+        // business changing.
+        startUpRecordingTelemetry(analyticsReportingEnabled = true, telemetryOff = true)
+
+        assertTrue(installIdFile.exists())
+    }
+
+    @Test
+    fun `enabling analytics stamps the install id, disabling it does not`() {
+        startUp(analyticsReportingEnabled = false)
+        assertFalse(installIdFile.exists(), "opting out must not mint an identifier")
+
+        startUp(analyticsReportingEnabled = true)
+        assertTrue(installIdFile.exists())
+        val minted = installIdFile.readText().trim()
+
+        startUp(analyticsReportingEnabled = true)
+        assertEquals(minted, installIdFile.readText().trim(), "a restart is the same install")
+    }
+
+    @Test
+    fun `the build identity it is given is what it reports`() {
+        startUp(
+            analyticsReportingEnabled = false,
+            BuildIdentity(versionDisplay = "26.9.177 (abc1234)", appVersion = "26.9.177", isRelease = true),
+        )
+
+        val options = SentryOptions()
+        CrashReporter.configureOptions(options, "https://key@example.org/1")
+        assertEquals("26.9.177", options.release, "the release is what groups events in Sentry")
+        assertNotNull(options.beforeBreadcrumb, "every breadcrumb is scrubbed as it is recorded")
+    }
+
+    @Test
+    fun `the static tags carry the build provenance it was given`() {
+        startUp(
+            analyticsReportingEnabled = false,
+            BuildIdentity(isRelease = true, buildType = "release", buildChannel = "ci"),
+        )
+
+        val tags = CrashReporter.staticTags(osName = "Mac OS X", arch = "aarch64")
+
+        assertEquals("release", tags["build.type"])
+        assertEquals("ci", tags["build.channel"])
+        assertEquals("macos", tags["os.family"])
+        assertEquals("aarch64", tags["os.arch"])
+    }
+
+    @Test
+    fun `a locally packaged build is production but not ci`() {
+        // The whole point of build.channel: `isRelease` is "a packaging task ran", so this build
+        // and one CI shipped were indistinguishable, and both reported production.
+        startUp(
+            analyticsReportingEnabled = false,
+            BuildIdentity(isRelease = true, buildType = "dirty", buildChannel = "local"),
+        )
+        val options = SentryOptions()
+
+        CrashReporter.configureOptions(options, "https://key@example.org/1")
+
+        assertEquals("production", options.environment, "a packaged build is still a real install")
+        assertEquals("local", CrashReporter.staticTags()["build.channel"], "but it is not a CI one")
+        assertEquals("dirty", CrashReporter.staticTags()["build.type"])
+    }
+
+    @Test
+    fun `build provenance it was never told reads as unknown, not as a release`() {
+        startUp(analyticsReportingEnabled = false, BuildIdentity())
+
+        val tags = CrashReporter.staticTags()
+
+        assertEquals("unknown", tags["build.type"])
+        assertEquals("unknown", tags["build.channel"])
+    }
+
+    // ── Sentry options ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `a dev build reports as development and samples everything`() {
+        startUp(analyticsReportingEnabled = false, BuildIdentity(isRelease = false))
+        val options = SentryOptions()
+
+        CrashReporter.configureOptions(options, "https://key@example.org/1")
+
+        assertEquals("development", options.environment, "dev runs must stay out of release health")
+        assertEquals(1.0, options.tracesSampleRate)
+        assertEquals(1.0, options.profilesSampleRate)
+    }
+
+    @Test
+    fun `a release build reports as production and samples performance down`() {
+        startUp(analyticsReportingEnabled = false, BuildIdentity(isRelease = true))
+        val options = SentryOptions()
+
+        CrashReporter.configureOptions(options, "https://key@example.org/1")
+
+        assertEquals("production", options.environment)
+        // Perf volume must not crowd errors out of the quota; errors are captured directly.
+        assertEquals(0.2, options.tracesSampleRate)
+        assertEquals(0.2, options.profilesSampleRate)
+    }
+
+    @Test
+    fun `the privacy and triage options are not left to the SDK defaults`() {
+        val options = SentryOptions()
+
+        CrashReporter.configureOptions(options, "https://key@example.org/1")
+
+        assertEquals("https://key@example.org/1", options.dsn)
+        assertFalse(options.isAttachServerName, "a hostname is the user's machine name")
+        assertFalse(options.isAttachThreads)
+        assertTrue(options.isAttachStacktrace)
+        assertTrue(options.isEnableUncaughtExceptionHandler)
+        assertTrue(options.isEnableAutoSessionTracking)
+        assertTrue(options.inAppIncludes.contains("org.churchpresenter"), "app frames must stand out")
+        assertNotNull(options.beforeSend, "nothing may leave without going through the scrubber")
+    }
+
+    // ── beforeSend ──────────────────────────────────────────────────────────────
+
+    @Test
+    fun `beforeSend returns the event so delivery is never blocked`() {
+        val callback = CrashReporter.crashAttachingBeforeSend()
+        val event = io.sentry.SentryEvent().apply { level = SentryLevel.INFO }
+
+        val result = callback.execute(event, io.sentry.Hint())
+
+        assertEquals(event, result)
+    }
+
+    @Test
+    fun `an error event carries the latest crash log, scrubbed`() {
+        crashDir.mkdirs()
+        File(crashDir, "crash_test.txt").writeText("failed for user sam at /Users/sam/Documents/set.cps")
+        val callback = CrashReporter.crashAttachingBeforeSend()
+        val hint = io.sentry.Hint()
+
+        callback.execute(io.sentry.SentryEvent().apply { level = SentryLevel.ERROR }, hint)
+
+        val attachment = hint.attachments.singleOrNull()
+        assertNotNull(attachment, "the local log is what makes a remote error diagnosable")
+        val body = String(assertNotNull(attachment.bytes))
+        assertFalse(body.contains("/Users/sam"), "a home path names the person: $body")
+    }
+
+    @Test
+    fun `an info event carries no attachment`() {
+        crashDir.mkdirs()
+        File(crashDir, "crash_test.txt").writeText("something")
+        val hint = io.sentry.Hint()
+
+        CrashReporter.crashAttachingBeforeSend()
+            .execute(io.sentry.SentryEvent().apply { level = SentryLevel.INFO }, hint)
+
+        assertTrue(hint.attachments.isEmpty(), "breadcrumb-level noise must not ship crash files")
+    }
+
+    // ── DSN ─────────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `an absent sentry properties reads as no DSN rather than failing`() {
+        assertEquals("", CrashReporter.dsnFrom(null))
+    }
+
+    @Test
+    fun `the dsn property is read and trimmed`() {
+        val stream = ByteArrayInputStream("dsn=https://key@example.org/1  \n".toByteArray())
+
+        assertEquals("https://key@example.org/1", CrashReporter.dsnFrom(stream))
+    }
+
+    @Test
+    fun `a properties file without a dsn key reads as empty`() {
+        val stream = ByteArrayInputStream("something=else\n".toByteArray())
+
+        assertEquals("", CrashReporter.dsnFrom(stream))
+    }
+
+    @Test
+    fun `masking keeps the DSN recognisable without printing the key`() {
+        val masked = CrashReporter.maskDsn("https://abcdef0123456789@o1.ingest.sentry.io/42")
+
+        assertTrue(masked.startsWith("https://abcdef"), "enough to tell two DSNs apart: $masked")
+        assertFalse(masked.contains("0123456789"), "the secret half must not survive: $masked")
+        assertTrue(masked.endsWith("@o1.ingest.sentry.io/42"), "the host identifies the project")
+    }
+
+    @Test
+    fun `an unconfigured DSN masks to empty`() {
+        assertEquals("", CrashReporter.maskDsn(""))
+        assertEquals("", CrashReporter.maskDsn("   "))
+    }
+
+    @Test
+    fun `a malformed DSN is truncated rather than echoed`() {
+        // No '@' means the shape is unknown, so none of it can be assumed safe to show.
+        val masked = CrashReporter.maskDsn("not-a-dsn-but-quite-long-anyway")
+
+        assertTrue(masked.endsWith("••••"))
+        assertFalse(masked.contains("quite-long-anyway"), masked)
+    }
+
+    @Test
+    fun `a fatal event carries the crash log too`() {
+        crashDir.mkdirs()
+        File(crashDir, "crash_fatal.txt").writeText("it died")
+        val hint = io.sentry.Hint()
+
+        CrashReporter.crashAttachingBeforeSend()
+            .execute(io.sentry.SentryEvent().apply { level = SentryLevel.FATAL }, hint)
+
+        assertEquals(1, hint.attachments.size, "a fatal is the case the log matters most for")
+    }
+
+    @Test
+    fun `an error event with no crash log on disk still sends`() {
+        crashDir.deleteRecursively()
+        val hint = io.sentry.Hint()
+        val event = io.sentry.SentryEvent().apply { level = SentryLevel.ERROR }
+
+        val result = CrashReporter.crashAttachingBeforeSend().execute(event, hint)
+
+        assertEquals(event, result, "no local log is not a reason to drop the report")
+        assertTrue(hint.attachments.isEmpty())
+    }
+
+    @Test
+    fun `the newest crash log is the one attached`() {
+        crashDir.mkdirs()
+        val older = File(crashDir, "crash_old.txt").apply { writeText("older") }
+        val newer = File(crashDir, "crash_new.txt").apply { writeText("newer") }
+        older.setLastModified(1_000_000L)
+        newer.setLastModified(2_000_000L)
+
+        assertEquals(newer, CrashReporter.latestCrashFile(), "an old log describes a different fault")
+    }
+
+    @Test
+    fun `no crash logs at all reads as none rather than failing`() {
+        crashDir.deleteRecursively()
+
+        assertEquals(null, CrashReporter.latestCrashFile())
+    }
+
+    // ── the reporting opt-out ───────────────────────────────────────────────────
+
+    @Test
+    fun `turning reporting off with Sentry already disabled is a no-op`() {
+        // The opt-out is reachable from the settings dialog at any time, including before anything
+        // has initialised Sentry — it must not throw there.
+        CrashReporter.setReportingEnabled(false)
+
+        assertFalse(CrashReporter.isEnabled())
+    }
+
+    @Test
+    fun `turning reporting on without a DSN leaves it disabled rather than half-initialised`() {
+        // :diagnostics has no sentry.properties on its classpath, so this is the shipped
+        // no-DSN path: it must come back cleanly instead of leaving a partly-configured SDK.
+        CrashReporter.setReportingEnabled(true)
+
+        assertFalse(CrashReporter.isEnabled())
+    }
+
+    @Test
+    fun `the masked DSN of an unconfigured build is empty`() {
+        assertEquals("", CrashReporter.maskedDsn())
+    }
+
+    @Test
+    fun `a test event cannot be sent while Sentry is disabled`() {
+        assertFalse(CrashReporter.sendTestEvent(), "nothing may be sent without a configured DSN")
+    }
+
+    @Test
+    fun `only crash logs are considered, not whatever else is in the folder`() {
+        crashDir.mkdirs()
+        File(crashDir, "notes.txt").writeText("not a crash log")
+        File(crashDir, "subdir").mkdirs()
+
+        assertEquals(null, CrashReporter.latestCrashFile(), "a stray file must not be sent to Sentry")
+    }
+
+    @Test
+    fun `logs older than the retention window are cleaned up and recent ones are kept`() {
+        crashDir.mkdirs()
+        val stale = File(crashDir, "crash_stale.txt").apply { writeText("old") }
+        val recent = File(crashDir, "crash_recent.txt").apply { writeText("new") }
+        val other = File(crashDir, "keep.txt").apply { writeText("not ours") }
+        val fortyDaysAgo = System.currentTimeMillis() - 40L * 24 * 60 * 60 * 1000
+        stale.setLastModified(fortyDaysAgo)
+        other.setLastModified(fortyDaysAgo)
+
+        CrashReporter.cleanOldLogs()
+
+        assertFalse(stale.exists(), "crash logs are personal data and must not accumulate for ever")
+        assertTrue(recent.exists(), "a recent log is still the one a user would be asked for")
+        assertTrue(other.exists(), "cleanup owns crash_ files only")
+    }
+}

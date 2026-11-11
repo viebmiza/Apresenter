@@ -1,0 +1,124 @@
+package org.churchpresenter.bibletab
+
+import androidx.compose.foundation.VerticalScrollbar
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import org.churchpresenter.strings.generated.resources.Res
+import org.churchpresenter.strings.generated.resources.bible_found_results_bible
+import org.churchpresenter.strings.generated.resources.bible_found_results_book
+import org.churchpresenter.sharedui.composables.initialPassClickable
+import org.churchpresenter.sharedui.utils.highlightedText
+import org.jetbrains.compose.resources.stringResource
+import androidx.compose.foundation.layout.ColumnScope
+import org.churchpresenter.bible.BibleSearch
+import org.churchpresenter.sharedui.composables.BibleVerseRowShape
+import org.churchpresenter.sharedui.composables.bibleListCard
+import org.churchpresenter.sharedui.composables.bibleRowColors
+import org.churchpresenter.sharedui.composables.rememberRowHover
+import org.churchpresenter.sharedui.composables.rowPad
+
+/**
+ * The list a text search produced, with the matched words picked out of each verse, under a count
+ * that says where it searched.
+ */
+@Composable
+internal fun ColumnScope.BibleSearchResults(
+    results: List<BibleSearch>,
+    query: String,
+    /** The book the search was limited to, or null for the entire Bible. */
+    scopeBook: String?,
+    onResultChosen: (BibleSearch) -> Unit,
+    /** The result the arrow keys reached from the search box; -1 for none. */
+    highlightedIndex: Int = -1,
+) {
+        Column(
+            modifier = Modifier.fillMaxWidth().weight(1f)
+                .padding(start = 4.dp, end = 4.dp, bottom = 4.dp)
+                .bibleListCard()
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(40.dp)
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (scopeBook == null) {
+                        stringResource(Res.string.bible_found_results_bible, results.size)
+                    } else {
+                        stringResource(Res.string.bible_found_results_book, results.size, scopeBook)
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                )
+            }
+            Box(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
+                val listState = rememberLazyListState()
+                LaunchedEffect(highlightedIndex) {
+                    if (highlightedIndex >= 0 && !listState.layoutInfo.showsWhole(highlightedIndex)) {
+                        listState.animateScrollToItem(highlightedIndex)
+                    }
+                }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(start = 8.dp, end = 12.dp, bottom = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(rowPad(2.dp)),
+                ) {
+                    itemsIndexed(results) { index, result ->
+
+                        val resultText = result.verseText
+                        val highlightedText = highlightedText(resultText, query)
+                        val (hover, hovered) = rememberRowHover()
+                        Text(
+                            text = highlightedText,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(BibleVerseRowShape)
+                                .background(
+                                    bibleRowColors(selected = index == highlightedIndex, hovered = hovered).background
+                                )
+                                .hoverable(hover)
+                                .initialPassClickable { onResultChosen(result) }
+                                .padding(
+                                    start = rowPad(12.dp), top = rowPad(8.dp),
+                                    end = rowPad(10.dp), bottom = rowPad(8.dp),
+                                ),
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                lineHeight = MaterialTheme.typography.bodyMedium.fontSize * 1.55f,
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+                VerticalScrollbar(
+                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+                    adapter = rememberScrollbarAdapter(scrollState = listState)
+                )
+            }
+        }
+}

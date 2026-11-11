@@ -1,0 +1,77 @@
+# `:live-output` — Agent Notes
+
+Rules, structure and commands for this module only. The repo-wide rules are in the root `AGENT.md`.
+
+## What it is
+
+What is on air, and everything that puts it on a screen or a wire:
+- `PresenterManager` and the live state it is split into (`LiveSongs`, `LiveBible`, `LiveSlides`,
+  `LivePictures`, `LiveAnnouncements`, `LiveLowerThird`, `LiveOverlays`, `LiveScreens`, `LiveWeb`),
+  `PreviewBus`, `OutputLocks`, `ScreenHolds` (each screen held on its last frame or black, runtime
+  only, drawn by `HeldOutputFrame`, chosen from `ScreenHoldMenu` on a screen's tile), `legacyProgram` and
+  the tabs' output adapters (`Presenter*Output`);
+- the whole-cue layers `LiveShow` holds and their clearing (`docs/SHOW_CONTROL.md`): `Messages`
+  (`showMessage`, `MessageExpiry`), `Props`, `ClearGroups` (with `clearFromOperator`) and
+  `LayerClearing`, drawn by `MessageCue` and `PropsCue`;
+- the output windows' content (`PresenterScreen`, `PresenterOutputContent`, `PresenterModeContent`,
+  `OutputLayers`, `CueTextContent`/`CueMediaContent`) and the transitions that drive them
+  (`PresenterTransitionEffects`, `TransitionLogic`, `AnnouncementLogic`, `LottieBandEffects`, and
+  `TitleSlideEffects` -- a song title slide's own Lottie on a clock of its own); `AnnouncementExpiry`
+  (an announcement's Show For seconds) and `SongPage` (the next song page or verses on air takes
+  the overlays over it down, as slide content going live does);
+- the stage monitor (`StageMonitorScreen`, `StageZoneContent`, `StageZoneStyle`);
+- the off-screen outputs on the shared `ComposeScenePump`: `BrowserSourceVideoRenderer`,
+  `NdiVideoRenderer`/`NdiManager`, `OmtVideoRenderer`/`OmtManager`, `DeckLinkComposeOutput`, over
+  `OffscreenOutputContent`; and `PresentationPlayer`, `LottieFrameStream`, `AppNetworkInputs`;
+- the live preview panel (`preview/`): `LivePreviewPanel` and its tiles, entries, header and media
+  controls, the preview layouts (`PreviewLayoutView`, `PreviewLayoutTemplate`, `PreviewGroupsPopover`), the
+  profile sets menu (`ProfileSetsPopover`)
+  and the stage monitor tile's `TransposeOverlay`. The app's `PreviewSidebar` hosts it and passes
+  `isRelease`;
+- the Projection settings pages (`settings/`): `ProjectionSettingsTab` and its screen, Browser Source,
+  NDI, OMT and ffmpeg cards, the resolution picker and the per-output profile picker. The app's
+  `OptionsDialog` hosts them and passes `isRelease`; their file and folder pickers go through
+  `LocalPathChooser`, which a test answers instead of the native dialog;
+- `LottieOutputFrames`: the lower third's frames for outputs larger than its desktop frames. Each
+  output holds its pixel size from `LowerThirdCue`; a larger size gets frames pre-rendered at the
+  size it draws them, at most two sizes at once, closed when no output of that size is left.
+
+The output layer (root AGENT.md, "Layers"): `include(":live-output")`. `:composeApp` uses it for the
+root screen, the window wiring (`PresenterWindows`, `VirtualOutputs`), the remote and Instance Link
+wiring, and the live preview panel; `:telemetry` reads the NDI and OMT status for its device report,
+`:app-settings` the preview mode (`withPreviewMode`) and `:dialogs` the clearable layers.
+It takes `:output-api` (the ports it implements), `:presenter`, `:live-show` and the engines whose
+content it draws — `:canvas-engine`, `:slides-engine`, `:media-engine`, `:web-engine`,
+`:stt-engine`, `:lower-third-engine`, `:presentation-engine`, `:lottieGenerator`, `:song-chords`,
+`:ndi` and `:omt` — and no tab and nothing of `:composeApp`'s.
+
+## Seams to the app
+
+- **`OffscreenOutputContext.appVersion`**: the version an OMT sender reports. The app passes
+  `BuildConfig.APP_VERSION`, which this module cannot see.
+- **`AppNetworkInputs`**: installed by `main` first thing, as `:canvas-engine`'s `NetworkInputs`.
+
+## Package
+
+**`org.churchpresenter.liveoutput`**, with the preview panel in `.preview` and the Projection
+settings pages in `.settings`.
+
+## Rules
+
+- `internal` stops at the module edge. What `:composeApp` calls is public; nothing else is.
+- **Tests and screenshots live here.** The screenshot suites are `screenshot/StageMonitorScreenshotTest`,
+  `PreviewLayoutsScreenshotTest`, `ScreenHoldScreenshotTest`, `ProjectionFfmpegCardScreenshotTest`, `ProjectionOmtCardScreenshotTest`
+  and the full-screen suites (`PresenterFullScreenScreenshotTest` and its portrait twin); their images are under `live-output/screenshots/`. `LiveOutputTestSupport.kt` holds this suite's copies of the app's
+  `withSongsEverywhere`/`withBibleEverywhere` and `TestSingletons.latchSkikoHostOs` — copies, so the
+  move did not touch `:shared-ui`.
+- What needs the app stays there, with its tests: `PresenterWindows` and the window geometry
+  (`MergeTileTest`, `PresenterOverflowTest`), the render benchmark and the soak test.
+
+## Commands
+
+```bash
+./gradlew :live-output:test :live-output:detekt
+./gradlew :live-output:jacocoTestCoverageVerification
+./gradlew :live-output:recordRoborazziJvm --tests '*ScreenshotTest*'
+./gradlew :live-output:verifyRoborazziJvm --tests '*ScreenshotTest*'
+```

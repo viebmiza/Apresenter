@@ -1,0 +1,191 @@
+package org.churchpresenter.app.churchpresenter.dialogs
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import org.churchpresenter.theme.components.RaisedButton
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import org.churchpresenter.theme.components.KeyButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.FrameWindowScope
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPosition
+import androidx.compose.ui.window.WindowState
+import androidx.compose.ui.window.rememberWindowState
+import org.churchpresenter.theme.AppShape
+import churchpresenter.composeapp.generated.resources.Res as AppRes
+import org.churchpresenter.icons.generated.resources.Res as IconRes
+import org.churchpresenter.strings.generated.resources.Res
+import org.churchpresenter.icons.generated.resources.ic_app_icon
+import org.churchpresenter.strings.generated.resources.license_accept_button
+import org.churchpresenter.strings.generated.resources.license_decline_button
+import org.churchpresenter.strings.generated.resources.license_prompt
+import org.churchpresenter.strings.generated.resources.license_title
+import org.churchpresenter.app.churchpresenter.utils.MacMenuBarActivationFix
+import org.churchpresenter.theme.ProvideUiScale
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.stringResource
+import org.churchpresenter.sharedui.utils.uiScaledWindowSize
+
+/** The EULA text shown in [LicenseDialog], read from the bundled resource file. */
+internal suspend fun loadEulaText(): String = AppRes.readBytes("files/eula.txt").toString(Charsets.UTF_8)
+
+/**
+ * Hosts the EULA window content. Overridable so tests can reach the state/effect logic around it
+ * (window title, icon, when the license text becomes available) without opening a real AWT window
+ * in headless mode.
+ */
+internal typealias LicenseWindowHost = @Composable (
+    title: String,
+    icon: Painter,
+    state: WindowState,
+    onCloseRequest: () -> Unit,
+    content: @Composable FrameWindowScope.() -> Unit
+) -> Unit
+
+@Composable
+fun LicenseDialog(
+    isVisible: Boolean,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+    windowHost: LicenseWindowHost = { title, icon, state, onCloseRequest, content ->
+        Window(
+            onCloseRequest = onCloseRequest,
+            title = title,
+            icon = icon,
+            state = state,
+            resizable = true,
+            alwaysOnTop = true,
+            content = content
+        )
+    }
+) {
+    if (!isVisible) return
+
+    val windowState = rememberWindowState(
+        size = uiScaledWindowSize(760.dp, 600.dp),
+        position = WindowPosition(Alignment.Center)
+    )
+
+    var licenseText by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        licenseText = loadEulaText()
+    }
+
+    windowHost(
+        stringResource(Res.string.license_title),
+        painterResource(IconRes.drawable.ic_app_icon),
+        windowState,
+        onDecline
+    ) {
+        MacMenuBarActivationFix()
+        ProvideUiScale {
+            LicenseDialogContent(licenseText = licenseText, onAccept = onAccept, onDecline = onDecline)
+        }
+    }
+}
+
+@Composable
+internal fun LicenseDialogContent(licenseText: String, onAccept: () -> Unit, onDecline: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+                    .padding(horizontal = 24.dp, vertical = 16.dp)
+            ) {
+                Column {
+                    Text(
+                        text = stringResource(Res.string.license_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(Res.string.license_prompt),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+
+            HorizontalDivider()
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = licenseText,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontFamily = FontFamily.Monospace,
+                        lineHeight = 18.sp
+                    ),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            HorizontalDivider()
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                KeyButton(
+                    shape = AppShape(6.dp),
+                    onClick = onDecline,
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(stringResource(Res.string.license_decline_button))
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                RaisedButton(shape = AppShape(6.dp), onClick = onAccept) {
+                    Text(stringResource(Res.string.license_accept_button))
+                }
+            }
+        }
+    }
+}

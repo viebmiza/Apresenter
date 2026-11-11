@@ -1,0 +1,375 @@
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+
+package org.churchpresenter.songs.screenshot
+
+import androidx.compose.ui.test.onNodeWithTag
+import org.churchpresenter.songs.SONG_NOTES_TAG
+import org.churchpresenter.songs.verseMode
+import org.churchpresenter.songs.defaultSongs
+import org.churchpresenter.songs.updateSelectedSongbook
+import androidx.compose.ui.test.ComposeUiTest
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performMouseInput
+import androidx.compose.ui.test.rightClick
+import org.churchpresenter.settings.SongSettings
+import org.churchpresenter.songs.SongFixture
+import org.churchpresenter.songs.SongsViewModel
+import org.churchpresenter.songs.search
+import org.churchpresenter.songs.songsTab
+import org.churchpresenter.settings.utils.Constants
+import kotlin.test.Test
+import org.churchpresenter.sharedui.screenshot.captureTo
+import org.churchpresenter.sharedui.screenshot.stackedThemes
+
+class SongsTabScreenshotTest {
+
+    private val allColumns = emptySet<String>()
+
+    private val bilingual = listOf(
+        SongFixture(
+            number = "1",
+            title = "Amazing Grace",
+            author = "John Newton",
+            lyrics = listOf("[Verse 1]", "Amazing grace how sweet the sound"),
+            secondaryTitle = "О благодать",
+            secondaryLyrics = listOf("[Verse 1]", "О благодать, спасён тобой"),
+        ),
+    )
+
+    /**
+     * A translation that skips a verse — how an imported book reads when it prints a title slide,
+     * or a verse, in one language only.
+     */
+    private val partlyTranslated = listOf(
+        SongFixture(
+            number = "1",
+            title = "Amazing Grace",
+            author = "John Newton",
+            lyrics = listOf(
+                "[Verse 1]",
+                "Amazing grace how sweet the sound",
+                "[Verse 2]",
+                "'Twas grace that taught my heart to fear",
+            ),
+            secondaryTitle = "О благодать",
+            secondaryLyrics = listOf("[Verse 1]", "[Verse 2]", "И научила сердце страх"),
+        ),
+    )
+
+    private val withLyrics = listOf(
+        SongFixture(
+            number = "1",
+            title = "Amazing Grace",
+            author = "John Newton",
+            lyrics = listOf("[Verse 1]", "Amazing grace how sweet the sound", "That saved a wretch like me"),
+        ),
+        SongFixture(number = "2", title = "Be Thou My Vision", author = "Dallan Forgaill"),
+        SongFixture(number = "12", title = "Amazing Love", author = "Charles Wesley"),
+    )
+
+    private val splitChorus = listOf(
+        SongFixture(
+            number = "1",
+            title = "Amazing Grace",
+            author = "John Newton",
+            lyrics = listOf(
+                "[Verse 1]",
+                "Amazing grace how sweet the sound",
+                "{Chorus}",
+                "Praise the Lord, praise the Lord",
+                "[---]",
+                "Let the earth hear His voice",
+            ),
+        ),
+    )
+
+    private val arranged = listOf(
+        SongFixture(
+            number = "12",
+            title = "Amazing Grace",
+            author = "John Newton",
+            lyrics = listOf(
+                "[Verse 1]", "Amazing grace how sweet the sound", "That saved a wretch like me",
+                "{Chorus}", "Praise the Lord, praise the Lord",
+                "[Verse 2]", "'Twas grace that taught my heart to fear", "And grace my fears relieved",
+            ),
+            sectionOrder = listOf(
+                "[Verse 1]", "{Chorus}", "[Verse 2]", "{Chorus}", "[Verse 1]", "{Chorus}", "{Chorus}",
+            ),
+            notes = "Capo 2 for the band. Piano intro, 4 bars. " +
+                "Last verse a cappella, then full band on the final line.",
+            sectionNotes = mapOf("[Verse 1]" to "Piano only", "[Verse 2]" to "Key change"),
+        ),
+        SongFixture(number = "45", title = "Be Thou My Vision", author = "Dallan Forgaill"),
+        SongFixture(
+            number = "455",
+            title = "It Is Well With My Soul",
+            lyrics = listOf("[Verse 1]", "When peace like a river", "{Chorus}", "It is well"),
+            sectionOrder = listOf("[Verse 1]", "{Chorus}"),
+        ),
+    )
+
+    // The Order column after Composer, with the columns before it hidden so it is in view.
+    private val orderColumnShown = setOf("songbook", "tune", "play_count", "author", "composer")
+    private val orderColumnOrder = listOf(
+        "number", "title", "songbook", "tune", "play_count", "author", "composer", "order", "add_to_schedule",
+        "favorites",
+    )
+
+    private fun shoot(
+        name: String,
+        songs: List<SongFixture>? = null,
+        songSettings: SongSettings = SongSettings(),
+        hiddenCols: Set<String>? = null,
+        colOrder: List<String>? = null,
+        songBpm: Map<String, Int>? = null,
+        stageMonitor: Boolean = false,
+        isPresenting: Boolean = false,
+        drive: ComposeUiTest.(SongsViewModel) -> Unit = {},
+    ) = stackedThemes(SECTION, name) { mode, file ->
+        songsTab(
+            songs = songs ?: defaultSongs,
+            songSettings = songSettings,
+            hiddenCols = hiddenCols,
+            colOrder = colOrder,
+            songBpm = songBpm,
+            stageMonitor = stageMonitor,
+            isPresenting = isPresenting,
+            themeMode = mode,
+        ) { vm, _ ->
+            drive(vm)
+            captureTo(file)
+        }
+    }
+
+    private fun ComposeUiTest.clickSong(title: String) {
+        onAllNodes(hasText(title))[0].performClick()
+        waitForIdle()
+    }
+
+    @Test
+    fun browsing() = shoot("browsing")
+
+    @Test
+    fun `a song selected with its lyrics`() = shoot("song_selected") {
+        clickSong("Amazing Grace")
+    }
+
+    @Test
+    fun `a song live`() = shoot("song_live", isPresenting = true) {
+        clickSong("Amazing Grace")
+        onAllNodes(hasContentDescription("Go Live"))[0].performClick()
+        waitForIdle()
+    }
+
+    @Test
+    fun `a song with notes and section cues`() =
+        shoot("song_notes_and_cues", songs = arranged, songSettings = verseMode()) {
+            clickSong("Amazing Grace")
+        }
+
+    @Test
+    fun `a song's notes opened`() = shoot("song_notes_opened", songs = arranged, songSettings = verseMode()) {
+        clickSong("Amazing Grace")
+        onNodeWithTag(SONG_NOTES_TAG).performClick()
+        waitForIdle()
+    }
+
+    @Test
+    fun `the order column`() =
+        shoot("columns_order", songs = arranged, hiddenCols = orderColumnShown, colOrder = orderColumnOrder)
+
+    @Test
+    fun `every column shown`() = shoot("columns_all_shown", hiddenCols = allColumns)
+
+    @Test
+    fun `only number and title shown`() =
+        shoot("columns_minimal", hiddenCols = setOf("songbook", "tune", "play_count", "author", "composer"))
+
+    @Test
+    fun `the column picker`() = stackedThemes(SECTION, "columns_picker") { mode, file ->
+        songsTab(hiddenCols = allColumns, themeMode = mode) { _, _ ->
+            onNodeWithContentDescription("Filter columns").performClick()
+            waitForIdle()
+            captureTo(file, rootIndex = 1)
+        }
+    }
+
+    /** The app's default: four columns off, so they dim and Show all appears. */
+    @Test
+    fun `the column picker with columns hidden`() = stackedThemes(SECTION, "columns_picker_hidden") { mode, file ->
+        songsTab(themeMode = mode) { _, _ ->
+            onNodeWithContentDescription("Filter columns").performClick()
+            waitForIdle()
+            captureTo(file, rootIndex = 1)
+        }
+    }
+
+    @Test
+    fun `searching by title`() = shoot("search_by_title") { search("Amazing") }
+
+    @Test
+    fun `searching by lyrics`() = stackedThemes(SECTION, "search_by_lyrics") { mode, file ->
+        songsTab(songs = withLyrics, themeMode = mode) { _, _ ->
+            search("wretch like me")
+            captureTo(file)
+        }
+    }
+
+    /** One of every chip the match line draws: title, verse, chorus, another section, a translation. */
+    private val everyMatchKind = listOf(
+        SongFixture("12", "Be Thou My Vision", lyrics = listOf("[Verse 1]", "Be Thou my vision, O Lord of my heart")),
+        SongFixture("48", "Holy Holy Holy", lyrics = listOf("{Chorus}", "Lord God Almighty, early in the morning")),
+        SongFixture("73", "Lord I Lift Your Name On High"),
+        SongFixture(
+            "90",
+            "Великий Бог",
+            lyrics = listOf("[Куплет 1]", "Коли дивлюсь"),
+            secondaryTitle = "How Great Thou Art",
+            secondaryLyrics = listOf("{Chorus}", "Then sings my soul, how great Thou art, Lord"),
+        ),
+        SongFixture("120", "Doxology", lyrics = listOf("[Bridge]", "Praise the Lord, ye heavenly host")),
+    )
+
+    @Test
+    fun `where each search result matched`() = stackedThemes(SECTION, "search_matches") { mode, file ->
+        songsTab(songs = everyMatchKind, themeMode = mode) { _, _ ->
+            search("lord")
+            captureTo(file)
+        }
+    }
+
+    @Test
+    fun `searching by number`() = shoot("search_by_number") { search("12") }
+
+    @Test
+    fun `filtered to one songbook`() = shoot("songbook_filtered") { vm ->
+        vm.updateSelectedSongbook("Chorus Book")
+        waitForIdle()
+    }
+
+    @Test
+    fun `the songbook picker`() = stackedThemes(SECTION, "songbook_picker") { mode, file ->
+        songsTab(themeMode = mode) { _, _ ->
+            onNodeWithText("SONG BOOK", substring = true).performClick()
+            waitForIdle()
+            captureTo(file, rootIndex = 1)
+        }
+    }
+
+    @Test
+    fun `the match-mode picker`() = stackedThemes(SECTION, "filter_mode_picker") { mode, file ->
+        songsTab(themeMode = mode) { _, _ ->
+            onNodeWithText("FILTER", substring = true).performClick()
+            waitForIdle()
+            captureTo(file, rootIndex = 1)
+        }
+    }
+
+    @Test
+    fun `starts-with match mode`() = shoot("search_starts_with") {
+        onNodeWithText("FILTER", substring = true).performClick()
+        waitForIdle()
+        onNodeWithText("Starts With").performClick()
+        waitForIdle()
+        search("Amazing")
+    }
+
+    @Test
+    fun `search with no matches`() = shoot("search_no_matches") { search("zzzznotasong") }
+
+    @Test
+    fun `favourites panel`() = shoot("favourites") { vm ->
+        vm.songsData.value.getSongs().take(2).forEach { vm.toggleFavorite(it.songId) }
+        waitForIdle()
+    }
+
+    @Test
+    fun `verse mode drops the line-navigation hint`() = shoot(
+        "verse_mode",
+        songSettings = SongSettings(
+            fullscreenDisplayMode = Constants.SONG_DISPLAY_MODE_VERSE,
+            lowerThirdDisplayMode = Constants.SONG_DISPLAY_MODE_VERSE,
+            lookAheadDisplayMode = Constants.SONG_DISPLAY_MODE_VERSE,
+            lowerThirdLookAheadDisplayMode = Constants.SONG_DISPLAY_MODE_VERSE,
+        ),
+    ) {
+        clickSong("Amazing Grace")
+    }
+
+    @Test
+    fun `the title slide listed above the verses`() = shoot(
+        "title_slide",
+        songSettings = SongSettings(titleSlideEnabled = true),
+    ) {
+        clickSong("Amazing Grace")
+    }
+
+    @Test
+    fun `the second song row selected`() = shoot("second_row_selected") {
+        clickSong("Amazing Love")
+    }
+
+    @Test
+    fun `a song in two languages`() = stackedThemes(SECTION, "song_two_languages") { mode, file ->
+        songsTab(songs = bilingual, themeMode = mode) { _, _ ->
+            clickSong("Amazing Grace")
+            captureTo(file)
+        }
+    }
+
+    /** The language Display order opened on a two-language song, its languages named. */
+    @Test
+    fun `the language display order`() = stackedThemes(SECTION, "language_order") { mode, file ->
+        songsTab(
+            songs = bilingual,
+            songSettings = SongSettings(languageNames = listOf("English", "Español")),
+            themeMode = mode,
+        ) { _, _ ->
+            clickSong("Amazing Grace")
+            onAllNodes(hasText("Languages", substring = true, ignoreCase = true))[0].performClick()
+            waitForIdle()
+            captureTo(file, rootIndex = 1)
+        }
+    }
+
+    /** The first verse untranslated: it shows in one language while verse 2 shows in both. */
+    @Test
+    fun `a song translated only in part`() = stackedThemes(SECTION, "song_two_languages_partial") { mode, file ->
+        songsTab(songs = partlyTranslated, themeMode = mode) { _, _ ->
+            clickSong("Amazing Grace")
+            captureTo(file)
+        }
+    }
+
+    /** A chorus broken across two slides, both still badged CHORUS and numbered 1/2 and 2/2. */
+    @Test
+    fun `a section split across slides`() = stackedThemes(SECTION, "section_split_slides") { mode, file ->
+        songsTab(songs = splitChorus, themeMode = mode) { _, _ ->
+            clickSong("Amazing Grace")
+            captureTo(file)
+        }
+    }
+
+    @Test
+    fun `an empty library`() = stackedThemes(SECTION, "empty_library") { mode, file ->
+        songsTab(songs = emptyList<SongFixture>(), themeMode = mode) { _, _ -> captureTo(file) }
+    }
+
+    @Test
+    fun `the right-click menu`() = stackedThemes(SECTION, "song_context_menu") { mode, file ->
+        songsTab(themeMode = mode) { _, _ ->
+            onNodeWithText("Amazing Grace").performMouseInput { rightClick() }
+            waitForIdle()
+            captureTo(file, rootIndex = 1)
+        }
+    }
+
+    private companion object {
+        const val SECTION = "songsTab"
+    }
+}

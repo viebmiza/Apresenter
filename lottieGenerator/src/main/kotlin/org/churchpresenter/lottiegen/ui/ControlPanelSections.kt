@@ -1,0 +1,454 @@
+package org.churchpresenter.lottiegen.ui
+import androidx.compose.foundation.clickable
+import org.churchpresenter.lottiegen.ControlTag
+import org.churchpresenter.lottiegen.GuidedControl
+import org.churchpresenter.lottiegen.NoControlTag
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import org.churchpresenter.lottiegen.LottieGenState
+import org.churchpresenter.lottiegen.model.CANVAS_PRESETS
+import org.churchpresenter.lottiegen.model.StyleCatalog
+import org.churchpresenter.lottiegen.model.TIMING_PRESETS
+import org.churchpresenter.lottiegen.ui.components.AccentButton
+import org.churchpresenter.lottiegen.ui.components.CollapsibleSection
+import org.churchpresenter.lottiegen.ui.components.DeleteIconButton
+import org.churchpresenter.lottiegen.ui.components.LocalLottieGenPickers
+import org.churchpresenter.lottiegen.ui.components.LottieCheckbox
+import org.churchpresenter.lottiegen.ui.components.LottieDropdown
+import org.churchpresenter.lottiegen.ui.components.LottieTextField
+import org.churchpresenter.lottiegen.ui.components.SectionCard
+import org.churchpresenter.lottiegen.ui.components.SegmentedButtons
+import org.churchpresenter.lottiegen.ui.components.SliderWithLabel
+import org.churchpresenter.lottiegen.ui.components.SubtleButton
+import javax.swing.SwingUtilities
+import org.churchpresenter.lottiegen.ui.components.ScrollingMenuItems
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun CanvasSection(viewModel: LottieGenState) {
+    val cfg = viewModel.config
+    // ═══ Canvas ═══
+    CollapsibleSection(Strings.sectionCanvas, hint = "${cfg.canvasW} × ${cfg.canvasH}") {
+        val canvasIndex = CANVAS_PRESETS.indexOfFirst {
+            it.width == cfg.canvasW && it.height == cfg.canvasH
+        }
+        SegmentedButtons(
+            labels = CANVAS_PRESETS.map { it.label },
+            selectedIndex = canvasIndex,
+            onSelect = { i ->
+                val p = CANVAS_PRESETS[i]
+                viewModel.updateConfig { it.copy(canvasW = p.width, canvasH = p.height) }
+            }
+        )
+        FieldRow {
+            LottieTextField(
+                value = cfg.canvasW.toString(),
+                onValueChange = { v ->
+                    v.toIntOrNull()?.let {
+                        viewModel.updateConfig { c ->
+                            c.copy(canvasW = it.coerceIn(MIN_CANVAS_PX, MAX_CANVAS_W_PX))
+                        }
+                    }
+                },
+                label = Strings.width,
+                modifier = Modifier.weight(1f), fillWidth = true, singleLine = true
+            )
+            LottieTextField(
+                value = cfg.canvasH.toString(),
+                onValueChange = { v ->
+                    v.toIntOrNull()?.let {
+                        viewModel.updateConfig { c ->
+                            c.copy(canvasH = it.coerceIn(MIN_CANVAS_PX, MAX_CANVAS_H_PX))
+                        }
+                    }
+                },
+                label = Strings.height,
+                modifier = Modifier.weight(1f), fillWidth = true, singleLine = true
+            )
+        }
+        SliderWithLabel(
+            Strings.scale, cfg.scaleFactor,
+            { viewModel.updateConfig { c -> c.copy(scaleFactor = it) } },
+            0.5f..3f, unit = "×", format = { "%.2f".format(it) }
+        )
+    }
+}
+
+private val MENU_THUMB_WIDTH = 104.dp
+private val MENU_THUMB_HEIGHT = 36.dp
+private val FIELD_THUMB_WIDTH = 56.dp
+private val FIELD_THUMB_HEIGHT = 20.dp
+private val THUMB_SHAPE = RoundedCornerShape(4.dp)
+private val STYLE_MENU_WIDTH = 340.dp
+
+/** On every drawn style thumbnail; a test waits for it. */
+const val LOWER_THIRD_STYLE_THUMBNAIL_TAG = "lowerThirdStyleThumbnail"
+
+/**
+ * One style's picture in the Style menu, fitted inside a fixed box on the preview's checkerboard
+ * colour so a white lower third still shows; an empty box until the picture has been drawn.
+ */
+@Composable
+private fun StyleThumbnail(picture: ImageBitmap?, width: Dp, height: Dp) {
+    Box(
+        Modifier
+            .size(width, height)
+            .clip(THUMB_SHAPE)
+            .background(Tokens.CanvasBg)
+            .border(1.dp, Tokens.FieldBorder, THUMB_SHAPE),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (picture != null) {
+            Image(
+                bitmap = picture,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().padding(2.dp).testTag(LOWER_THIRD_STYLE_THUMBNAIL_TAG),
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun StyleLayoutSection(viewModel: LottieGenState) {
+    val cfg = viewModel.config
+    // ═══ Style & Layout ═══
+    SectionCard(Strings.sectionStyleLayout) {
+        FieldRow {
+            var styleExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(styleExpanded, { styleExpanded = it }, Modifier.weight(1f)) {
+                // Built as soon as the section shows rather than when the menu opens, so the
+                // pictures are there by the time anyone looks; the key makes a repeat a no-op.
+                LaunchedEffect(cfg) { viewModel.ensureStyleThumbnails() }
+                val thumbnails = viewModel.styleThumbnails
+                LottieDropdown(
+                    label = Strings.style,
+                    value = StyleCatalog.labelFor(cfg.style),
+                    expanded = styleExpanded,
+                    modifier = Modifier.fillMaxWidth()
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
+                    leading = { StyleThumbnail(thumbnails[cfg.style], FIELD_THUMB_WIDTH, FIELD_THUMB_HEIGHT) },
+                )
+                // Wider than its field, which shares the row with Alignment: a thumbnail and the
+                // style's name side by side do not fit in half the panel.
+                ExposedDropdownMenu(
+                    expanded = styleExpanded,
+                    onDismissRequest = { styleExpanded = false },
+                    matchAnchorWidth = false,
+                    modifier = Modifier.width(STYLE_MENU_WIDTH),
+                ) {
+                    ScrollingMenuItems(StyleCatalog.entries.size) {
+                        StyleCatalog.entries.forEach { style ->
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    StyleThumbnail(thumbnails[style.id], MENU_THUMB_WIDTH, MENU_THUMB_HEIGHT)
+                                },
+                                text = { Text(style.label) },
+                                onClick = {
+                                    viewModel.updateConfig { it.copy(style = style.id) }
+                                    styleExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            var alignExpanded by remember { mutableStateOf(false) }
+            val alignmentLabels = mapOf(
+                "left" to Strings.alignLeft,
+                "center" to Strings.alignCenter,
+                "right" to Strings.alignRight
+            )
+            ExposedDropdownMenuBox(alignExpanded, { alignExpanded = it }, Modifier.weight(1f)) {
+                LottieDropdown(
+                    label = Strings.alignment,
+                    value = alignmentLabels[cfg.align] ?: cfg.align,
+                    expanded = alignExpanded,
+                    modifier = Modifier.fillMaxWidth()
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                )
+                ExposedDropdownMenu(alignExpanded, { alignExpanded = false }) {
+                    alignmentLabels.forEach { (id, label) ->
+                        DropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = { viewModel.updateConfig { it.copy(align = id) }; alignExpanded = false }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ShapeSection(viewModel: LottieGenState) {
+    val cfg = viewModel.config
+    // ═══ Shape ═══
+    CollapsibleSection(Strings.sectionShape) {
+        SliderWithLabel(
+            Strings.corners, cfg.corners,
+            { viewModel.updateConfig { c -> c.copy(corners = it) } },
+            0f..2f, unit = "em", format = { "%.2f".format(it) }
+        )
+        SliderWithLabel(
+            Strings.borderThickness, cfg.borderThickness,
+            { viewModel.updateConfig { c -> c.copy(borderThickness = it) } },
+            0f..5f, format = { "%.2f".format(it) }
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            FieldRow {
+                LottieCheckbox(Strings.showBackground, cfg.bgEnabled,
+                    { viewModel.updateConfig { c -> c.copy(bgEnabled = it) } }, Modifier.weight(1f))
+                LottieCheckbox(Strings.shadow, cfg.shadowEnabled,
+                    { viewModel.updateConfig { c -> c.copy(shadowEnabled = it) } }, Modifier.weight(1f))
+            }
+            FieldRow {
+                LottieCheckbox(Strings.hideName, cfg.hideName,
+                    { viewModel.updateConfig { c -> c.copy(hideName = it) } }, Modifier.weight(1f))
+                LottieCheckbox(Strings.hideInfo, cfg.hideInfo,
+                    { viewModel.updateConfig { c -> c.copy(hideInfo = it) } }, Modifier.weight(1f))
+            }
+            FieldRow {
+                LottieCheckbox(Strings.hideDetail, cfg.hideDetail,
+                    { viewModel.updateConfig { c -> c.copy(hideDetail = it) } }, Modifier.weight(1f))
+                Box(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun LogoSection(viewModel: LottieGenState) {
+    val cfg = viewModel.config
+    val pickers = LocalLottieGenPickers.current
+    // ═══ Logo ═══
+    CollapsibleSection(
+        Strings.sectionLogo,
+        hint = if (cfg.logoEnabled) cfg.logoSelect.ifEmpty { Strings.logoNone } else Strings.logoNone
+    ) {
+        LottieCheckbox(Strings.showLogo, cfg.logoEnabled,
+            { viewModel.updateConfig { c -> c.copy(logoEnabled = it) } })
+
+        var logoExpanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(logoExpanded, { logoExpanded = it }, Modifier.fillMaxWidth()) {
+            LottieDropdown(
+                label = Strings.logoLabel,
+                value = cfg.logoSelect.ifEmpty { Strings.logoNone },
+                expanded = logoExpanded,
+                modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+            )
+            ExposedDropdownMenu(logoExpanded, { logoExpanded = false }) {
+                DropdownMenuItem({ Text(Strings.logoNone) }, { viewModel.clearLogo(); logoExpanded = false })
+                viewModel.availableLogos.forEach { logo ->
+                    DropdownMenuItem({ Text(logo) }, { viewModel.selectLogo(logo); logoExpanded = false })
+                }
+                DropdownMenuItem({ Text(Strings.logoImport) }, {
+                    logoExpanded = false
+                    SwingUtilities.invokeLater {
+                        pickers.openFile("Images", "png", "jpg", "jpeg", "svg", "webp")
+                            ?.let { viewModel.importAndLoadLogo(it) }
+                    }
+                })
+            }
+        }
+
+        SliderWithLabel(
+            Strings.logoSize, cfg.logoSize,
+            { viewModel.updateConfig { c -> c.copy(logoSize = it) } },
+            2f..6f, unit = "em"
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun TimingSection(viewModel: LottieGenState) {
+    val cfg = viewModel.config
+    // ═══ Timing ═══
+    CollapsibleSection(
+        Strings.sectionTiming,
+        hint = "%.1fs".format(cfg.animDuration + cfg.holdDuration)
+    ) {
+        val timingIndex = TIMING_PRESETS.indexOfFirst {
+            it.animDuration == cfg.animDuration && it.holdDuration == cfg.holdDuration
+        }
+        SegmentedButtons(
+            labels = TIMING_PRESETS.map { it.label },
+            selectedIndex = timingIndex,
+            onSelect = { i ->
+                val p = TIMING_PRESETS[i]
+                viewModel.updateConfig { it.copy(animDuration = p.animDuration, holdDuration = p.holdDuration) }
+            }
+        )
+        FieldRow {
+            LottieTextField(
+                value = cfg.animDuration.toString(),
+                onValueChange = { v ->
+                    v.toFloatOrNull()?.let {
+                        viewModel.updateConfig { c ->
+                            c.copy(animDuration = it.coerceIn(MIN_ANIM_SECONDS, MAX_ANIM_SECONDS))
+                        }
+                    }
+                },
+                label = Strings.animDuration, modifier = Modifier.weight(1f),
+                fillWidth = true, singleLine = true
+            )
+            LottieTextField(
+                value = cfg.holdDuration.toString(),
+                onValueChange = { v ->
+                    v.toFloatOrNull()?.let {
+                        viewModel.updateConfig { c -> c.copy(holdDuration = it.coerceIn(0f, MAX_HOLD_SECONDS)) }
+                    }
+                },
+                label = Strings.holdDuration, modifier = Modifier.weight(1f),
+                fillWidth = true, singleLine = true
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun PositionSection(viewModel: LottieGenState) {
+    val cfg = viewModel.config
+    // ═══ Position ═══
+    CollapsibleSection(Strings.sectionPosition) {
+        SliderWithLabel(
+            Strings.marginH, cfg.marginH,
+            { viewModel.updateConfig { c -> c.copy(marginH = it) } },
+            0f..10f, unit = "rem"
+        )
+        SliderWithLabel(
+            Strings.marginV, cfg.marginV,
+            { viewModel.updateConfig { c -> c.copy(marginV = it) } },
+            0f..10f, unit = "rem"
+        )
+        SliderWithLabel(
+            Strings.lineSpacing, cfg.lineSpacing,
+            { viewModel.updateConfig { c -> c.copy(lineSpacing = it) } },
+            MIN_NUDGE_EM..MAX_NUDGE_EM, unit = "em", format = { "%.2f".format(it) }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ActionsSection(viewModel: LottieGenState, controlTag: ControlTag = NoControlTag) {
+    val cfg = viewModel.config
+    val pickers = LocalLottieGenPickers.current
+    // ═══ Actions ═══
+    Spacer(Modifier.height(5.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (viewModel.hasOutputDir) {
+            AccentButton(
+                Strings.saveLowerThird,
+                { viewModel.saveLowerThird() },
+                Modifier.weight(1f).then(controlTag(GuidedControl.SAVE)),
+            )
+        } else {
+            AccentButton(
+                Strings.downloadJson,
+                {
+                    SwingUtilities.invokeLater { pickers.openDirectory()?.let { viewModel.downloadJson(it) } }
+                },
+                Modifier.weight(1f)
+            )
+            SubtleButton(Strings.saveToLibrary, { viewModel.savePreset() }, Modifier.weight(1f))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun LibrarySection(viewModel: LottieGenState, onBatchImport: () -> Unit) {
+    val cfg = viewModel.config
+    val pickers = LocalLottieGenPickers.current
+    // ═══ Library ═══
+    SectionCard(
+        Strings.sectionLibrary,
+        modifier = Modifier.padding(top = 3.dp),
+        trailing = { SubtleButton(Strings.batchImport, onBatchImport, compact = true) }
+    ) {
+        if (viewModel.presets.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                SubtleButton(Strings.applyStyleToAll, { viewModel.applyStyleToAll() }, compact = true)
+                if (viewModel.hasOutputDir) {
+                    SubtleButton(
+                        Strings.saveAllLowerThirds,
+                        { viewModel.batchDownloadAll(null) },
+                        compact = true,
+                    )
+                } else {
+                    SubtleButton(Strings.saveAllLowerThirds, {
+                        SwingUtilities.invokeLater { pickers.openDirectory()?.let { viewModel.batchDownloadAll(it) } }
+                    }, compact = true)
+                }
+            }
+        }
+
+        if (viewModel.presets.isEmpty()) {
+            Box(Modifier.fillMaxWidth().padding(vertical = 7.dp), contentAlignment = Alignment.Center) {
+                Text(Strings.noPresets, fontSize = 12.sp, color = Tokens.UnitText)
+            }
+        } else {
+            viewModel.presets.forEachIndexed { i, preset ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { viewModel.loadPreset(i) },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(preset.name, fontSize = 12.sp, color = Tokens.PrimaryText, maxLines = 1)
+                        Text(
+                            "${preset.config.canvasW}×${preset.config.canvasH} · " +
+                                StyleCatalog.labelFor(preset.config.style),
+                            fontSize = 10.sp,
+                            color = Tokens.UnitText,
+                            maxLines = 1
+                        )
+                    }
+                    DeleteIconButton({ viewModel.deletePreset(i) })
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,544 @@
+package org.churchpresenter.core.models.scene
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import org.churchpresenter.core.models.text.TextBackdrop
+import org.churchpresenter.core.models.text.TextOutline
+import java.util.UUID
+
+/**
+ * Where a layer sits and how it is composited — the properties every kind of [SceneSource] has,
+ * applied once by the canvas rather than re-implemented per source type.
+ *
+ * [x], [y], [width] and [height] are fractions of the canvas.
+ */
+@Serializable
+data class SourceTransform(
+    val x: Float = 0f,
+    val y: Float = 0f,
+    val width: Float = 1f,
+    val height: Float = 1f,
+    val rotation: Float = 0f,
+    val opacity: Float = 1f,
+    /**
+     * Which part of a picture set to Fill shows when the picture is cropped to its box: 0 keeps its
+     * left (or top) edge, 1 its right (or bottom), 0.5 the centre. Per layout, like the rest of the
+     * box, so a portrait screen can show a different part of the picture from a landscape one (#937).
+     */
+    val cropX: Float = DEFAULT_CROP,
+    val cropY: Float = DEFAULT_CROP,
+)
+
+/** A crop centred in the picture: what Fill did before a crop could be moved. */
+const val DEFAULT_CROP = 0.5f
+
+@Serializable
+sealed class SceneSource {
+    abstract val id: String
+    abstract val name: String
+    abstract val transform: SourceTransform
+    abstract val visible: Boolean
+    abstract val locked: Boolean
+
+    /**
+     * This source with every setting kept but a new [id] — how a duplicated scene stops sharing its
+     * layers with the original.
+     */
+    abstract fun withId(id: String): SceneSource
+
+    /** This source with every setting kept but a new [transform] — where it sits in another layout. */
+    abstract fun withTransform(transform: SourceTransform): SceneSource
+
+    @Serializable
+    @SerialName("org.churchpresenter.app.churchpresenter.models.SceneSource.ImageSource")
+    data class ImageSource(
+        override val id: String,
+        override val name: String,
+        override val transform: SourceTransform = SourceTransform(),
+        override val visible: Boolean = true,
+        override val locked: Boolean = false,
+        val filePath: String,
+        val contentScale: String = "FIT"
+    ) : SceneSource() {
+        override fun withId(id: String): SceneSource = copy(id = id)
+        override fun withTransform(transform: SourceTransform): SceneSource = copy(transform = transform)
+    }
+
+    @Serializable
+    @SerialName("org.churchpresenter.app.churchpresenter.models.SceneSource.TextSource")
+    data class TextSource(
+        override val id: String,
+        override val name: String,
+        override val transform: SourceTransform = SourceTransform(),
+        override val visible: Boolean = true,
+        override val locked: Boolean = false,
+        val text: String = "Text",
+        val fontFamily: String = "Arial",
+        val fontSize: Int = 48,
+        val fontColor: String = "#FFFFFF",
+        val backgroundColor: String = "#00000000",
+        val bold: Boolean = false,
+        val italic: Boolean = false,
+        val underline: Boolean = false,
+        val strikethrough: Boolean = false,
+        /** The band behind each line and the box around the block. */
+        val backdrop: TextBackdrop = TextBackdrop(),
+        /** The stroke drawn around the glyphs, under the fill. */
+        val outline: TextOutline = TextOutline(),
+        val horizontalAlignment: String = "center",
+        val verticalAlignment: String = "center",
+        val lineSpacing: Int = 100,
+        /**
+         * Space added between letters, as a percentage of the font size: 0 is the font's own
+         * spacing, positive tracks it out, negative tightens it.
+         */
+        val letterSpacing: Float = 0f,
+        /**
+         * How far the line is bent, as a percentage: 0 is straight, 100 arches it over a half
+         * circle, -100 cups it under one. A bent line is drawn a glyph at a time, so it is always
+         * one line — any newlines in [text] are drawn as spaces.
+         */
+        val curve: Float = 0f
+    ) : SceneSource() {
+        override fun withId(id: String): SceneSource = copy(id = id)
+        override fun withTransform(transform: SourceTransform): SceneSource = copy(transform = transform)
+    }
+
+    @Serializable
+    @SerialName("org.churchpresenter.app.churchpresenter.models.SceneSource.ColorSource")
+    data class ColorSource(
+        override val id: String,
+        override val name: String,
+        override val transform: SourceTransform = SourceTransform(),
+        override val visible: Boolean = true,
+        override val locked: Boolean = false,
+        val color: String = "#000000",
+        val sourceOpacity: Float = 1f,
+        val isGradient: Boolean = false,
+        val gradientColor2: String = "#FFFFFF",
+        val gradientColor2Opacity: Float = 1f,
+        val gradientAngle: Float = 0f,
+        val gradientPosition: Float = 0.5f
+    ) : SceneSource() {
+        override fun withId(id: String): SceneSource = copy(id = id)
+        override fun withTransform(transform: SourceTransform): SceneSource = copy(transform = transform)
+    }
+
+    @Serializable
+    @SerialName("org.churchpresenter.app.churchpresenter.models.SceneSource.VideoSource")
+    data class VideoSource(
+        override val id: String,
+        override val name: String,
+        override val transform: SourceTransform = SourceTransform(),
+        override val visible: Boolean = true,
+        override val locked: Boolean = false,
+        val filePath: String,
+        val loop: Boolean = false,
+        val volume: Float = 1f
+    ) : SceneSource() {
+        override fun withId(id: String): SceneSource = copy(id = id)
+        override fun withTransform(transform: SourceTransform): SceneSource = copy(transform = transform)
+    }
+
+    @Serializable
+    @SerialName("org.churchpresenter.app.churchpresenter.models.SceneSource.BrowserSource")
+    data class BrowserSource(
+        override val id: String,
+        override val name: String,
+        override val transform: SourceTransform = SourceTransform(),
+        override val visible: Boolean = true,
+        override val locked: Boolean = false,
+        val url: String,
+        val refreshInterval: Int = 0,
+        val renderWidth: Int = 1920,
+        val renderHeight: Int = 1080,
+        val customCss: String = "",
+        val fps: Int = 30,
+        val forceTransparent: Boolean = false
+    ) : SceneSource() {
+        override fun withId(id: String): SceneSource = copy(id = id)
+        override fun withTransform(transform: SourceTransform): SceneSource = copy(transform = transform)
+    }
+
+    @Serializable
+    @SerialName("org.churchpresenter.app.churchpresenter.models.SceneSource.ShapeSource")
+    data class ShapeSource(
+        override val id: String,
+        override val name: String,
+        override val transform: SourceTransform = SourceTransform(),
+        override val visible: Boolean = true,
+        override val locked: Boolean = false,
+        val shapeType: String = "rectangle",
+        val strokeColor: String = "#FFFFFF",
+        val fillColor: String = "#00000000",
+        val strokeWidth: Float = 3f,
+        val points: List<PathPoint> = emptyList(),
+        val fillOpacity: Float = 1f,
+        val strokeOpacity: Float = 1f,
+        val showStroke: Boolean = true,
+        val isGradient: Boolean = false,
+        val gradientColor2: String = "#FFFFFF",
+        val gradientColor2Opacity: Float = 1f,
+        val gradientAngle: Float = 0f,
+        val gradientPosition: Float = 0.5f
+    ) : SceneSource() {
+        override fun withId(id: String): SceneSource = copy(id = id)
+        override fun withTransform(transform: SourceTransform): SceneSource = copy(transform = transform)
+    }
+
+    @Serializable
+    @SerialName("org.churchpresenter.app.churchpresenter.models.SceneSource.ClockSource")
+    data class ClockSource(
+        override val id: String,
+        override val name: String,
+        override val transform: SourceTransform = SourceTransform(),
+        override val visible: Boolean = true,
+        override val locked: Boolean = false,
+        val mode: String = ClockModes.CLOCK,
+        val timeFormat: String = "24h",
+        val showHours: Boolean = true,
+        val showSeconds: Boolean = true,
+        val fontFamily: String = "Arial",
+        val fontSize: Int = 64,
+        val fontColor: String = "#FFFFFF",
+        val backgroundColor: String = "#00000000",
+        val bold: Boolean = true,
+        val italic: Boolean = false,
+        val underline: Boolean = false,
+        val strikethrough: Boolean = false,
+        /** The band behind each line and the box around the block. */
+        val backdrop: TextBackdrop = TextBackdrop(),
+        /** The stroke drawn around the glyphs, under the fill. */
+        val outline: TextOutline = TextOutline(),
+        /** The length a [ClockModes.COUNTDOWN] counts down from. Not a time of day. */
+        val targetHour: Int = 0,
+        val targetMinute: Int = 0,
+        val targetSecond: Int = 0,
+        /** The time of day a [ClockModes.TARGET_TIME] counts down to, on a 24-hour clock. */
+        val targetTimeHour: Int = 0,
+        val targetTimeMinute: Int = 0,
+        val targetTimeSecond: Int = 0,
+        /** Shown in place of 00:00 once a [ClockModes.COUNTDOWN] runs out. Blank keeps the zeroes. */
+        val expiredText: String = "",
+        /** Space added between letters, as on [TextSource.letterSpacing]. */
+        val letterSpacing: Float = 0f,
+        /** Bends the read-out around a circle, as on [TextSource.curve]. */
+        val curve: Float = 0f
+    ) : SceneSource() {
+        override fun withId(id: String): SceneSource = copy(id = id)
+        override fun withTransform(transform: SourceTransform): SceneSource = copy(transform = transform)
+    }
+
+    @Serializable
+    @SerialName("org.churchpresenter.app.churchpresenter.models.SceneSource.QRCodeSource")
+    data class QRCodeSource(
+        override val id: String,
+        override val name: String,
+        override val transform: SourceTransform = SourceTransform(),
+        override val visible: Boolean = true,
+        override val locked: Boolean = false,
+        val contentType: String = "url",
+        val content: String = "https://example.com",
+        val wifiSsid: String = "",
+        val wifiPassword: String = "",
+        val wifiEncryption: String = "WPA",
+        val wifiHidden: Boolean = false,
+        val foregroundColor: String = "#000000",
+        val backgroundColor: String = "#FFFFFF",
+        val transparentBackground: Boolean = false,
+        val errorCorrection: String = "M"
+    ) : SceneSource() {
+        override fun withId(id: String): SceneSource = copy(id = id)
+        override fun withTransform(transform: SourceTransform): SceneSource = copy(transform = transform)
+    }
+
+    @Serializable
+    @SerialName("org.churchpresenter.app.churchpresenter.models.SceneSource.CameraSource")
+    data class CameraSource(
+        override val id: String,
+        override val name: String,
+        override val transform: SourceTransform = SourceTransform(),
+        override val visible: Boolean = true,
+        override val locked: Boolean = false,
+        val devicePath: String = "",
+        val deviceName: String = "",
+        val videoFormat: String = "",
+        val videoConnection: Int = 0,
+        val isDeckLink: Boolean = false,
+        val deckLinkIndex: Int = -1
+    ) : SceneSource() {
+        override fun withId(id: String): SceneSource = copy(id = id)
+        override fun withTransform(transform: SourceTransform): SceneSource = copy(transform = transform)
+    }
+
+    @Serializable
+    @SerialName("org.churchpresenter.app.churchpresenter.models.SceneSource.ScreenCaptureSource")
+    data class ScreenCaptureSource(
+        override val id: String,
+        override val name: String,
+        override val transform: SourceTransform = SourceTransform(),
+        override val visible: Boolean = true,
+        override val locked: Boolean = false,
+        val captureMode: String = "region",
+        val captureX: Int = 0,
+        val captureY: Int = 0,
+        val captureWidth: Int = 1920,
+        val captureHeight: Int = 1080,
+        val captureInterval: Int = 100,
+        val windowTitle: String = "",
+        val windowId: String = ""
+    ) : SceneSource() {
+        override fun withId(id: String): SceneSource = copy(id = id)
+        override fun withTransform(transform: SourceTransform): SceneSource = copy(transform = transform)
+    }
+
+    /**
+     * A live NDI source from the network, received and drawn as a layer.
+     *
+     * [sourceName] is the full `MACHINE (Source)` name the sender advertises, which is the only
+     * durable handle a source has — its address moves with DHCP, so that is stored beside it in
+     * [sourceAddress] as a fallback for a source on another subnet rather than as the identity.
+     *
+     * [lowBandwidth] asks the sender for the low-resolution proxy it generates anyway. Worth having
+     * on a layer that ends up as a corner inset: on a congested network it is the difference
+     * between a service that runs and one that stutters.
+     */
+    @Serializable
+    @SerialName("org.churchpresenter.app.churchpresenter.models.SceneSource.NdiSource")
+    data class NdiSource(
+        override val id: String,
+        override val name: String,
+        override val transform: SourceTransform = SourceTransform(),
+        override val visible: Boolean = true,
+        override val locked: Boolean = false,
+        val sourceName: String = "",
+        val sourceAddress: String = "",
+        val lowBandwidth: Boolean = false
+    ) : SceneSource() {
+        override fun withId(id: String): SceneSource = copy(id = id)
+        override fun withTransform(transform: SourceTransform): SceneSource = copy(transform = transform)
+    }
+
+    /**
+     * A live OMT (Open Media Transport) source from the network, received and drawn as a layer.
+     *
+     * [sourceAddress] is what the receiver connects by: the full `HOSTNAME (Source)` name discovery
+     * reports, or an `omt://host:port` URL typed for a source discovery cannot see. One field where
+     * [NdiSource] has two, because OMT takes either form in the same place.
+     *
+     * [preview] asks the sender for its 1/8-size preview stream — OMT's counterpart of NDI's
+     * low-bandwidth proxy, and worth it for the same corner-inset layer.
+     *
+     * The serial name follows its siblings' historical form, pinned as they are.
+     */
+    @Serializable
+    @SerialName("org.churchpresenter.app.churchpresenter.models.SceneSource.OmtSource")
+    data class OmtSource(
+        override val id: String,
+        override val name: String,
+        override val transform: SourceTransform = SourceTransform(),
+        override val visible: Boolean = true,
+        override val locked: Boolean = false,
+        val sourceAddress: String = "",
+        val preview: Boolean = false
+    ) : SceneSource() {
+        override fun withId(id: String): SceneSource = copy(id = id)
+        override fun withTransform(transform: SourceTransform): SceneSource = copy(transform = transform)
+    }
+
+    @Serializable
+    @SerialName("org.churchpresenter.app.churchpresenter.models.SceneSource.BibleSource")
+    data class BibleSource(
+        override val id: String,
+        override val name: String,
+        override val transform: SourceTransform = SourceTransform(),
+        override val visible: Boolean = true,
+        override val locked: Boolean = false,
+        val verseText: String = "",
+        val referenceText: String = "",
+        val fontFamily: String = "Arial",
+        val fontSize: Int = 48,
+        val fontColor: String = "#FFFFFF",
+        val referenceFontSize: Int = 32,
+        val referenceFontColor: String = "#FFFFFF",
+        val backgroundColor: String = "#00000000",
+        val bold: Boolean = false,
+        val italic: Boolean = false,
+        val underline: Boolean = false,
+        val strikethrough: Boolean = false,
+        val referenceBold: Boolean = false,
+        val referenceItalic: Boolean = false,
+        val referenceUnderline: Boolean = false,
+        val referenceStrikethrough: Boolean = false,
+        /** The band and box behind the verse, and behind its reference line. */
+        val backdrop: TextBackdrop = TextBackdrop(),
+        val referenceBackdrop: TextBackdrop = TextBackdrop(),
+        /** The stroke around the verse's glyphs, and around its reference line's. */
+        val outline: TextOutline = TextOutline(),
+        val referenceOutline: TextOutline = TextOutline(),
+        val horizontalAlignment: String = "center",
+        val verticalAlignment: String = "center",
+        val lineSpacing: Int = 100,
+        /** Space added between letters, as on [TextSource.letterSpacing]. */
+        val letterSpacing: Float = 0f,
+        /** Bends the verse and its reference around a circle, as on [TextSource.curve]. */
+        val curve: Float = 0f
+    ) : SceneSource() {
+        override fun withId(id: String): SceneSource = copy(id = id)
+        override fun withTransform(transform: SourceTransform): SceneSource = copy(transform = transform)
+    }
+}
+
+@Serializable
+data class PathPoint(val x: Float, val y: Float)
+
+@Serializable
+data class Scene(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String = "Scene",
+    val sources: List<SceneSource> = emptyList(),
+    val canvasWidth: Int = 1920,
+    val canvasHeight: Int = 1080,
+    /**
+     * A second layout of the same layers for screens of the other orientation, or null for a scene
+     * with one canvas. Its canvas is this one turned sideways — see [alternateScene].
+     */
+    val alternate: SceneAlternateLayout? = null
+)
+
+/**
+ * Where each layer sits in a scene's second layout. Only position and size differ between the two
+ * layouts; the layers themselves — their content and styling — are the scene's own.
+ *
+ * [transforms] is keyed by source id. A layer with no entry sits where it does in the main layout,
+ * at the same fractions of the turned canvas.
+ */
+@Serializable
+data class SceneAlternateLayout(
+    val transforms: Map<String, SourceTransform> = emptyMap()
+)
+
+/** True when the canvas is wider than it is tall. A square counts as landscape. */
+val Scene.isLandscape: Boolean get() = canvasWidth >= canvasHeight
+
+/**
+ * The scene as its second layout draws it: the canvas turned sideways (width and height swapped)
+ * and each layer moved to its [SceneAlternateLayout.transforms] entry. With no alternate layout
+ * this is the scene itself.
+ */
+fun Scene.alternateScene(): Scene {
+    val layout = alternate ?: return this
+    return copy(
+        canvasWidth = canvasHeight,
+        canvasHeight = canvasWidth,
+        sources = sources.map { source ->
+            val transform = layout.transforms[source.id]
+                ?: source.transform.turnedFor(source, canvasWidth, canvasHeight, canvasHeight, canvasWidth)
+            // Opacity is the layer's own, like its content: one setting for both layouts.
+            source.withTransform(transform.copy(opacity = source.transform.opacity))
+        },
+    )
+}
+
+/** Slack at the canvas edges, so a box flush with one still counts as inside. */
+private const val EDGE_SLACK = 0.001f
+
+/**
+ * Where [source] starts on a [toWidth]×[toHeight] canvas when this is where it sits on a
+ * [fromWidth]×[fromHeight] one — for a layer not yet moved in a scene's second layout.
+ *
+ * Two kinds of layer are turned with the canvas rather than kept as they were:
+ * - One that covers the whole canvas covers the whole of the new one, whatever it holds — a
+ *   full-screen picture set to Fill fills a portrait screen and crops the sides.
+ * - One that spans the whole of the canvas's short side — a column down a landscape canvas, a row
+ *   across a portrait one — spans the new canvas's short side at the same place along it. So
+ *   halves side by side in landscape are stacked in portrait, the left one on top (#937).
+ *
+ * Any other layer keeps its shape, since copying its fractions would change the box's shape along
+ * with the canvas's:
+ * - Pictures, video, captures, QR codes and shapes keep their shape, scaled by as much as the whole
+ *   canvas has to shrink to fit the new one.
+ * - Text, clocks and Bible verses keep their text size (fonts are in canvas pixels): the box keeps
+ *   its pixel width, up to the canvas width, and its pixel area, so wrapped lines have room.
+ * - A colour keeps its fractions.
+ *
+ * The box's centre stays at the same fractions, and a box that was inside the canvas is kept inside.
+ */
+fun SourceTransform.turnedFor(
+    source: SceneSource,
+    fromWidth: Int,
+    fromHeight: Int,
+    toWidth: Int,
+    toHeight: Int,
+): SourceTransform {
+    val sized = minOf(fromWidth, fromHeight, toWidth, toHeight) > 0
+    val turned = sized && (fromWidth > fromHeight) != (toWidth > toHeight)
+    val withCanvas = if (turned) turnedWithCanvas(fromLandscape = fromWidth > fromHeight) else null
+    return when {
+        !sized -> this
+        withCanvas != null -> withCanvas
+        source is SceneSource.ColorSource -> this
+        else -> keptShape(source, fromWidth, fromHeight, toWidth, toHeight)
+    }
+}
+
+/** [turnedFor] for a layer that keeps its shape: see its rules for pictures and text. */
+private fun SourceTransform.keptShape(
+    source: SceneSource,
+    fromWidth: Int,
+    fromHeight: Int,
+    toWidth: Int,
+    toHeight: Int,
+): SourceTransform {
+    val pixelWidth = width * fromWidth
+    val pixelHeight = height * fromHeight
+    val (newWidth, newHeight) = when (source) {
+        is SceneSource.TextSource, is SceneSource.ClockSource, is SceneSource.BibleSource -> {
+            val w = minOf(pixelWidth, toWidth.toFloat())
+            val h = if (w > 0f) pixelWidth * pixelHeight / w else pixelHeight
+            w / toWidth to h / toHeight
+        }
+        else -> {
+            val scale = minOf(toWidth.toFloat() / fromWidth, toHeight.toFloat() / fromHeight)
+            pixelWidth * scale / toWidth to pixelHeight * scale / toHeight
+        }
+    }
+    var newX = x + width / 2f - newWidth / 2f
+    var newY = y + height / 2f - newHeight / 2f
+    val wasInside = x >= -EDGE_SLACK && y >= -EDGE_SLACK &&
+        x + width <= 1f + EDGE_SLACK && y + height <= 1f + EDGE_SLACK
+    if (wasInside) {
+        newX = newX.coerceIn(0f, (1f - newWidth).coerceAtLeast(0f))
+        newY = newY.coerceIn(0f, (1f - newHeight).coerceAtLeast(0f))
+    }
+    return copy(x = newX, y = newY, width = newWidth, height = newHeight)
+}
+
+/**
+ * Where this box goes when the canvas turns and the box turns with it: the whole canvas stays the
+ * whole canvas, and a box spanning the short side of a [fromLandscape] canvas has its fractions
+ * transposed, so a column becomes a row at the same place. Null for any other box.
+ */
+private fun SourceTransform.turnedWithCanvas(fromLandscape: Boolean): SourceTransform? {
+    val fullWidth = x <= SPAN_SLACK && x + width >= 1f - SPAN_SLACK
+    val fullHeight = y <= SPAN_SLACK && y + height >= 1f - SPAN_SLACK
+    return when {
+        fullWidth && fullHeight -> copy(x = 0f, y = 0f, width = 1f, height = 1f)
+        if (fromLandscape) fullHeight else fullWidth -> copy(x = y, y = x, width = height, height = width)
+        else -> null
+    }
+}
+
+/** How near an edge a box has to come to count as reaching it, as a fraction of the canvas. */
+private const val SPAN_SLACK = 0.01f
+
+/**
+ * The layout to draw on an area of [width]×[height]: the alternate when there is one and the area
+ * is the alternate's orientation, this scene otherwise. An area with no size keeps the main layout.
+ */
+fun Scene.forArea(width: Float, height: Float): Scene {
+    val sized = width > 0f && height > 0f
+    if (alternate == null || !sized || width == height) return this
+    val areaLandscape = width > height
+    return if (areaLandscape == isLandscape) this else alternateScene()
+}

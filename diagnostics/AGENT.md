@@ -1,0 +1,189 @@
+# `:diagnostics` — Agent Notes
+
+Rules, structure and commands for this module only. The repo-wide rules are in the root `AGENT.md`.
+
+## What it is
+
+**Crash reporting**: the crash log written to disk, and the Sentry forwarding behind it. A real
+Gradle module of this build: `include(":diagnostics")`, `implementation(projects.diagnostics)`.
+
+**The package is `org.churchpresenter.diagnostics`.** It held
+`org.churchpresenter.app.churchpresenter.utils` — the app's own utils package, shared with
+`:composeApp` and `:settings` — which cost nothing at extraction time (no import changed) but left
+three modules writing into one package name, so `CrashReporter` resolved in `:composeApp`'s utils
+files with no import at all and the dependency was invisible there. It now has a package of its
+own, and those files say what they depend on.
+
+Nothing here is imported by prefix: a rewrite that touches `…churchpresenter.utils.*` wholesale
+will drag `:composeApp`'s and `:settings`' own classes with it. Key on the two types this module
+owns — [CrashReporter] and [BuildIdentity].
+
+## What lives here
+
+| Path | Owns |
+|---|---|
+| `CrashReporter.kt` | `object CrashReporter` — the local crash log, the Sentry bridge, PII scrubbing, the crash-escalation counter, and `BuildIdentity` |
+| `Secrets.kt` | `Secrets.redact` — masks secret query parameters (`apiKey`, `password`, `token`, `access_token`, `refresh_token`, `client_secret`) and `X-Api-Key:` / `Authorization: Bearer|Basic` values |
+| `Log.kt` | `object Log` (`info`/`warn`/`error`) — the app's diagnostic lines: `[tag] message` on stderr, and a breadcrumb for warnings and errors. `Logger` takes its sink and trail as parameters for tests |
+| `UiWatchdog.kt` | `StallDetector` and `object UiWatchdog` — pings the AWT event thread and logs its stack when a ping goes unanswered past the budget; runs in every build |
+| `EventThreadIoMonitor.kt` | Watches the AWT event thread through JFR for file, socket and sleep calls, each place once: failed on by the soak test, logged by a debug build that asks (`DevFlags.watchEventThreadIo`) (root AGENT.md, "Live-safe output paths") |
+| `UiStallReporter.kt` | Which stalls become Sentry events (the live budget, the startup settle window, ten a run), and the live minutes and live stalls a run reports to telemetry (`docs/SHOW_CONTROL.md`, Output isolation) |
+| `StallGrouping.kt` | `stallEvent` — what a stall's samples group on: its screen, the app frame most samples were in, or a cause of its own (software rendering, Chromium, cold load, process paused, no app frame) |
+| `StallNames.kt` | `groupName` — a frame's class and function without the compiler's lambda, anonymous-class and Compose mangle names, so a refactor does not open a new issue; `isInChromium` |
+| `StallSamples.kt` | What one sample says: the part above the innermost nested event loop, the modal dialog's caller below it, and whether the thread was idle |
+
+47 files across `:composeApp` call it, which is why it is its own module rather than part of
+`:settings`: everything that can fail wants to report, and nothing should have to depend on the
+settings module to do so.
+
+## Rules
+
+- **`BuildConfig` is not available here.** It is generated into `:composeApp`. What the reporter
+  says this build is arrives as [BuildIdentity], passed to `initialize` from `main.kt`. Do not add
+  a dependency on `:composeApp` to get at it — that is the cycle this module exists to avoid.
+- **Nothing here may read a setting.** Whether analytics reporting is on is a `Boolean` parameter,
+  read from `AppSettings` by the caller. This module must never depend on `:settings`.
+- **The paths are `get()`, not `val`.** `appDir`/`crashDir`/`runningFile` and friends resolve from
+  `user.home` on every access. As fields they were fixed at first touch, which in a test suite that
+  redirects `user.home` meant whichever class touched the reporter first pinned it to a directory
+  that was later deleted. The doc comment at the declaration says this too; leave it alone.
+- **Anything `:composeApp` calls has to be public here.** `internal` no longer reaches the app.
+
+## Triaging what this module sends
+
+The project is **`church-projector` / `church-presenter-desktop`** (the slugs are in the `sentry`
+block of `composeApp/build.gradle.kts`). Reach it through the Sentry MCP server:
+
+```bash
+claude mcp add --scope user --transport http sentry https://mcp.sentry.dev/mcp
+```
+
+**Always filter `environment:production` first.** Dev builds report into the same project —
+`configureOptions` picks the environment from `BuildIdentity.isRelease` and nothing suppresses a
+dev build — so an unfiltered issue list mixes real user crashes with whatever a developer's machine
+did that afternoon. A stale Gradle build is the loud one: it produces `NoClassDefFoundError` and
+`NoSuchMethodError` on `:settings` classes, and `Base64` failures inside `decodeAsString` of the
+generated Compose resources. Those are one `./gradlew clean`, not ten bugs.
+
+**UI stalls are one issue per cause**, titled "UI thread stalled". The watchdog samples the event
+thread every 50 ms while it is stuck; a stall groups on `stall.screen` (the screen on the stack —
+a `…Page`, else a `…Tab`/`…Screen`, else a `…Dialog`/`…Window`) and the first frame of the app's own
+code that most samples were in, named without the compiler's `$lambda$0`, `$1` and `-533V2PY`
+parts. `stall.samples.top` counts what the samples saw. Filter `stall.live:true` for the ones an
+audience saw; `stall.length` says how long, in ranges.
+
+**What is sent is judged against the machine.** Only stalls of 250 ms or more are sent, and a stall
+in the app's own code also has to last three times this run's 95th-percentile ping (`machine.p95`
+as a range, `machine.p95.ms` exact), so an old laptop whose every frame is slow does not report its
+ordinary frames. A stall that groups by its kind (below) is sent only from one second: under that
+it is a slow driver or machine, which no change to the app closes. Every stall is still counted.
+
+Each sample is cut at the innermost nested
+event loop first, so a stall inside a modal dialog's loop is not blamed on the code that opened the
+dialog (`stall.modal` names that caller), and a sample of the thread idle in
+`EventQueue.getNextEvent` is dropped; a stall whose every sample was idle is counted, not sent.
+Five kinds group by `stall.cause` instead, in this order: `software-renderer` (the main window
+draws in software — `render.api.actual`, the API it actually drew with, says so; `render.api` is
+only what was asked for), `chromium` (JCEF starting Chromium, or the Win32 pump handing its windows
+their sent messages; per `os.family`), `cold-load` (the JVM loading code, or Compose reading a string, for the
+first time), `process-paused` (the first sample came more than a poll and two sample intervals past
+the budget — the watchdog itself was not running, so the whole process was paused by GC or the OS;
+`stall.first.sample.ms` says how late), and `no-app-frame` (no sample reached the app's code;
+grouped per `os.family` and actual render API, with `stall.top` naming the frame it was in).
+
+**Resolve a stall in the next release, never plainly.** A fix reaches users only with a release,
+and a plain resolve reopens as "regressed" on the first event from the version still out there.
+Use "resolved in next release" (`update_issue` with `inNextRelease`), and check `git merge-base
+--is-ancestor <fix> <latest tag>` before calling an issue fixed.
+
+**Not every issue is a crash.** `logback.xml` forwards every `ERROR` log line to Sentry as its own
+issue and every `WARN` as a breadcrumb, so an issue whose only frame is a log call came from
+logging, not from throwing — the fault is usually a frame or two up from the log site.
+
+**What arrives with an event**, worth knowing before asking for more: `os.family` and `os.arch`
+(both — arch alone cannot separate Apple Silicon from ARM Linux), `build.type`, `active_tab`,
+`presenting`, the availability tags (`vlc`, `jcef`, `javafx`), an anonymous install id, ≤50
+breadcrumbs, and the newest local `crash_*.txt` on ERROR and FATAL. Threads are **not** attached, so
+a deadlock arrives with one stack.
+
+Stack traces are **pre-scrubbed** — `scrubPii` rewrites home-directory paths and the OS username, so
+`<user>` in a frame is redaction rather than corruption — and credentials are masked as `<redacted>`
+by `Secrets.redact`: in every `Log` line before stderr and the breadcrumb, in `beforeBreadcrumb`
+(which also catches `sentry-logback`'s WARN crumbs), in `scrubEvent` and in the local crash file.
+Still, never log a URL with its query string or a header value — redaction is the backstop.
+
+### Rules for what gets reported
+
+- **A fixed issue gets a test**, in the suite that owns the code. A Sentry issue is a bug report
+  with a stack trace attached; per the root `AGENT.md`, past bugs live in commits and tests, never
+  in a write-up.
+- **The operator's environment is not a defect.** A missing optional tool, a disk with no room, a
+  directory the user cannot write to, a network that will not resolve — none of these is actionable
+  here, and reporting them files one issue per underlying exception type for what is a single fact
+  about someone's machine. Return the outcome so the UI can say what happened, and leave a tag
+  rather than send an event. `BibleInstallSupport.reported` and `CefManager.jcefInstallBlocker` are
+  the worked examples.
+- **Classify by exception type, never by message.** The disk-full and access-denied cases identify
+  themselves in the OS's language, so matching on wording works in English and silently stops
+  working in the other thirty-three locales the app ships.
+- **Match a subclass before its superclass.** `io.ktor.client.network.sockets.ConnectTimeoutException`
+  extends `java.net.ConnectException`, which had every connect timeout filed as a refusal.
+- **Keep the message constant and put what varies in tags** — `reportWarning`'s own KDoc. A message
+  carrying a file name or a size splits one fault across dozens of issues.
+- **A report nobody can act on is a bug in the report.** If triage stalls because the event does not
+  say which branch was taken, add the tag or breadcrumb; do not guess.
+
+## Gates
+
+- **detekt**: the app's `config/detekt/detekt.yml`, **no baseline**, main and test both in scope.
+  One `@Suppress` at the declaration, with its reason: `TooManyFunctions` on `CrashReporter`, which
+  is the single telemetry facade the whole app calls.
+- **Coverage**: `cp.test`'s default six counters at 85%, all of them — **no**
+  `coverageFloors`, **no** `coverageExcludes`.
+
+  Reaching that needed two seams, both of the shape the root `AGENT.md` describes under **Tests**:
+  - `startUp` takes `setUncaughtHandler` and `addShutdownHook` as parameters, because a default
+    uncaught-exception handler and a JVM shutdown hook outlive the test that installed them. They
+    are two parameters rather than one collector so each stays where it always was — the handler
+    before `cleanOldLogs`, the shutdown hook last. `initialize` is the one-line production caller.
+  - `configureOptions` applies every Sentry decision to a `SentryOptions` it is handed, so a test
+    checks release, environment and sampling without `Sentry.init` installing a live SDK for the
+    whole JVM. `crashAttachingBeforeSend`, `maskDsn` and `dsnFrom` are split out for the same
+    reason.
+
+  **`trace` is the one thing left uncovered**, and it cannot be reached: it is `inline`, so its
+  body is compiled into the caller — a test's own class, which is not in the report. Its behaviour
+  is pinned by `CrashReporterSentryTest` (`a traced block returns its own value`, `a traced block
+  that throws lets the failure through`) even though the coverage does not show it.
+
+## Test isolation — do not remove either system property
+
+`build.gradle.kts` sets both on the `test` task:
+
+- `user.home` → `build/test-home`. `CrashReporterTest` **deletes** `~/.churchpresenter/crash-reports`,
+  `.install_id` and `.crash_count` in its `@BeforeTest`. In `:composeApp` that was safe because the
+  `jvmTest` task redirects `user.home`; here this is the whole of that protection, and without it
+  the suite deletes the developer's own crash reports on the first run.
+- `sentry.dsn` → `""`. The real DSN lives in `:composeApp`'s `sentry.properties` and is not on this
+  module's classpath, but the SDK auto-initialises from any properties file it finds, and an empty
+  DSN leaves it permanently disabled.
+
+**`no SentryAppender is attached to logback during tests` stayed in `:composeApp`**
+(`LogbackSentryAppenderTest`). The appender comes from `sentry-logback`, a `:composeApp` dependency,
+and `logback-test.xml` is `:composeApp`'s test resource — here the assertion would be vacuously true.
+
+## Commands
+
+```bash
+./gradlew :diagnostics:test
+./gradlew :diagnostics:detekt                            # gate — no baseline, must be clean
+./gradlew :diagnostics:jacocoTestCoverageVerification
+```
+
+All three run in CI, gated on this directory or the shared build files changing.
+
+## Dependencies
+
+`api(libs.sentry)` — `api` rather than `implementation` because `CrashReporter.breadcrumb` takes a
+`SentryLevel`, so the type is part of this module's public surface. Nothing else, ever: no Compose,
+no `:settings`, no `:core-models`.

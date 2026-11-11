@@ -1,0 +1,508 @@
+package org.churchpresenter.app.churchpresenter
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.input.key.KeyShortcut
+import androidx.compose.ui.window.FrameWindowScope
+import androidx.compose.ui.window.MenuBar
+import androidx.compose.ui.window.MenuBarScope
+import org.churchpresenter.strings.generated.resources.Res
+import org.churchpresenter.strings.generated.resources.language_arabic
+import org.churchpresenter.strings.generated.resources.language_belarusian
+import org.churchpresenter.strings.generated.resources.language_chinese
+import org.churchpresenter.strings.generated.resources.language_croatian
+import org.churchpresenter.strings.generated.resources.language_czech
+import org.churchpresenter.strings.generated.resources.language_dutch
+import org.churchpresenter.strings.generated.resources.language_english
+import org.churchpresenter.strings.generated.resources.language_estonian
+import org.churchpresenter.strings.generated.resources.language_finnish
+import org.churchpresenter.strings.generated.resources.language_french
+import org.churchpresenter.strings.generated.resources.language_german
+import org.churchpresenter.strings.generated.resources.language_hindi
+import org.churchpresenter.strings.generated.resources.language_indonesian
+import org.churchpresenter.strings.generated.resources.language_japanese
+import org.churchpresenter.strings.generated.resources.language_kazakh
+import org.churchpresenter.strings.generated.resources.language_lao
+import org.churchpresenter.strings.generated.resources.language_latvian
+import org.churchpresenter.strings.generated.resources.language_malay
+import org.churchpresenter.strings.generated.resources.language_nepali
+import org.churchpresenter.strings.generated.resources.language_norwegian
+import org.churchpresenter.strings.generated.resources.language_persian
+import org.churchpresenter.strings.generated.resources.language_polish
+import org.churchpresenter.strings.generated.resources.language_portuguese
+import org.churchpresenter.strings.generated.resources.language_romanian
+import org.churchpresenter.strings.generated.resources.language_russian
+import org.churchpresenter.strings.generated.resources.language_slovak
+import org.churchpresenter.strings.generated.resources.language_spanish
+import org.churchpresenter.strings.generated.resources.language_swahili
+import org.churchpresenter.strings.generated.resources.language_swedish
+import org.churchpresenter.strings.generated.resources.language_tagalog
+import org.churchpresenter.strings.generated.resources.language_tahitian
+import org.churchpresenter.strings.generated.resources.language_tamil
+import org.churchpresenter.strings.generated.resources.language_thai
+import org.churchpresenter.strings.generated.resources.language_turkish
+import org.churchpresenter.strings.generated.resources.language_ukrainian
+import org.churchpresenter.strings.generated.resources.language_uzbek
+import org.churchpresenter.strings.generated.resources.menu_about
+import org.churchpresenter.strings.generated.resources.menu_getting_started
+import org.churchpresenter.strings.generated.resources.menu_show_helper
+import org.churchpresenter.strings.generated.resources.add_to_schedule
+import org.churchpresenter.strings.generated.resources.menu_keyboard_shortcuts
+import org.churchpresenter.strings.generated.resources.menu_clear_schedule
+import org.churchpresenter.strings.generated.resources.menu_close_schedule
+import org.churchpresenter.strings.generated.resources.menu_connect
+import org.churchpresenter.strings.generated.resources.menu_connect_to_instance
+import org.churchpresenter.strings.generated.resources.menu_developer
+import org.churchpresenter.strings.generated.resources.menu_developer_always_on_top
+import org.churchpresenter.strings.generated.resources.menu_developer_display
+import org.churchpresenter.strings.generated.resources.menu_developer_show_window
+import org.churchpresenter.strings.generated.resources.menu_developer_simulate_missing_outputs
+import org.churchpresenter.strings.generated.resources.menu_developer_style_editor
+import org.churchpresenter.strings.generated.resources.menu_developer_memory_monitor
+import org.churchpresenter.strings.generated.resources.menu_developer_story_prompt
+import org.churchpresenter.strings.generated.resources.menu_developer_wick_intro
+import org.churchpresenter.strings.generated.resources.menu_disconnect
+import org.churchpresenter.strings.generated.resources.menu_edit
+import org.churchpresenter.strings.generated.resources.menu_exit
+import org.churchpresenter.strings.generated.resources.menu_file
+import org.churchpresenter.strings.generated.resources.menu_help
+import org.churchpresenter.strings.generated.resources.menu_how_to_blog
+import org.churchpresenter.strings.generated.resources.menu_tutorial_videos
+import org.churchpresenter.strings.generated.resources.open_converter
+import org.churchpresenter.strings.generated.resources.open_calendar_manager
+import org.churchpresenter.strings.generated.resources.open_song_library
+import org.churchpresenter.strings.generated.resources.menu_check_for_updates
+import org.churchpresenter.strings.generated.resources.menu_contact_us
+import org.churchpresenter.strings.generated.resources.menu_language
+import org.churchpresenter.strings.generated.resources.menu_customize_theme
+import org.churchpresenter.strings.generated.resources.menu_actual_size
+import org.churchpresenter.strings.generated.resources.menu_zoom_out
+import org.churchpresenter.strings.generated.resources.menu_zoom_in
+import org.churchpresenter.strings.generated.resources.menu_view
+import org.churchpresenter.strings.generated.resources.tooltip_new_schedule
+import org.churchpresenter.strings.generated.resources.tooltip_open_schedule
+import org.churchpresenter.strings.generated.resources.menu_remove_from_schedule
+import org.churchpresenter.strings.generated.resources.tooltip_save_schedule
+import org.churchpresenter.strings.generated.resources.menu_save_schedule_as
+import org.churchpresenter.strings.generated.resources.schedule
+import org.churchpresenter.strings.generated.resources.menu_settings
+import org.churchpresenter.strings.generated.resources.menu_statistics
+import org.churchpresenter.sharedui.language.Language
+import org.churchpresenter.sharedui.models.ShortcutAction
+import org.churchpresenter.sharedui.utils.LocalShortcuts
+import org.churchpresenter.sharedui.utils.themeDisplayName
+import org.churchpresenter.theme.ThemeMode
+import org.jetbrains.compose.resources.StringResource
+import org.jetbrains.compose.resources.stringResource
+
+@Composable
+fun FrameWindowScope.NavigationTopBar(
+    theme: (ThemeMode) -> Unit,
+    currentTheme: ThemeMode = ThemeMode.SYSTEM,
+    /** Whether a custom accent has been saved, so View offers Custom beside the presets. */
+    hasCustomTheme: Boolean = false,
+    onCustomizeTheme: () -> Unit = {},
+    /** View → Zoom In / Zoom Out / Actual Size: the interface size of the app's own windows. */
+    onZoomIn: () -> Unit = {},
+    onZoomOut: () -> Unit = {},
+    onActualSize: () -> Unit = {},
+    onLanguageChange: (Language) -> Unit = {},
+    onNewSchedule: () -> Unit = {},
+    onOpenSchedule: () -> Unit = {},
+    onSaveSchedule: () -> Unit = {},
+    onSaveScheduleAs: () -> Unit = {},
+    onCloseSchedule: () -> Unit = {},
+    onExit: () -> Unit = {},
+    onAddToSchedule: () -> Unit = {},
+    onRemoveFromSchedule: () -> Unit = {},
+    onClearSchedule: () -> Unit = {},
+    onSettings: () -> Unit = {},
+    onStatistics: () -> Unit = {},
+    onConnectToInstance: () -> Unit = {},
+    onDisconnectInstance: () -> Unit = {},
+    isInstanceLinkConnected: Boolean = false,
+    onAbout: () -> Unit = {},
+    onHelp: () -> Unit = {},
+    onHowToBlog: () -> Unit = {},
+    onTutorialVideos: () -> Unit = {},
+    onGettingStarted: () -> Unit = {},
+    /** Help → Show Helper; null leaves the item out — Wick is shown in dev mode only. */
+    onShowHelper: (() -> Unit)? = null,
+    onConverter: () -> Unit = {},
+    onSongLibrary: () -> Unit = {},
+    onCalendar: () -> Unit = {},
+    onKeyboardShortcuts: () -> Unit = {},
+    onCheckForUpdates: () -> Unit = {},
+    onContactUs: () -> Unit = {},
+    showDeveloperMenu: Boolean = false,
+    isPresenterWindowVisible: Boolean = true,
+    onSetPresenterWindowVisible: (Boolean) -> Unit = {},
+    isDevWindowAlwaysOnTop: Boolean = false,
+    onSetDevWindowAlwaysOnTop: (Boolean) -> Unit = {},
+    isSimulatingMissingOutputs: Boolean = false,
+    onSetSimulatingMissingOutputs: (Boolean) -> Unit = {},
+    onOpenStyleEditor: () -> Unit = {},
+    onOpenMemoryMonitor: () -> Unit = {},
+    onOpenStoryPrompt: () -> Unit = {},
+    onOpenWickIntro: () -> Unit = {},
+) {
+    val fileLabel = stringResource(Res.string.menu_file)
+    val fileMnemonic = fileLabel.firstOrNull() ?: 'F'
+
+    val scheduleLabel = stringResource(Res.string.schedule)
+    val scheduleMnemonic = scheduleLabel.firstOrNull() ?: 'S'
+
+    val editLabel = stringResource(Res.string.menu_edit)
+    val editMnemonic = editLabel.firstOrNull() ?: 'E'
+
+    val helpLabel = stringResource(Res.string.menu_help)
+    val helpMnemonic = helpLabel.firstOrNull() ?: 'H'
+
+    // Menu accelerators come from the same registry the key handlers use, so a rebind shows up on
+    // the menu item too. Only the first chord can be an accelerator — Compose's `Item` takes one —
+    // and null means the user unbound the action, which simply drops the accelerator label.
+    val shortcuts = LocalShortcuts.current
+    fun accelerator(action: ShortcutAction): KeyShortcut? =
+        shortcuts.chordsFor(action).firstOrNull()?.toKeyShortcut()
+
+    MenuBar {
+        FileMenu(fileLabel, fileMnemonic, ::accelerator, onNewSchedule, onOpenSchedule, onSaveSchedule,
+            onSaveScheduleAs, onCloseSchedule, onExit)
+        ScheduleMenu(scheduleLabel, scheduleMnemonic, ::accelerator, onAddToSchedule, onRemoveFromSchedule,
+            onClearSchedule)
+        EditMenu(editLabel, editMnemonic, ::accelerator, onSettings, onStatistics)
+        ConnectMenu(onConnectToInstance, onDisconnectInstance, isInstanceLinkConnected)
+        ViewMenu(theme, currentTheme, hasCustomTheme, onCustomizeTheme,
+            ZoomActions(onZoomIn, onZoomOut, onActualSize), ::accelerator)
+        LanguageMenu(onLanguageChange)
+        HelpMenu(helpLabel, helpMnemonic, ::accelerator, onGettingStarted, onShowHelper, onKeyboardShortcuts,
+            onHowToBlog, onTutorialVideos,
+            onConverter, onSongLibrary, onCalendar, onAbout, onHelp, onContactUs, onCheckForUpdates)
+        if (showDeveloperMenu) {
+            DeveloperMenu(
+                DeveloperDisplayToggles(
+                    isPresenterWindowVisible, onSetPresenterWindowVisible, isDevWindowAlwaysOnTop,
+                    onSetDevWindowAlwaysOnTop, isSimulatingMissingOutputs, onSetSimulatingMissingOutputs,
+                ),
+                onOpenStyleEditor, onOpenMemoryMonitor, onOpenStoryPrompt, onOpenWickIntro,
+            )
+        }
+    }
+}
+
+/**
+ * The menus, one composable each.
+ *
+ * They were the body of [NavigationTopBar] until the bar outgrew what anyone can read at once: the
+ * language menu alone lists 34 entries. Each takes the actions it fires and the accelerator lookup,
+ * which comes from the same registry the key handlers use so a rebind shows on the item too.
+ */
+@Composable
+private fun MenuBarScope.FileMenu(
+    label: String,
+    mnemonic: Char,
+    accel: (ShortcutAction) -> KeyShortcut?,
+    onNewSchedule: () -> Unit,
+    onOpenSchedule: () -> Unit,
+    onSaveSchedule: () -> Unit,
+    onSaveScheduleAs: () -> Unit,
+    onCloseSchedule: () -> Unit,
+    onExit: () -> Unit,
+) {
+    Menu(label, mnemonic = mnemonic) {
+        Item(
+            stringResource(Res.string.tooltip_new_schedule),
+            onClick = onNewSchedule,
+            shortcut = accel(ShortcutAction.NEW_SCHEDULE)
+        )
+        Item(
+            stringResource(Res.string.tooltip_open_schedule),
+            onClick = onOpenSchedule,
+            shortcut = accel(ShortcutAction.OPEN_SCHEDULE)
+        )
+        Item(
+            stringResource(Res.string.tooltip_save_schedule),
+            onClick = onSaveSchedule,
+            shortcut = accel(ShortcutAction.SAVE_SCHEDULE)
+        )
+        Item(
+            stringResource(Res.string.menu_save_schedule_as),
+            onClick = onSaveScheduleAs,
+            shortcut = accel(ShortcutAction.SAVE_SCHEDULE_AS)
+        )
+        Item(
+            stringResource(Res.string.menu_close_schedule),
+            onClick = onCloseSchedule,
+            shortcut = accel(ShortcutAction.CLOSE_SCHEDULE)
+        )
+        Item(
+            stringResource(Res.string.menu_exit),
+            onClick = onExit,
+            shortcut = accel(ShortcutAction.EXIT)
+        )
+    }
+}
+
+@Composable
+private fun MenuBarScope.ScheduleMenu(
+    label: String,
+    mnemonic: Char,
+    accel: (ShortcutAction) -> KeyShortcut?,
+    onAddToSchedule: () -> Unit,
+    onRemoveFromSchedule: () -> Unit,
+    onClearSchedule: () -> Unit,
+) {
+    Menu(label, mnemonic = mnemonic) {
+        Item(
+            stringResource(Res.string.add_to_schedule),
+            onClick = onAddToSchedule,
+            shortcut = accel(ShortcutAction.ADD_TO_SCHEDULE)
+        )
+        Item(
+            stringResource(Res.string.menu_remove_from_schedule),
+            onClick = onRemoveFromSchedule,
+            shortcut = accel(ShortcutAction.REMOVE_FROM_SCHEDULE)
+        )
+        Item(stringResource(Res.string.menu_clear_schedule), onClick = onClearSchedule)
+    }
+}
+
+@Composable
+private fun MenuBarScope.EditMenu(
+    label: String,
+    mnemonic: Char,
+    accel: (ShortcutAction) -> KeyShortcut?,
+    onSettings: () -> Unit,
+    onStatistics: () -> Unit,
+) {
+    Menu(label, mnemonic = mnemonic) {
+        Item(
+            stringResource(Res.string.menu_settings),
+            onClick = onSettings,
+            shortcut = accel(ShortcutAction.OPEN_SETTINGS)
+        )
+        Item(
+            stringResource(Res.string.menu_statistics),
+            onClick = onStatistics
+        )
+    }
+}
+
+@Composable
+private fun MenuBarScope.ConnectMenu(
+    onConnectToInstance: () -> Unit,
+    onDisconnectInstance: () -> Unit,
+    isInstanceLinkConnected: Boolean,
+) {
+    Menu(stringResource(Res.string.menu_connect), mnemonic = 'C') {
+        Item(
+            stringResource(Res.string.menu_connect_to_instance),
+            onClick = onConnectToInstance
+        )
+        Item(
+            stringResource(Res.string.menu_disconnect),
+            onClick = onDisconnectInstance,
+            enabled = isInstanceLinkConnected
+        )
+    }
+}
+
+/** The View menu's interface-size items, grouped so the menu takes one parameter for them. */
+private class ZoomActions(val zoomIn: () -> Unit, val zoomOut: () -> Unit, val actualSize: () -> Unit)
+
+@Composable
+private fun MenuBarScope.ViewMenu(
+    theme: (ThemeMode) -> Unit,
+    currentTheme: ThemeMode,
+    hasCustomTheme: Boolean,
+    onCustomizeTheme: () -> Unit,
+    zoom: ZoomActions,
+    accel: (ShortcutAction) -> KeyShortcut?,
+) {
+    Menu(stringResource(Res.string.menu_view), mnemonic = 'V') {
+        // Every preset, from the enum. This was ten RadioButtonItems written out by hand, which
+        // compiled perfectly while silently offering fewer themes than the app shipped.
+        ThemeMode.entries.filter { it != ThemeMode.CUSTOM }.forEach { mode ->
+            RadioButtonItem(
+                text = themeDisplayName(mode),
+                selected = currentTheme == mode,
+                onClick = { theme.invoke(mode) }
+            )
+        }
+        Separator()
+        // Custom only once there is one to go back to; until then it would paint the default accent.
+        if (hasCustomTheme || currentTheme == ThemeMode.CUSTOM) {
+            RadioButtonItem(
+                text = themeDisplayName(ThemeMode.CUSTOM),
+                selected = currentTheme == ThemeMode.CUSTOM,
+                onClick = { theme.invoke(ThemeMode.CUSTOM) }
+            )
+        }
+        Item(stringResource(Res.string.menu_customize_theme), onClick = onCustomizeTheme)
+        Separator()
+        Item(
+            stringResource(Res.string.menu_zoom_in),
+            onClick = zoom.zoomIn,
+            shortcut = accel(ShortcutAction.ZOOM_IN),
+        )
+        Item(
+            stringResource(Res.string.menu_zoom_out),
+            onClick = zoom.zoomOut,
+            shortcut = accel(ShortcutAction.ZOOM_OUT),
+        )
+        // No key: Ctrl+0 is the quick background's reset, a live control.
+        Item(stringResource(Res.string.menu_actual_size), onClick = zoom.actualSize)
+    }
+}
+
+@Composable
+private fun MenuBarScope.LanguageMenu(onLanguageChange: (Language) -> Unit) {
+    Menu(stringResource(Res.string.menu_language), mnemonic = 'L') {
+        LANGUAGES.forEach { entry ->
+            Item(
+                text = "${entry.flag} ${stringResource(entry.label)}",
+                onClick = { onLanguageChange(entry.language) }
+            )
+        }
+    }
+}
+
+/** One entry of the language menu: the flag shown beside the name, and what picking it selects. */
+private data class LanguageEntry(val flag: String, val label: StringResource, val language: Language)
+
+/**
+ * The languages the app offers, in the order the menu lists them.
+ *
+ * A table rather than 34 near-identical `Item` blocks: adding a language is a line here, and the
+ * menu cannot drift out of step with itself.
+ */
+private val LANGUAGES = listOf(
+    LanguageEntry("🇷🇺", Res.string.language_russian, Language.RUSSIAN),
+    LanguageEntry("🇺🇸", Res.string.language_english, Language.ENGLISH),
+    LanguageEntry("🇺🇦", Res.string.language_ukrainian, Language.UKRAINIAN),
+    LanguageEntry("🇰🇿", Res.string.language_kazakh, Language.KAZAKH),
+    LanguageEntry("🇩🇪", Res.string.language_german, Language.GERMAN),
+    LanguageEntry("🇵🇱", Res.string.language_polish, Language.POLISH),
+    LanguageEntry("🇧🇾", Res.string.language_belarusian, Language.BELARUSIAN),
+    LanguageEntry("🇨🇿", Res.string.language_czech, Language.CZECH),
+    LanguageEntry("🇪🇸", Res.string.language_spanish, Language.SPANISH),
+    LanguageEntry("🇫🇷", Res.string.language_french, Language.FRENCH),
+    LanguageEntry("🇳🇱", Res.string.language_dutch, Language.DUTCH),
+    LanguageEntry("🇵🇹", Res.string.language_portuguese, Language.PORTUGUESE),
+    LanguageEntry("🇷🇴", Res.string.language_romanian, Language.ROMANIAN),
+    LanguageEntry("🇸🇰", Res.string.language_slovak, Language.SLOVAK),
+    LanguageEntry("🇪🇪", Res.string.language_estonian, Language.ESTONIAN),
+    LanguageEntry("🇱🇻", Res.string.language_latvian, Language.LATVIAN),
+    LanguageEntry("🇭🇷", Res.string.language_croatian, Language.CROATIAN),
+    LanguageEntry("🇸🇪", Res.string.language_swedish, Language.SWEDISH),
+    LanguageEntry("🇳🇴", Res.string.language_norwegian, Language.NORWEGIAN),
+    LanguageEntry("🇫🇮", Res.string.language_finnish, Language.FINNISH),
+    LanguageEntry("🇹🇷", Res.string.language_turkish, Language.TURKISH),
+    LanguageEntry("🇺🇿", Res.string.language_uzbek, Language.UZBEK),
+    LanguageEntry("🇸🇦", Res.string.language_arabic, Language.ARABIC),
+    LanguageEntry("🇮🇷", Res.string.language_persian, Language.PERSIAN),
+    LanguageEntry("🇮🇳", Res.string.language_hindi, Language.HINDI),
+    LanguageEntry("🇳🇵", Res.string.language_nepali, Language.NEPALI),
+    LanguageEntry("🇹🇭", Res.string.language_thai, Language.THAI),
+    LanguageEntry("🇱🇦", Res.string.language_lao, Language.LAO),
+    LanguageEntry("🇯🇵", Res.string.language_japanese, Language.JAPANESE),
+    LanguageEntry("🇨🇳", Res.string.language_chinese, Language.CHINESE),
+    LanguageEntry("🇮🇩", Res.string.language_indonesian, Language.INDONESIAN),
+    LanguageEntry("🇲🇾", Res.string.language_malay, Language.MALAY),
+    LanguageEntry("🇱🇰", Res.string.language_tamil, Language.TAMIL),
+    LanguageEntry("🇵🇭", Res.string.language_tagalog, Language.TAGALOG),
+    LanguageEntry("🇹🇿", Res.string.language_swahili, Language.SWAHILI),
+    LanguageEntry("🇵🇫", Res.string.language_tahitian, Language.TAHITIAN),
+)
+
+@Composable
+private fun MenuBarScope.HelpMenu(
+    label: String,
+    mnemonic: Char,
+    accel: (ShortcutAction) -> KeyShortcut?,
+    onGettingStarted: () -> Unit,
+    onShowHelper: (() -> Unit)?,
+    onKeyboardShortcuts: () -> Unit,
+    onHowToBlog: () -> Unit,
+    onTutorialVideos: () -> Unit,
+    onConverter: () -> Unit,
+    onSongLibrary: () -> Unit,
+    onCalendar: () -> Unit,
+    onAbout: () -> Unit,
+    onHelp: () -> Unit,
+    onContactUs: () -> Unit,
+    onCheckForUpdates: () -> Unit,
+) {
+    Menu(label, mnemonic = mnemonic) {
+        Item(stringResource(Res.string.menu_getting_started), onClick = onGettingStarted)
+        onShowHelper?.let { Item(stringResource(Res.string.menu_show_helper), onClick = it) }
+        Item(
+            stringResource(Res.string.menu_keyboard_shortcuts),
+            onClick = onKeyboardShortcuts,
+            shortcut = accel(ShortcutAction.KEYBOARD_SHORTCUTS)
+        )
+        Item(stringResource(Res.string.menu_how_to_blog), onClick = onHowToBlog)
+        Item(stringResource(Res.string.menu_tutorial_videos), onClick = onTutorialVideos)
+        Item(
+            stringResource(Res.string.open_converter),
+            onClick = onConverter,
+            shortcut = accel(ShortcutAction.OPEN_CONVERTER),
+        )
+        Item(
+            stringResource(Res.string.open_song_library),
+            onClick = onSongLibrary,
+            shortcut = accel(ShortcutAction.OPEN_SONG_LIBRARY),
+        )
+        Item(
+            stringResource(Res.string.open_calendar_manager),
+            onClick = onCalendar,
+            shortcut = accel(ShortcutAction.OPEN_CALENDAR_MANAGER),
+        )
+        Item(stringResource(Res.string.menu_about), onClick = onAbout)
+        Item(stringResource(Res.string.menu_help), onClick = onHelp)
+        Item(stringResource(Res.string.menu_contact_us), onClick = onContactUs)
+        Item(stringResource(Res.string.menu_check_for_updates), onClick = onCheckForUpdates)
+    }
+}
+
+/** The Developer → Display checkboxes: each one's state and what ticking it does. */
+private class DeveloperDisplayToggles(
+    val isPresenterWindowVisible: Boolean,
+    val onSetPresenterWindowVisible: (Boolean) -> Unit,
+    val isDevWindowAlwaysOnTop: Boolean,
+    val onSetDevWindowAlwaysOnTop: (Boolean) -> Unit,
+    val isSimulatingMissingOutputs: Boolean,
+    val onSetSimulatingMissingOutputs: (Boolean) -> Unit,
+)
+
+@Composable
+private fun MenuBarScope.DeveloperMenu(
+    display: DeveloperDisplayToggles,
+    onOpenStyleEditor: () -> Unit,
+    onOpenMemoryMonitor: () -> Unit,
+    onOpenStoryPrompt: () -> Unit,
+    onOpenWickIntro: () -> Unit,
+) {
+    Menu(stringResource(Res.string.menu_developer), mnemonic = 'D') {
+        Menu(stringResource(Res.string.menu_developer_display), mnemonic = 'S') {
+            CheckboxItem(
+                text = stringResource(Res.string.menu_developer_show_window),
+                checked = display.isPresenterWindowVisible,
+                onCheckedChange = display.onSetPresenterWindowVisible
+            )
+            CheckboxItem(
+                text = stringResource(Res.string.menu_developer_always_on_top),
+                checked = display.isDevWindowAlwaysOnTop,
+                onCheckedChange = display.onSetDevWindowAlwaysOnTop
+            )
+            CheckboxItem(
+                text = stringResource(Res.string.menu_developer_simulate_missing_outputs),
+                checked = display.isSimulatingMissingOutputs,
+                onCheckedChange = display.onSetSimulatingMissingOutputs
+            )
+        }
+        Item(stringResource(Res.string.menu_developer_style_editor), onClick = onOpenStyleEditor)
+        Item(stringResource(Res.string.menu_developer_memory_monitor), onClick = onOpenMemoryMonitor)
+        Item(stringResource(Res.string.menu_developer_story_prompt), onClick = onOpenStoryPrompt)
+        Item(stringResource(Res.string.menu_developer_wick_intro), onClick = onOpenWickIntro)
+    }
+}

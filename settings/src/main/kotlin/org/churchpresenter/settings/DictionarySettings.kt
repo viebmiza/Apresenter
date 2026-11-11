@@ -1,0 +1,68 @@
+package org.churchpresenter.settings
+
+import kotlinx.serialization.Serializable
+import org.churchpresenter.core.models.text.TextBackdrop
+import org.churchpresenter.core.models.text.TextOutline
+
+@Serializable
+data class DictionarySettings(
+    // Original word (Hebrew/Greek text)
+    val wordColor: String = "#FFFFFF",
+    val wordFontType: String = "Arial",
+    val wordFontSize: Int = 70,
+    val wordBold: Boolean = false,
+    val wordItalic: Boolean = false,
+    val wordShadow: Boolean = false,
+    val wordShadowColor: String = "#000000",
+    val wordShadowSize: Int = 100,
+    val wordShadowOpacity: Int = 90,
+
+    // Reference text (Strong's number, transliteration, pronunciation, KJV usage)
+    val referenceColor: String = "#FFFFFF",
+    val referenceFontType: String = "Arial",
+    val referenceFontSize: Int = 28,
+    val referenceShadow: Boolean = false,
+    val referenceShadowColor: String = "#000000",
+    val referenceShadowSize: Int = 100,
+    val referenceShadowOpacity: Int = 90,
+
+    // The band behind each line and the box around the block, per element.
+    val wordBackdrop: TextBackdrop = TextBackdrop(),
+    val referenceBackdrop: TextBackdrop = TextBackdrop(),
+    val definitionBackdrop: TextBackdrop = TextBackdrop(),
+
+    // The stroke around each element's glyphs, one record per element beside its backdrop.
+    val wordOutline: TextOutline = TextOutline(),
+    val referenceOutline: TextOutline = TextOutline(),
+    val definitionOutline: TextOutline = TextOutline(),
+
+    // Definition
+    val definitionColor: String = "#DDDDDD",
+    val definitionFontSize: Int = 32,
+
+    // KJV usage
+    val kjvUsageColor: String = "#AAAAAA",
+    val kjvUsageFontSize: Int = 22,
+
+    // Card overlay background
+    val cardBackgroundColor: String = "#1A1A2E",
+    val cardBackgroundOpacity: Float = 0.92f,
+
+    // Transitions
+    val fadeIn: Boolean = true,
+    val fadeOut: Boolean = true,
+    val transitionDuration: Float = 500f,
+
+    // Visible fields on presenter output
+    val showWord: Boolean = true,
+    val showReference: Boolean = true,
+    val showDefinition: Boolean = true,
+    val showKjvUsage: Boolean = true,
+    /**
+     * Each item's own text box, keyed by [textBoxKey] with the name of the dictionary part it places.
+     * An item with none, or with one turned off, is drawn where it always was.
+     */
+    val textBoxes: Map<String, TextBox> = emptyMap(),
+    /** How this page's boxes behave -- see [TextBoxOptions]. */
+    val textBoxOptions: TextBoxOptions = TextBoxOptions(),
+)

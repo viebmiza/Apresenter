@@ -1,0 +1,280 @@
+package org.churchpresenter.theme
+
+import androidx.compose.foundation.LocalScrollbarStyle
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.InternalComposeUiApi
+import androidx.compose.ui.LocalSystemTheme
+import androidx.compose.ui.SystemTheme
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.v2.runComposeUiTest
+import androidx.compose.ui.unit.dp
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+
+/**
+ * The theme actually reaching the app, rather than the colour tables behind it.
+ *
+ * [ThemeTest] reads the nine schemes as data. This runs `ChurchPresenterTheme` in a composition and
+ * asks what a component inside it would see: the right scheme for the chosen mode, the app's own
+ * shapes and typography, and a scrollbar style that is legible against the surface it is drawn on.
+ *
+ * The mapping from mode to scheme is a ten-branch `when` written once and never seen again — two
+ * branches pointing at the same scheme, or a dark scheme wired to a light mode, compiles perfectly
+ * and is only visible when somebody selects that theme mid-service. The wrappers around it are just
+ * as easy to get wrong quietly: `AppThemeWrapper` has to supply a `ThemeManager`, because without
+ * one a theme control inside it edits a throwaway.
+ *
+ * SYSTEM is deliberately asserted loosely — it follows the host OS, so a test that pinned it to
+ * light would pass on one machine and fail on the next.
+ */
+@OptIn(ExperimentalTestApi::class, InternalComposeUiApi::class)
+// LocalSystemTheme/SystemTheme are deprecated with no replacement: they are still the only way to
+// override what `isSystemInDarkTheme()` reads, which the SYSTEM-mode tests need.
+@Suppress("DEPRECATION")
+class ThemeRenderTest {
+
+    /** One of the private schemes in `Theme.kt`, by name. */
+    private fun scheme(name: String): ColorScheme =
+        Class.forName("org.churchpresenter.theme.ThemeKt")
+            .getDeclaredField(name)
+            .apply { isAccessible = true }
+            .get(null) as ColorScheme
+
+    /** The scheme each mode has to resolve to. SYSTEM is excluded — it depends on the host. */
+    private val expectedScheme = mapOf(
+        ThemeMode.LIGHT to "LightColorScheme",
+        ThemeMode.DARK to "DarkColorScheme",
+        ThemeMode.WARM to "WarmColorScheme",
+        ThemeMode.OCEAN to "OceanColorScheme",
+        ThemeMode.ROSE to "RoseColorScheme",
+        ThemeMode.MIDNIGHT to "MidnightColorScheme",
+        ThemeMode.FOREST to "ForestColorScheme",
+        ThemeMode.MOCHA to "MochaColorScheme",
+        ThemeMode.STUDIO to "StudioColorScheme",
+    )
+
+    /** Renders [content] inside the app theme and hands back what it captured. */
+    private fun <T> underTheme(mode: ThemeMode, capture: @Composable () -> T): T {
+        var captured: T? = null
+        runComposeUiTest {
+            setContent { ChurchPresenterTheme(themeMode = mode) { captured = capture() } }
+        }
+        @Suppress("UNCHECKED_CAST")
+        return captured as T
+    }
+
+    // ── Which scheme each mode gets ─────────────────────────────────────────────
+
+    @Test
+    fun `every mode resolves to its own scheme`() {
+        expectedScheme.forEach { (mode, name) ->
+            val applied = underTheme(mode) { MaterialTheme.colorScheme }
+
+            assertSame(scheme(name), applied, "$mode is not painted with $name")
+        }
+    }
+
+    @Test
+    fun `no two modes are painted the same`() {
+        val applied = expectedScheme.keys.associateWith { underTheme(it) { MaterialTheme.colorScheme.primary } }
+
+        assertEquals(
+            expectedScheme.size,
+            applied.values.toSet().size,
+            "two themes that look identical make one of them pointless: $applied",
+        )
+    }
+
+    @Test
+    fun `the system mode follows the host rather than inventing a scheme`() {
+        val applied = underTheme(ThemeMode.SYSTEM) { MaterialTheme.colorScheme }
+
+        assertTrue(
+            applied === scheme("LightColorScheme") || applied === scheme("DarkColorScheme"),
+            "System has to resolve to the plain light or dark scheme, not to an accent theme",
+        )
+    }
+
+    /** Overrides the desktop's own theme signal, so both sides of `isSystemInDarkTheme()` are reachable. */
+    private fun <T> underSystemTheme(systemTheme: SystemTheme, capture: @Composable () -> T): T {
+        var captured: T? = null
+        runComposeUiTest {
+            setContent {
+                CompositionLocalProvider(LocalSystemTheme provides systemTheme) {
+                    ChurchPresenterTheme(themeMode = ThemeMode.SYSTEM) { captured = capture() }
+                }
+            }
+        }
+        @Suppress("UNCHECKED_CAST")
+        return captured as T
+    }
+
+    @Test
+    fun `system mode picks the light scheme when the desktop reports light`() {
+        val applied = underSystemTheme(SystemTheme.Light) { MaterialTheme.colorScheme }
+
+        assertSame(scheme("LightColorScheme"), applied)
+    }
+
+    @Test
+    fun `system mode picks the dark scheme when the desktop reports dark`() {
+        val applied = underSystemTheme(SystemTheme.Dark) { MaterialTheme.colorScheme }
+
+        assertSame(scheme("DarkColorScheme"), applied)
+    }
+
+    @Test
+    fun `the theme mode defaults to system when none is given`() {
+        // Every call site in the app passes themeMode explicitly, so this is the only place
+        // ChurchPresenterTheme's own default argument is ever actually used.
+        var applied: ColorScheme? = null
+        runComposeUiTest {
+            setContent {
+                CompositionLocalProvider(LocalSystemTheme provides SystemTheme.Light) {
+                    ChurchPresenterTheme { applied = MaterialTheme.colorScheme }
+                }
+            }
+        }
+
+        assertSame(scheme("LightColorScheme"), applied)
+    }
+
+    @Test
+    fun `a light mode really is light and a dark mode really is dark`() {
+        // The cheap sanity check the ten-branch when cannot make for itself.
+        fun luminance(mode: ThemeMode) = underTheme(mode) { MaterialTheme.colorScheme.background }.luminance()
+
+        listOf(ThemeMode.LIGHT, ThemeMode.WARM, ThemeMode.OCEAN, ThemeMode.ROSE).forEach {
+            assertTrue(luminance(it) > 0.5f, "$it is wired to a dark scheme")
+        }
+        listOf(ThemeMode.DARK, ThemeMode.MIDNIGHT, ThemeMode.FOREST, ThemeMode.MOCHA, ThemeMode.STUDIO).forEach {
+            assertTrue(luminance(it) < 0.5f, "$it is wired to a light scheme")
+        }
+    }
+
+    // ── What else the theme carries ─────────────────────────────────────────────
+
+    @Test
+    fun `the app's own corner radii are applied`() {
+        // Material's defaults are rounder; these are the values the whole app is drawn with.
+        val shapes = underTheme(ThemeMode.LIGHT) { MaterialTheme.shapes }
+
+        assertEquals(AppShape(4.dp), shapes.extraSmall)
+        assertEquals(AppShape(6.dp), shapes.small)
+        assertEquals(AppShape(8.dp), shapes.medium)
+        assertEquals(AppShape(10.dp), shapes.large)
+        assertEquals(AppShape(12.dp), shapes.extraLarge)
+    }
+
+    @Test
+    fun `the app's own typography is applied`() {
+        val typography = underTheme(ThemeMode.LIGHT) { MaterialTheme.typography }
+
+        assertEquals(AppTypography, typography, "falling back to Material's defaults changes every size in the app")
+    }
+
+    @Test
+    fun `the scrollbar is styled against the theme it sits in`() {
+        val light = underTheme(ThemeMode.LIGHT) { LocalScrollbarStyle.current }
+        val dark = underTheme(ThemeMode.DARK) { LocalScrollbarStyle.current }
+
+        assertEquals(5.dp, light.thickness)
+        assertEquals(16.dp, light.minimalHeight)
+        assertNotEquals(
+            light.unhoverColor,
+            dark.unhoverColor,
+            "a scrollbar coloured for one theme disappears into the surface of the other",
+        )
+    }
+
+    @Test
+    fun `a hovered scrollbar is more visible than an idle one`() {
+        val style = underTheme(ThemeMode.DARK) { LocalScrollbarStyle.current }
+
+        assertTrue(
+            style.hoverColor.alpha > style.unhoverColor.alpha,
+            "hovering has to make the bar clearer, not dimmer",
+        )
+    }
+
+    @Test
+    fun `content inside the theme is composed`() = runComposeUiTest {
+        // The theme wraps the entire app; a content lambda that is not called is a blank window.
+        setContent { ChurchPresenterTheme(themeMode = ThemeMode.OCEAN) { Text("the whole app") } }
+
+        onNodeWithText("the whole app").assertExists()
+    }
+
+    // ── The wrappers around it ──────────────────────────────────────────────────
+
+    @Test
+    fun `the app wrapper applies the theme it is given`() {
+        var applied: ColorScheme? = null
+        runComposeUiTest {
+            setContent { AppThemeWrapper(theme = ThemeMode.FOREST) { applied = MaterialTheme.colorScheme } }
+        }
+
+        assertSame(scheme("ForestColorScheme"), applied)
+    }
+
+    @Test
+    fun `the app wrapper supplies a theme manager to what it wraps`() {
+        // Without one, a theme control inside would edit a manager nothing else can see.
+        var manager: ThemeManager? = null
+        runComposeUiTest {
+            setContent { AppThemeWrapper { manager = LocalThemeManager.current } }
+        }
+
+        assertTrue(manager != null)
+    }
+
+    @Test
+    fun `the app wrapper defaults to following the system`() {
+        var applied: ColorScheme? = null
+        runComposeUiTest {
+            setContent { AppThemeWrapper { applied = MaterialTheme.colorScheme } }
+        }
+
+        assertTrue(
+            applied === scheme("LightColorScheme") || applied === scheme("DarkColorScheme"),
+            "a wrapper with no theme named must not pick an accent theme of its own",
+        )
+    }
+
+    @Test
+    fun `reading the theme manager with no provider still returns a usable one`() {
+        // compositionLocalOf { ThemeManager() } — the fallback a screen hits if it forgets
+        // ProvideThemeManager entirely, rather than what AppThemeWrapper always sets up.
+        var seen: ThemeManager? = null
+        runComposeUiTest {
+            setContent { seen = LocalThemeManager.current }
+        }
+
+        assertEquals(
+            ThemeMode.SYSTEM,
+            seen?.themeMode?.value,
+            "an unprovided manager must not leave the UI blank or throw",
+        )
+    }
+
+    @Test
+    fun `provide theme manager without one explicitly given still creates one for its content`() {
+        // Exercises ProvideThemeManager's own default `remember { ThemeManager() }`, not the
+        // explicit instance AppThemeWrapper always passes in.
+        var seen: ThemeManager? = null
+        runComposeUiTest {
+            setContent { ProvideThemeManager { seen = rememberThemeManager() } }
+        }
+
+        assertEquals(ThemeMode.SYSTEM, seen!!.themeMode.value)
+    }
+}

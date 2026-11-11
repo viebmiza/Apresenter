@@ -1,0 +1,157 @@
+package org.churchpresenter.app.churchpresenter
+
+import java.io.File
+import org.churchpresenter.showcontrol.Action
+import org.churchpresenter.core.models.schedule.RowTiming
+import org.churchpresenter.core.models.schedule.ScheduleItem
+import org.churchpresenter.schedule.ScheduleTabActions
+
+// Kept for NavigationTopBar / menu — wraps ScheduleTabActions
+data class ScheduleActions(
+    val newSchedule: () -> Unit = {},
+    val openSchedule: () -> Unit = {},
+    val saveSchedule: () -> Unit = {},
+    val saveScheduleAs: () -> Unit = {},
+    val removeSelected: () -> Unit = {},
+    /** Removes a specific item by id — used to apply an approved remote "remove from schedule". */
+    val removeById: (id: String) -> Unit = {},
+    val clearSchedule: () -> Unit = {},
+    // Remote-API add helpers (populated from ScheduleTabActions)
+    val addSong: (songNumber: Int, title: String, songbook: String, songId: String) -> Unit = { _, _, _, _ -> },
+    val addBibleVerse: (
+        bookName: String, chapter: Int, verseNumber: Int, verseText: String, verseRange: String, bookId: Int,
+    ) -> Unit = { _, _, _, _, _, _ -> },
+    val addPicture: (folderPath: String, folderName: String, imageCount: Int) -> Unit = { _, _, _ -> },
+    /** One picture as its own row; [folderImageCount] is how many its folder holds. */
+    val addSinglePicture: (image: File, folderImageCount: Int) -> Unit = { _, _ -> },
+    /** Runs the block with every row it adds landing at index and on, rather than at the end. */
+    val insertingAt: (index: Int?, block: () -> Unit) -> Unit = { _, block -> block() },
+    val addPresentation: (filePath: String, fileName: String, slideCount: Int, fileType: String) -> Unit =
+        { _, _, _, _ -> },
+    val addMedia: (mediaUrl: String, mediaTitle: String, mediaType: String, subtitleUrl: String) -> Unit =
+        { _, _, _, _ -> },
+    val addScene: (sceneId: String, sceneName: String) -> Unit = { _, _ -> },
+    val addDictionary: (number: String, word: String, transliteration: String, definition: String) -> Unit =
+        { _, _, _, _ -> },
+    val addAnnouncement: (item: ScheduleItem.AnnouncementItem) -> Unit = { },
+    val addWebsite: (url: String, title: String) -> Unit = { _, _ -> },
+    /** A cue row, as loaded from the Calendar Manager -- kept whole, its payload and time with it. */
+    val addCue: (item: ScheduleItem.CueItem) -> Unit = { },
+    /**
+     * A planned row loaded whole from the Calendar Manager, id and all, with how it runs on its
+     * own. The one path a plan comes in by, so its timing lands on the very row it was set on.
+     */
+    val addRow: (item: ScheduleItem, timing: RowTiming?) -> Unit = { _, _ -> },
+    /** How each row of the schedule runs on its own -- what the automation engine reads each tick. */
+    val currentTiming: () -> Map<String, RowTiming> = { emptyMap() },
+    /** What each row of the schedule does when it goes live, keyed by row id. */
+    val currentActions: () -> Map<String, List<Action>> = { emptyMap() },
+    /**
+     * The `HH:mm` start of the service the schedule was loaded from, or null to forget it. What
+     * the Schedule's clock times are reckoned from when no row carries a pin.
+     */
+    val setServiceStart: (startTime: String?) -> Unit = {},
+    /**
+     * The two structural rows, added for the Calendar Manager.
+     *
+     * A planned run of show carries its section headings as [ScheduleItem.LabelItem]s, so loading a
+     * service without these would silently drop every heading. They are deliberately *not* reached
+     * by the remote paths — see `addScheduleItem`'s `wholePlan`.
+     */
+    val addLabel: (text: String, textColor: String, backgroundColor: String) -> Unit = { _, _, _ -> },
+    val addLowerThird: (presetId: String, presetLabel: String, pauseAtFrame: Boolean, pauseDurationMs: Long) -> Unit =
+        { _, _, _, _ -> },
+    /**
+     * Puts a canvas scene on screen by id — what a tap on a scene row in the Schedule tab does.
+     *
+     * Here rather than in `executeProjectItem` because the scenes live in a ViewModel owned by
+     * `MainDesktop`, which this bridge is the one sanctioned way out of; a calendar cue that shows
+     * a scene comes through it.
+     */
+    val presentScene: (sceneId: String) -> Unit = {},
+    /**
+     * Starts a slideshow or a deck playing through [plays] times — 1 once, 0 until stopped — for a
+     * calendar cue that shows a picture folder or a presentation. Same reason as [presentScene]:
+     * the two ViewModels belong to `MainDesktop`.
+     */
+    val playSlideshow: (item: ScheduleItem, plays: Int) -> Unit = { _, _ -> },
+    /** Selects a row, so the Schedule shows what the automation has just put on screen. */
+    val selectItem: (id: String) -> Unit = {},
+)
+
+/**
+ * The menu's view of the Schedule tab's [actions]. [presentScene] and [playSlideshow] are the two it
+ * cannot take from the tab, because they reach past the Schedule into the Canvas and the players.
+ */
+internal fun scheduleActionsFrom(
+    actions: ScheduleTabActions,
+    presentScene: (sceneId: String) -> Unit,
+    playSlideshow: (item: ScheduleItem, plays: Int) -> Unit,
+): ScheduleActions = ScheduleActions(
+    newSchedule = actions.newSchedule,
+    openSchedule = actions.openSchedule,
+    saveSchedule = actions.saveSchedule,
+    saveScheduleAs = actions.saveScheduleAs,
+    removeSelected = actions.removeSelected,
+    removeById = actions.removeById,
+    clearSchedule = actions.clearSchedule,
+    addSong = actions.addSong,
+    addBibleVerse = actions.addBibleVerse,
+    addPicture = actions.addPicture,
+    insertingAt = actions.insertingAt,
+    addSinglePicture = actions.addSinglePicture,
+    addPresentation = actions.addPresentation,
+    addMedia = actions.addMedia,
+    addScene = actions.addScene,
+    addDictionary = actions.addDictionary,
+    addAnnouncement = { item ->
+        actions.addAnnouncement(
+            item.text, item.textColor, item.backgroundColor,
+            item.fontSize, item.fontType, item.bold, item.italic,
+            item.underline, item.shadow, item.shadowColor,
+            item.shadowSize, item.shadowOpacity, item.horizontalAlignment,
+            item.position, item.animationType, item.animationDuration,
+            item.loopCount, item.isTimer, item.timerHours,
+            item.timerMinutes, item.timerSeconds, item.timerTextColor,
+            item.timerExpiredText, item.timerMode, item.targetHour,
+            item.targetMinute, item.targetSecond, item.liveClockFormat,
+            item.backdrop, item.outline, item.showForSeconds,
+        )
+    },
+    addWebsite = actions.addWebsite,
+    addCue = actions.addCue,
+    addRow = actions.addRow,
+    selectItem = actions.selectItem,
+    currentTiming = actions.currentTiming,
+    currentActions = actions.currentActions,
+    setServiceStart = actions.setServiceStart,
+    addLabel = actions.addLabel,
+    addLowerThird = actions.addLowerThird,
+    presentScene = presentScene,
+    playSlideshow = playSlideshow,
+)
+
+/**
+ * These actions with every add a no-op and everything else kept: for putting an item live
+ * without leaving a row behind. A phone projecting a song used to add it to the schedule each
+ * time; adding is what the phone's own Add to Schedule is for.
+ */
+fun ScheduleActions.withoutAdds(): ScheduleActions {
+    val none = ScheduleActions()
+    return copy(
+        addSong = none.addSong,
+        addBibleVerse = none.addBibleVerse,
+        addPicture = none.addPicture,
+        addSinglePicture = none.addSinglePicture,
+        addPresentation = none.addPresentation,
+        addMedia = none.addMedia,
+        addScene = none.addScene,
+        addDictionary = none.addDictionary,
+        addAnnouncement = none.addAnnouncement,
+        addWebsite = none.addWebsite,
+        addCue = none.addCue,
+        addRow = none.addRow,
+        addLabel = none.addLabel,
+        addLowerThird = none.addLowerThird,
+    )
+}

@@ -1,0 +1,143 @@
+package org.churchpresenter.lottiegen.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import org.churchpresenter.theme.AppShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import org.churchpresenter.lottiegen.ui.Tokens
+import org.churchpresenter.theme.sunken
+import org.churchpresenter.theme.elevationPalette
+
+/** Alpha arrives from the UI as a percentage; Compose wants one 0..255 channel. */
+private const val FULLY_OPAQUE_PERCENT = 100
+private const val CHANNEL_MAX = 255
+
+/**
+ * One colour channel: a name, a chip showing the swatch and hex (click to open the picker),
+ * an inline opacity slider, and the numeric alpha. With [showAlpha] off the slider is left out
+ * and [trailing] — a button that opens the fuller controls, say — takes its place.
+ *
+ * Hex is edited inside [ColorPickerDialog], which carries its own validated hex field — the
+ * chip here is a launcher, not an input.
+ */
+@Composable
+fun ColorPickerRow(
+    label: String,
+    color: String,
+    alpha: Int,
+    onColorChange: (String) -> Unit,
+    onAlphaChange: (Int) -> Unit,
+    showAlpha: Boolean = true,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    var showDialog by remember { mutableStateOf(false) }
+
+    if (showDialog) {
+        ColorPickerDialog(
+            initialHex = color,
+            onDismiss = { showDialog = false },
+            onColorSelected = { hex ->
+                onColorChange(hex)
+                showDialog = false
+            }
+        )
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Text(
+            label,
+            modifier = Modifier.width(78.dp),
+            fontSize = 12.sp,
+            color = Tokens.LabelText,
+            maxLines = 1
+        )
+
+        // Swatch + hex chip — opens the picker.
+        Row(
+            modifier = Modifier
+                .height(28.dp)
+                // The app's sunken color field -- the same well as its other inputs.
+                .sunken(Tokens.ChipShape, elevationPalette())
+                .clickable { showDialog = true }
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(14.dp)
+                    .clip(AppShape(4.dp))
+                    .background(parseHexColor(color, FULLY_OPAQUE_PERCENT))
+                    .border(1.dp, Tokens.BorderHover, AppShape(4.dp))
+            )
+            Text(
+                color.uppercase(),
+                fontSize = 11.5.sp,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 0.23.sp,
+                color = Tokens.HexText,
+                maxLines = 1
+            )
+        }
+
+        if (showAlpha) {
+            LottieSlider(
+                value = alpha.toFloat(),
+                onValueChange = { onAlphaChange(it.toInt()) },
+                valueRange = 0f..100f,
+                modifier = Modifier.weight(1f)
+            )
+
+            Text(
+                "$alpha",
+                modifier = Modifier.width(26.dp),
+                fontSize = 11.5.sp,
+                color = Tokens.ValueText,
+                textAlign = TextAlign.End,
+                maxLines = 1
+            )
+        } else {
+            Spacer(Modifier.weight(1f))
+        }
+        trailing?.invoke()
+    }
+}
+
+private fun parseHexColor(hex: String, alpha: Int): Color {
+    return try {
+        val clean = hex.removePrefix("#")
+        val r = clean.substring(0, 2).toInt(16)
+        val g = clean.substring(2, 4).toInt(16)
+        val b = clean.substring(4, 6).toInt(16)
+        Color(r, g, b, (alpha * CHANNEL_MAX / FULLY_OPAQUE_PERCENT))
+    } catch (_: Exception) {
+        Color.White
+    }
+}

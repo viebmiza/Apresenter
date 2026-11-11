@@ -1,0 +1,63 @@
+@file:OptIn(androidx.compose.ui.test.ExperimentalTestApi::class)
+
+package org.churchpresenter.app.churchpresenter.screenshot
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.v2.runSkikoComposeUiTest
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import org.churchpresenter.app.churchpresenter.TestSingletons
+import org.churchpresenter.sharedui.language.Language
+import org.churchpresenter.appsettings.SetupWizardContent
+import java.io.File
+import kotlin.test.Test
+import org.churchpresenter.sharedui.screenshot.SCREENSHOT_ROOT
+import org.churchpresenter.sharedui.screenshot.THEMES
+import org.churchpresenter.sharedui.screenshot.captureTo
+import org.churchpresenter.sharedui.screenshot.PinnedFonts
+
+class AppPreviewSetupWizardScreenshotTest {
+
+    @Test
+    fun `every step of the getting started wizard`() {
+        TestSingletons.latchSkikoHostOs()
+        TestSingletons.latchToTestHome()
+        THEMES.forEach { (suffix, mode) ->
+            runSkikoComposeUiTest(size = Size(700f, 620f), density = Density(1f)) {
+                setContent {
+                    PinnedFonts {
+                        Box(Modifier.size(700.dp, 620.dp)) {
+                            SetupWizardContent(
+                                theme = mode,
+                                selectedLanguage = Language.ENGLISH,
+                                onLanguageSelected = {},
+                                onThemeSelected = {},
+                                onOpenSettings = {},
+                                onDismiss = {},
+                            )
+                        }
+                    }
+                }
+                waitForIdle()
+                STEPS.forEachIndexed { index, step ->
+                    captureTo(File("$SCREENSHOT_ROOT/previewApp/setup_${index + 1}_${step}_$suffix.png"))
+                    if (index < STEPS.lastIndex) {
+                        onNodeWithText("Next").performClick()
+                        waitForIdle()
+                    }
+                }
+            }
+        }
+    }
+
+    private companion object {
+        val STEPS = listOf(
+            "language", "theme", "welcome", "bible", "songs", "projection", "vlc", "ready",
+        )
+    }
+}

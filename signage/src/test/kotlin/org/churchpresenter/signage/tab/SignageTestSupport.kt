@@ -1,0 +1,226 @@
+package org.churchpresenter.signage.tab
+
+import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.ComposeUiTest
+import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.job
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import org.churchpresenter.signage.core.Features
+import org.churchpresenter.signage.core.Platform
+import org.churchpresenter.signage.core.ServerMessage
+import org.churchpresenter.signage.core.sha256Hex
+import org.churchpresenter.signage.hub.AgentUpdates
+import org.churchpresenter.signage.hub.PendingScreen
+import org.churchpresenter.signage.hub.SignageHub
+import org.churchpresenter.signage.smugmug.FakeAlbum
+import org.churchpresenter.signage.smugmug.FakeSmugMug
+import java.io.IOException
+import java.nio.file.Path
+import java.security.KeyPairGenerator
+import java.security.Signature
+import java.util.Base64
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.createDirectories
+import kotlin.io.path.createTempDirectory
+import kotlin.io.path.deleteRecursively
+import kotlin.io.path.writeText
+
+/**
+ * A signage folder, a hub with one paired screen, and a controller over them, in a temporary folder
+ * the test owns. Player releases come from memory, signed with a key made for the test.
+ *
+ * The tab starts with a folder playlist already copied in for each of [folders], by name: `""` is
+ * [folder], `Folders/Signage`, as `folder:` ("Signage"), and `"Events"` is `Folders/Events` as
+ * `folder:Events`, listed even while that folder does not exist.
+ */
+@OptIn(ExperimentalPathApi::class)
+class SignageWorld(
+    /** The folder the world lives in, deleted on close. A screenshot pins it: the tab shows its path. */
+    val root: Path = createTempDirectory("signage-tab"),
+    folders: List<String> = listOf(""),
+) : AutoCloseable {
+    /** Where the controller keeps the setup and the copies its playlists play. */
+    val signage: Path = root.resolve("store")
+
+    /** The first playlist's copy. */
+    val folder: Path = signage.resolve("Folders/Signage").createDirectories()
+
+    init {
+        val seeded = folders.map { name ->
+            val shown = name.ifEmpty { "Signage" }
+            PickedFolderPlaylist("folder:$name", shown, "Folders/$shown")
+        }
+        if (seeded.isNotEmpty()) SignageStore(signage).saveSettings(SignageSettings(added = seeded))
+    }
+    val scope = CoroutineScope(Job())
+    val release = SignedRelease()
+
+    /** The hub's clock; set it back to make a report look old. */
+    @Volatile
+    var now: Long = System.currentTimeMillis()
+
+    val hub = SignageHub(
+        root.resolve("hub"),
+        "Main PC",
+        scope,
+        clock = { now },
+        updates = release.updates(root.resolve("builds")),
+    )
+
+    /** This ChurchPresenter's analytics setting, as the app hands it to the controller. */
+    val diagnostics = MutableStateFlow(true)
+
+    /** The SmugMug API key the app hands the controller. */
+    val smugMugKey = MutableStateFlow("KEY")
+
+    /** The SmugMug account the slideshows read: never the real one. */
+    val smugMug = FakeSmugMug(
+        listOf(FakeAlbum("a1", "Harvest", listOf("p1", "p2", "p3")), FakeAlbum("a2", "Seminar", listOf("p4"))),
+    )
+
+    val controller = SignageController(
+        hub,
+        signage,
+        scope,
+        pollMs = POLL_MS,
+        diagnostics = diagnostics,
+        smugMugApiKey = smugMugKey,
+        smugMugHttp = smugMug,
+    )
+
+    /**
+     * Puts a file in [folder] (a picture or video by its extension), or with a folder part, such as
+     * `Events/flyer.png`, in that playlist's copy.
+     */
+    fun file(relative: String, text: String = relative): Path =
+        (if ('/' in relative) signage.resolve("Folders") else folder).resolve(relative).write(text)
+
+    /** Puts a file in a folder of pictures outside the signage folder, to be added from. */
+    fun original(relative: String, text: String = relative): Path = root.resolve("pictures/$relative").write(text)
+
+    private fun Path.write(text: String): Path = also {
+        it.parent.createDirectories()
+        it.writeText(text)
+    }
+
+    /**
+     * Pairs a screen that runs [version] and can do [features], connected now. Loads the registry
+     * first unless [load] is false: a started controller has loaded it already, and loading it again
+     * would read the file before the pairing reached it.
+     */
+    suspend fun pairScreen(
+        id: String = "player-1",
+        version: String = "26.0.8",
+        features: List<String> = listOf(Features.WIPE, Features.PREVIEW, Features.UPDATE),
+        load: Boolean = true,
+    ) {
+        if (load) hub.registry.load()
+        hub.links.opened(id, "10.0.0.5", null, features)
+        hub.registry.pair(PendingScreen(id, "4821", Platform.LINUX_X64, version, 1920, 1080, "10.0.0.5"), "Lobby")
+    }
+
+    /**
+     * Starts the controller and pairs a screen once it has loaded the registry. Pairing before then
+     * races its load, which can land after the pairing and read the file back without it.
+     */
+    suspend fun startAndPairScreen() {
+        controller.start()
+        withTimeout(WAIT_MS) { controller.state.first { it.ready } }
+        pairScreen(load = false)
+    }
+
+    /**
+     * The next message [id] is sent that [match]es, within a few seconds. Listening starts at once,
+     * before this returns: messages are not replayed, so call it before what sends one.
+     */
+    fun <T : ServerMessage> CoroutineScope.expect(
+        id: String = "player-1",
+        match: (ServerMessage) -> T?,
+    ): Deferred<T> =
+        async(start = CoroutineStart.UNDISPATCHED) {
+            withTimeout(WAIT_MS) {
+                hub.links.messagesFor(id).first { match(it) != null }.let { checkNotNull(match(it)) }
+            }
+        }
+
+    override fun close() {
+        controller.stop()
+        runBlocking { scope.coroutineContext.job.children.toList().forEach { it.cancelAndJoinQuietly() } }
+        scope.cancel()
+        root.deleteRecursively()
+    }
+
+    private suspend fun Job.cancelAndJoinQuietly() {
+        cancel()
+        join()
+    }
+
+    companion object {
+        const val POLL_MS = 20L
+        const val WAIT_MS = 5_000L
+    }
+}
+
+/** A player release in memory, its index signed with a key made for the test. */
+class SignedRelease(val version: String = "26.0.9") {
+    private val keys = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
+    val build = "the linux build".toByteArray()
+    private val index =
+        """{"version":"$version","protocolMin":1,"protocolMax":1,"assets":""" +
+            """{"linux_x64":{"name":"b.tar.gz","size":${build.size},"sha256":"${sha256Hex(build)}"}}}"""
+    private val signature = Base64.getEncoder().encodeToString(
+        Signature.getInstance("Ed25519").run {
+            initSign(keys.private)
+            update(index.toByteArray())
+            sign()
+        },
+    )
+    private val files = mapOf(
+        "signage-release.json" to index.toByteArray(),
+        "signage-release.json.sig" to signature.toByteArray(),
+        "b.tar.gz" to build,
+    )
+
+    fun updates(cache: Path) = AgentUpdates(
+        cache,
+        baseUrl = "https://example.test",
+        publicKey = Base64.getEncoder().encodeToString(keys.public.encoded),
+    ) { url, consume ->
+        val bytes = files[url.substringAfterLast('/')] ?: throw IOException("404")
+        bytes.inputStream().use(consume)
+    }
+}
+
+/** The text box inside the field tagged [tag]: a settings field draws its caption apart from it. */
+@OptIn(ExperimentalTestApi::class)
+internal fun ComposeUiTest.field(tag: String) = onNode(hasSetTextAction() and hasAnyAncestor(hasTestTag(tag)))
+
+/**
+ * The playlist panel with the header's Help and Add a playlist beside it, as the tab draws them, for a
+ * test that composes the panel without the whole tab.
+ */
+@Composable
+internal fun PanelWithMenu(state: SignageFolderState, actions: FolderActions) {
+    Column {
+        Row {
+            SignageHelpButton()
+            AddPlaylistMenu(state, actions)
+        }
+        SignageFolderPanel(state, actions, Modifier)
+    }
+}

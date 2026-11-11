@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Q&A Admin</title>
+<style>
+/*QA_SHARED_CSS*/
+:root{--qa-bg:#1e1e2e;--qa-surface:#2a2a3e;--qa-ink:#e0e0e0;--qa-muted:#a0a0ad;--qa-border:#3b3b5c}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--qa-bg);color:var(--qa-ink);min-height:100vh;padding:16px}
+.header{display:flex;align-items:center;justify-content:space-between;padding:16px;margin-bottom:16px}
+h1{font-size:22px}
+.tab{min-height:44px;padding:8px 20px;border-radius:8px;border:1px solid var(--qa-border);background:transparent;color:var(--qa-ink);cursor:pointer;font-size:14px;transition:background .2s,border-color .2s}
+.list{padding:0 16px}
+.q{background:var(--qa-surface);border-radius:12px;padding:16px;margin-bottom:8px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.q.live{border:2px solid var(--qa-success)}
+.q-text{flex:1;font-size:15px;line-height:1.4;min-width:150px}
+.q-words{white-space:pre-wrap;overflow-wrap:anywhere}
+.q-words.clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.more{background:none;border:none;color:var(--qa-primary);font-size:13px;font-weight:600;padding:6px 0;min-height:32px;cursor:pointer;font-family:inherit}
+.q-time{color:var(--qa-muted);font-size:12px;white-space:nowrap;padding-top:3px}
+.q-label{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:600}
+.q-label.done{background:#42a5f5;color:#08233b}
+.q-label.denied{background:var(--qa-danger);color:#fff}
+.q-actions{display:flex;gap:6px;flex-wrap:wrap}
+.btn{min-height:44px;padding:8px 14px;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:background .2s}
+.btn-approve{background:var(--qa-success);color:#fff}.btn-approve:hover{background:var(--qa-success-hover)}
+.btn-deny{background:var(--qa-danger);color:#fff}.btn-deny:hover{background:var(--qa-danger-hover)}
+.btn-live{background:var(--qa-primary);color:#fff}.btn-live:hover{background:var(--qa-primary-hover)}
+.btn-done{background:#42a5f5;color:#08233b}.btn-done:hover{background:#1e88e5;color:#fff}
+.btn-back{background:#ff9800;color:#3d2600}.btn-back:hover{background:#f57c00;color:#fff}
+.btn-golive-confirm{background:var(--qa-primary);color:#fff;opacity:0.6}.btn-golive-confirm:hover{opacity:1}
+.btn-edit{background:#ff9800;color:#3d2600}.btn-edit:hover{background:#f57c00;color:#fff}
+.btn-del{background:#4a4a5e;color:#e0e0e0}.btn-del:hover{background:#5e5e77}
+.edit-area{width:100%;display:flex;gap:6px;align-items:center;margin-top:8px}
+.edit-area textarea{flex:1;background:var(--qa-bg);color:var(--qa-ink);border:2px solid var(--qa-primary);border-radius:8px;padding:8px;font-size:14px;font-family:inherit;resize:vertical;min-height:40px}
+.edit-area .btn{white-space:nowrap}
+.empty{text-align:center;padding:48px;color:var(--qa-muted);font-size:16px}
+.status-bar{padding:8px 16px;background:var(--qa-success);color:#fff;border-radius:8px;margin:0 16px 16px;display:flex;align-items:center;justify-content:space-between}
+.status-bar .btn{background:rgba(255,255,255,.2);color:#fff}
+.add-bar{display:flex;gap:8px;padding:0 16px;margin-bottom:16px}
+.add-bar{align-items:flex-end}
+.add-bar .btn{flex:0 0 auto}
+.add-bar textarea{flex:1 1 0;min-width:0;width:100%;box-sizing:border-box;display:block;min-height:44px;max-height:240px;background:var(--qa-surface);color:var(--qa-ink);border:1px solid var(--qa-border);border-radius:8px;padding:10px 14px;font-size:14px;font-family:inherit;line-height:1.4;resize:none;overflow-y:auto}
+.add-bar textarea:focus{outline:none;border-color:var(--qa-primary)}
+.banner{margin:0 16px 16px;padding:12px 16px;border-radius:8px;background:#5c1f24;color:#ffdad6;font-size:14px}
+body.hide-actions .q-actions{display:none}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:0 16px;margin-bottom:16px}
+.toolbar{flex-wrap:nowrap}
+.toolbar .tab{flex:0 0 auto;padding:8px 12px}
+.sort-select{flex:1 1 0;min-width:0;min-height:44px;padding:8px 32px 8px 12px;border-radius:8px;border:1px solid var(--qa-border);background-color:var(--qa-surface);color:var(--qa-ink);font-size:14px;font-family:inherit;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23a0a0ad' stroke-width='2' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;text-overflow:ellipsis}
+.login{max-width:360px;margin:80px auto;text-align:center}
+.login input{width:100%;min-height:48px;background:var(--qa-surface);color:var(--qa-ink);border:2px solid var(--qa-border);border-radius:12px;padding:14px;font-size:16px;margin:16px 0;text-align:center}
+.login input:focus{outline:none;border-color:var(--qa-primary)}
+.login .btn{width:100%;padding:14px;font-size:16px}
+.login .err{color:#ef9a9a;margin-top:8px;font-size:14px}
+</style>
+</head>
+<body>
+<div id="login-screen" class="login" style="display:none">
+<h1>Q&A Admin</h1>
+<p style="color:var(--qa-muted);margin-top:8px">Enter the Q&amp;A admin password to continue</p>
+<label class="sr-only" for="pw-input">Admin password</label>
+<input type="password" id="pw-input" aria-label="Admin password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
+<button class="btn btn-live" id="login-btn" onclick="doLogin()">Login</button>
+<p id="connecting-msg" style="display:none;color:var(--qa-muted);margin-top:8px">Waiting for approval on the desktop…</p>
+<div class="err" id="pw-err" style="display:none"></div>
+</div>
+
+<div id="main-app" style="display:none">
+<div class="header">
+<h1>Q&A Admin</h1>
+<span id="status" role="status" aria-live="polite" style="font-size:13px;color:var(--qa-muted)">Connecting...</span>
+</div>
+
+<div id="session-banner" class="banner" role="status" style="display:none">No session running — nobody can submit questions yet.</div>
+
+<div id="display-bar" class="status-bar" style="display:none">
+<span id="display-text">Displaying question...</span>
+<button class="btn" onclick="clearDisplay()">Clear Display</button>
+</div>
+
+<div class="add-bar" id="add-bar" style="display:none">
+<label class="sr-only" for="add-input">Add a question</label>
+<textarea id="add-input" rows="1" aria-label="Add a question" placeholder="Add a question..." title="Enter adds it; Shift+Enter starts a new line" spellcheck="true" onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();addQ()}" oninput="growAdd()"></textarea>
+<button class="btn btn-approve" onclick="addQ()">Add</button>
+</div>
+
+<div class="toolbar">
+<label class="sr-only" for="view-select">View</label>
+<select id="view-select" class="sort-select" aria-label="View" onchange="setFilter(this.value)">
+<option value="ALL">All (0)</option>
+<option value="INCOMING">Incoming (0)</option>
+<option value="APPROVED">Approved (0)</option>
+<option value="INCOMING_APPROVED">Incoming + Approved (0)</option>
+<option value="DONE">Done (0)</option>
+<option value="DENIED">Denied (0)</option>
+</select>
+<label class="sr-only" for="sort-select">Sort</label>
+<select id="sort-select" class="sort-select" aria-label="Sort" onchange="setSort(this.value)">
+<option value="newest">Newest</option>
+<option value="oldest">Oldest</option>
+<option value="most" class="vote-sort">Most votes</option>
+<option value="least" class="vote-sort">Least votes</option>
+</select>
+<button class="tab" id="actions-btn" aria-pressed="true" onclick="toggleActions()">Hide actions</button>
+</div>
+
+<div class="list" id="list"></div>
+</div>
+
+<script>
+let questions=[],filter='ALL',displayedId=null,editingId=null,authed=false,votingEnabled=false;
+let sortBy='newest';
+try{sortBy=localStorage.getItem('qa_admin_sort')||'newest'}catch(e){}
+let password=new URLSearchParams(window.location.search).get('password')||localStorage.getItem('qa_admin_pw')||'';
+if(password){localStorage.setItem('qa_admin_pw',password);document.getElementById('pw-input').value=password;}
+let deviceId=localStorage.getItem('qa_admin_device_id');
+if(!deviceId){deviceId=(crypto.randomUUID?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(36).slice(2)));localStorage.setItem('qa_admin_device_id',deviceId);}
+const headers={'Content-Type':'application/json','X-Device-Id':deviceId};
+
+function setHeaders(){
+  if(password)headers['X-QA-Password']=password;
+}
+setHeaders();
+
+// Sends /api/qa/auth and waits for the desktop operator to approve this device — mirrors the
+// presentation remote's connection handshake, showing a "waiting for approval" state meanwhile.
+async function attemptAuth(){
+  const btn=document.getElementById('login-btn');
+  const msg=document.getElementById('connecting-msg');
+  const errEl=document.getElementById('pw-err');
+  document.getElementById('login-screen').style.display='block';
+  document.getElementById('main-app').style.display='none';
+  errEl.style.display='none';
+  btn.disabled=true;msg.style.display='block';
+  try{
+    const r=await fetch('/api/qa/auth',{method:'POST',headers});
+    if(r.ok){authed=true;document.getElementById('login-screen').style.display='none';document.getElementById('main-app').style.display='block';load();checkStatus();return true}
+    // Opening the page with no password yet is not a wrong guess: just ask for it.
+    if(r.status===401&&!password){document.getElementById('pw-input').focus();return false}
+    errEl.textContent=r.status===403?'Connection request denied':'Incorrect password';
+    errEl.style.display='block';
+    document.getElementById('pw-input').focus();
+    return false
+  }catch(e){
+    errEl.textContent='Could not reach the app';
+    errEl.style.display='block';
+    return false
+  }finally{
+    btn.disabled=false;msg.style.display='none';
+  }
+}
+async function doLogin(){
+  password=document.getElementById('pw-input').value;
+  localStorage.setItem('qa_admin_pw',password);
+  headers['X-QA-Password']=password;
+  await attemptAuth();
+}
+
+// Auto-connect on load — approval popup (if any) surfaces on the desktop while this awaits
+attemptAuth();
+
+function lockOut(){
+  authed=false;password='';localStorage.removeItem('qa_admin_pw');
+  document.getElementById('main-app').style.display='none';
+  document.getElementById('login-screen').style.display='block';
+  document.getElementById('pw-err').textContent='Session expired. Please log in again.';
+  document.getElementById('pw-err').style.display='block';
+  document.getElementById('pw-input').value='';document.getElementById('pw-input').focus();
+}
+let lastLoadSig='';
+async function load(){
+  if(!authed)return;
+  try{
+    const r=await fetch('/api/qa/questions',{headers});
+    if(r.status===401){lockOut();return}
+    if(r.ok)questions=await r.json();
+    // Skip the full innerHTML rebuild when nothing relevant changed (prevents flicker/mis-taps).
+    const sig=JSON.stringify(questions.map(q=>[q.id,q.status,q.text,q.upvotes,q.downvotes,q.submitterName]))+'|'+displayedId;
+    if(sig===lastLoadSig)return;
+    lastLoadSig=sig;
+    if(!editingId)render();
+  }catch(e){}
+}
+
+function render(){
+  // Show/hide clear display bar
+  const dbar=document.getElementById('display-bar');
+  if(displayedId){
+    const dq=questions.find(q=>q.id===displayedId);
+    document.getElementById('display-text').textContent='Displaying: '+(dq?dq.text.split('\n')[0].substring(0,50):'...');
+    dbar.style.display='flex';
+  }else{dbar.style.display='none'}
+  let filtered;
+  if(filter==='ALL')filtered=questions;
+  else if(filter==='INCOMING')filtered=questions.filter(q=>q.status==='PENDING');
+  else if(filter==='APPROVED')filtered=questions.filter(q=>q.status==='APPROVED');
+  else if(filter==='INCOMING_APPROVED')filtered=questions.filter(q=>q.status==='PENDING'||q.status==='APPROVED');
+  else if(filter==='DONE')filtered=questions.filter(q=>q.status==='DONE');
+  else if(filter==='DENIED')filtered=questions.filter(q=>q.status==='DENIED');
+  else filtered=questions;
+  const list=document.getElementById('list');
+  const counts={ALL:questions.length,
+    INCOMING:questions.filter(q=>q.status==='PENDING').length,
+    APPROVED:questions.filter(q=>q.status==='APPROVED').length,
+    INCOMING_APPROVED:questions.filter(q=>q.status==='PENDING'||q.status==='APPROVED').length,
+    DONE:questions.filter(q=>q.status==='DONE').length,
+    DENIED:questions.filter(q=>q.status==='DENIED').length};
+  const names={ALL:'All',INCOMING:'Incoming',APPROVED:'Approved',INCOMING_APPROVED:'Incoming + Approved',DONE:'Done',DENIED:'Denied'};
+  document.querySelectorAll('#view-select option').forEach(o=>{o.textContent=names[o.value]+' ('+counts[o.value]+')'});
+
+  filtered=sortQuestions(filtered);
+  if(!filtered.length){list.innerHTML='<div class="empty">No questions</div>';return}
+  list.innerHTML=filtered.map(q=>{
+    const time=new Date(q.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    const isLive=q.id===displayedId;
+    let label='';
+    if(q.status==='DONE')label='<span class="q-label done">Done</span> ';
+    else if(q.status==='DENIED')label='<span class="q-label denied">Denied</span> ';
+    let actions='<button class="btn btn-edit" onclick="editQ(\''+q.id+'\')">Edit</button>';
+    if(q.status==='PENDING'){
+      actions+='<button class="btn btn-approve" onclick="action(\'approve\',\''+q.id+'\')">Approve</button><button class="btn btn-deny" onclick="action(\'deny\',\''+q.id+'\')">Deny</button>';
+    }else if(q.status==='APPROVED'){
+      actions+=(isLive?'':'<button class="btn btn-live" onclick="action(\'display\',\''+q.id+'\')">Go Live</button>')+'<button class="btn btn-done" onclick="action(\'done\',\''+q.id+'\')">Done</button><button class="btn btn-deny" onclick="action(\'deny\',\''+q.id+'\')">Deny</button>';
+    }else if(q.status==='DONE'){
+      actions+='<button class="btn btn-back" onclick="action(\'approve\',\''+q.id+'\')">Back to Incoming</button>';
+      actions+='<button class="btn btn-golive-confirm" onclick="confirmGoLive(\''+q.id+'\')">Go Live</button>';
+    }else if(q.status==='DENIED'){
+      actions+='<button class="btn btn-approve" onclick="action(\'approve\',\''+q.id+'\')">Approve</button>';
+      actions+='<button class="btn btn-golive-confirm" onclick="confirmGoLive(\''+q.id+'\')">Go Live</button>';
+    }
+    actions+='<button class="btn btn-del" onclick="del(\''+q.id+'\')">Del</button>';
+    const nameTag=q.submitterName?'<span style="color:#888;font-size:12px">'+esc(q.submitterName)+':</span> ':'';
+    const upTag=q.upvotes>0?'<span style="display:inline-block;background:#e3f2fd;color:#1565c0;font-size:11px;font-weight:700;padding:2px 4px;border-radius:4px;margin-right:2px">&#9650; '+q.upvotes+'</span>':'';
+    const dnTag=q.downvotes>0?'<span style="display:inline-block;background:#ffebee;color:#c62828;font-size:11px;font-weight:700;padding:2px 4px;border-radius:4px;margin-right:4px">&#9660; '+q.downvotes+'</span>':'';
+    const voteTag=upTag+dnTag;
+    return '<div class="q'+(isLive?' live':'')+'" id="q-'+q.id+'"><span class="q-time">'+time+'</span><div class="q-text" id="qt-'+q.id+'"><div class="q-words'+(collapsed.has(q.id)?' clamp':'')+'" id="qw-'+q.id+'">'+voteTag+label+nameTag+esc(q.text)+'</div><button class="more" id="qm-'+q.id+'" hidden onclick="toggleMore(\''+q.id+'\')"></button></div><div class="q-actions">'+actions+'</div></div>';
+  }).join('');
+  markLong();
+}
+
+// Every question is shown whole at first; one that runs past three lines gets Show less / Show more.
+const collapsed=new Set();
+function markLong(){
+  document.querySelectorAll('.q-words').forEach(el=>{
+    const id=el.id.slice(3);
+    const btn=document.getElementById('qm-'+id);
+    if(!btn)return;
+    const lh=parseFloat(getComputedStyle(el).lineHeight)||21;
+    const clamped=el.classList.contains('clamp');
+    const long=clamped?el.scrollHeight>el.clientHeight+1:el.scrollHeight>lh*3+1;
+    btn.hidden=!long;
+    btn.textContent=clamped?'Show more':'Show less';
+    btn.setAttribute('aria-expanded',String(!clamped));
+  });
+}
+function toggleMore(id){
+  if(collapsed.has(id))collapsed.delete(id);else collapsed.add(id);
+  render();
+}
+window.addEventListener('resize',markLong);
+
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+let pendingConfirm=null;
+function confirmGoLive(id){
+  if(pendingConfirm===id){
+    pendingConfirm=null;
+    action('approve',id).then(()=>action('display',id));
+    return;
+  }
+  pendingConfirm=id;
+  const el=document.getElementById('q-'+id);
+  if(el){const btns=el.querySelectorAll('.btn-golive-confirm');btns.forEach(b=>{b.textContent='Confirm Go Live?';b.style.opacity='1'})}
+  setTimeout(()=>{if(pendingConfirm===id){pendingConfirm=null;load()}},3000);
+}
+async function action(act,id){
+  try{const r=await fetch('/api/qa/questions/'+id+'/'+act,{method:'POST',headers});
+    if(r.status===401){lockOut();return}
+    if(r.ok&&act==='display')displayedId=id;
+    if(r.ok&&(act==='done'||act==='deny'))if(displayedId===id)displayedId=null;
+    load();
+  }catch(e){}
+}
+async function del(id){
+  if(!confirm('Delete this question? This cannot be undone.'))return;
+  try{const r=await fetch('/api/qa/questions/'+id,{method:'DELETE',headers});if(r.status===401){lockOut();return}load()}catch(e){}
+}
+function editQ(id){
+  const q=questions.find(q=>q.id===id);if(!q)return;
+  editingId=id;
+  const el=document.getElementById('qt-'+id);if(!el)return;
+  el.innerHTML='<div class="edit-area"><textarea id="edit-'+id+'" spellcheck="true" aria-label="Edit question"></textarea><button class="btn btn-approve" onclick="saveEdit(\''+id+'\')">Save</button><button class="btn btn-del" onclick="cancelEdit()">Cancel</button></div>';
+  const ta=document.getElementById('edit-'+id);if(ta){ta.value=q.text;ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length)}
+}
+async function saveEdit(id){
+  const ta=document.getElementById('edit-'+id);if(!ta)return;
+  const text=ta.value.trim();if(!text)return;
+  editingId=null;
+  try{const r=await fetch('/api/qa/questions/'+id+'/edit',{method:'POST',headers,body:JSON.stringify({text})});if(r.status===401){lockOut();return}load()}catch(e){}
+}
+function cancelEdit(){editingId=null;render()}
+async function addQ(){
+  const inp=document.getElementById('add-input');const text=inp.value.trim();if(!text)return;
+  inp.value='';growAdd();
+  try{const r=await fetch('/api/qa/add',{method:'POST',headers,body:JSON.stringify({text})});if(r.status===401){lockOut();return}load()}catch(e){}
+}
+async function clearDisplay(){
+  try{await fetch('/api/qa/clear-display',{method:'POST',headers});displayedId=null;render();load()}catch(e){}
+}
+function setFilter(f){
+  filter=f;
+  try{localStorage.setItem('qa_admin_view',f)}catch(e){}
+  render();
+}
+try{const v=localStorage.getItem('qa_admin_view');if(v&&document.querySelector('#view-select option[value="'+v+'"]')){filter=v;document.getElementById('view-select').value=v}}catch(e){}
+// The desktop's four orders. A vote order breaks ties newest first, so it never looks unsorted.
+function sortQuestions(list){
+  const newest=(a,b)=>b.timestamp-a.timestamp;
+  const s=votingEnabled?sortBy:(sortBy==='most'||sortBy==='least'?'newest':sortBy);
+  if(s==='oldest')return [...list].sort((a,b)=>a.timestamp-b.timestamp);
+  if(s==='most')return [...list].sort((a,b)=>(b.voteCount-a.voteCount)||newest(a,b));
+  if(s==='least')return [...list].sort((a,b)=>(a.voteCount-b.voteCount)||newest(a,b));
+  return [...list].sort(newest);
+}
+function setSort(v){
+  sortBy=v;
+  try{localStorage.setItem('qa_admin_sort',v)}catch(e){}
+  render();
+}
+// Vote orders are offered only while voting is on; with it off every count is 0.
+function syncSortOptions(){
+  const sel=document.getElementById('sort-select');
+  sel.querySelectorAll('.vote-sort').forEach(o=>{o.hidden=!votingEnabled;o.disabled=!votingEnabled});
+  sel.value=(!votingEnabled&&(sortBy==='most'||sortBy==='least'))?'newest':sortBy;
+}
+syncSortOptions();
+// Hiding the buttons leaves a read-only list, for following along on a phone without mis-taps.
+function applyActions(hidden){
+  document.body.classList.toggle('hide-actions',hidden);
+  const b=document.getElementById('actions-btn');
+  b.textContent=hidden?'Show actions':'Hide actions';
+  b.setAttribute('aria-pressed',String(!hidden));
+}
+function toggleActions(){
+  const hidden=!document.body.classList.contains('hide-actions');
+  try{localStorage.setItem('qa_admin_hide_actions',hidden?'1':'0')}catch(e){}
+  applyActions(hidden);
+}
+try{applyActions(localStorage.getItem('qa_admin_hide_actions')==='1')}catch(e){applyActions(false)}
+function growAdd(){
+  const ta=document.getElementById('add-input');
+  ta.style.height='auto';ta.style.height=Math.min(ta.scrollHeight+2,240)+'px';
+}
+async function checkStatus(){
+  if(!authed)return;
+  try{const r=await fetch('/api/qa/status');const d=await r.json();
+    document.getElementById('status').textContent=d.sessionActive?('Session: '+(d.sessionName||'Active')):'No session running';
+    document.getElementById('status').style.color=d.sessionActive?'#66bb6a':'#ef5350';
+    document.getElementById('session-banner').style.display=d.sessionActive?'none':'block';
+    // Questions are added to a running session; with none, there is nothing to add them to.
+    document.getElementById('add-bar').style.display=d.sessionActive?'flex':'none';
+    if(!!d.votingEnabled!==votingEnabled){votingEnabled=!!d.votingEnabled;syncSortOptions();render()}
+    const newDisplayed=d.displayedQuestionId||null;
+    if(newDisplayed!==displayedId){displayedId=newDisplayed;render()}
+  }catch(e){document.getElementById('status').textContent='Disconnected';document.getElementById('status').style.color='#ef5350'}
+}
+
+setInterval(()=>{if(authed)load()},3000);
+setInterval(()=>{if(authed)checkStatus()},3000);
+</script>
+</body>
+</html>

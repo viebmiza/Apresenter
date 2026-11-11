@@ -1,0 +1,44 @@
+package org.churchpresenter.app.churchpresenter.ui.theme
+
+import org.churchpresenter.sharedui.composables.cpColorToHex
+import org.churchpresenter.sharedui.composables.cpTryParseHex
+import org.churchpresenter.dialogs.ThemeCustomizationChoice
+import org.churchpresenter.dialogs.toCustomization
+import org.churchpresenter.settings.AppSettings
+import org.churchpresenter.theme.DefaultCustomAccent
+import org.churchpresenter.theme.ThemeCustomization
+import org.churchpresenter.theme.UI_FONT_SCALES
+import org.churchpresenter.theme.UI_SCALES
+
+/**
+ * What the Customize Theme dialog opens on: the saved choices, with [useCustomColors] decided by the
+ * caller. A scale outside the offered range is clamped into it.
+ */
+fun themeChoiceFrom(settings: AppSettings, useCustomColors: Boolean): ThemeCustomizationChoice =
+    ThemeCustomizationChoice(
+        useCustomColors = useCustomColors,
+        accentHex = customAccentHex(settings),
+        dark = settings.customThemeDark,
+        colors = settings.customThemeColors,
+        fontFamily = settings.uiFontFamily,
+        fontScale = settings.uiFontScale.coerceIn(UI_FONT_SCALES.first(), UI_FONT_SCALES.last()),
+        uiScale = settings.uiScale.coerceIn(UI_SCALES.first(), UI_SCALES.last()),
+        rowSpacing = settings.uiRowSpacing,
+    )
+
+/**
+ * The user's theme choices as the theme module takes them: the colours parsed, the font resolved.
+ *
+ * The theme module reads no settings, so this is the one place the stored strings become values. A
+ * hex that no longer parses falls back to automatic (or, for the accent, the default one), and a font
+ * that is no longer installed to the platform face. The interface size is held to [maxUiScale], the
+ * largest the main window's screen can take: a size saved on a big monitor opens smaller on a laptop.
+ */
+fun themeCustomizationFrom(settings: AppSettings, maxUiScale: Float = UI_SCALES.last()): ThemeCustomization =
+    themeChoiceFrom(settings, useCustomColors = true).toCustomization().let {
+        it.copy(uiScale = it.uiScale.coerceAtMost(maxUiScale))
+    }
+
+/** The accent [settings] holds, as the hex the colour field edits — the default when none is saved. */
+fun customAccentHex(settings: AppSettings): String =
+    settings.customThemeAccent.takeIf { cpTryParseHex(it) != null } ?: cpColorToHex(DefaultCustomAccent)

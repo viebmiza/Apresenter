@@ -1,0 +1,628 @@
+name: Tests
+
+# The three build workflows are all workflow_dispatch-only, so until this existed nothing ran
+# automatically on a push or a pull request -- including the module test suites, which were
+# green but unenforced. This runs the whole suite on every PR, and on main after a merge.
+#
+# `push` is main-only again, and that is deliberate. Widening it to every branch meant a PR commit
+# matched BOTH events, and the two runs then had to be reconciled somehow -- neither way works here:
+#
+#   * let both run: two 15-minute runs of the same commit, for nothing;
+#   * dedupe them with a shared concurrency group: whichever is cancelled still posts a check named
+#     `test`, and `test` is the required context on main (strict). A cancelled required check is not
+#     a passing one, so EVERY pull request sat at BLOCKED with a green run beside a cancelled one.
+#     #106, #107 and #108 all hit this.
+#
+# What the widening was for -- commits pushed to a branch whose PR had already merged running
+# nothing -- is real but much smaller, and it only happens by pushing to a merged PR's branch, which
+# is a mistake worth catching with `gh pr view` rather than with a second CI run per commit.
+#
+# `merge_group` is what lets this branch use a merge queue, and it is not optional: GitHub runs the
+# queue's checks against a temporary `gh-readonly-queue/...` branch, and a workflow that does not
+# listen for that event never reports `test` -- which is the required context on main, so every
+# queued merge would sit until it timed out. The queue cannot be enabled before this trigger exists.
+#
+# It does not repeat the duplicate-run problem the note above describes. That was one commit
+# matching two events; a merge_group run is a different ref (`gh-readonly-queue/main/pr-...`) that no
+# `push` or `pull_request` event ever names, so it neither duplicates nor cancels them -- the
+# concurrency group below keys on `ref_name`, which is unique per queue entry.
+#
+# Change detection compares the queue branch with `merge_group.base_sha` -- main as it stood when the
+# group formed -- which is exactly the set of files the queued pull requests changed.
+on:
+  push:
+    branches: [main]
+  # Draft pull requests run nothing; `ready_for_review` is what runs the checks once one is marked
+  # ready. The first step of `test` decides, from the PR's live state -- see the note there.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+  # The JUnit reporter near the end of this job writes the failing tests into the pull request as a
+  # comment and as inline annotations. Checks for the annotations, pull-requests for the comment;
+  # `contents` deliberately stays read-only.
+  checks: write
+  pull-requests: write
+  # For a draft's run to cancel itself -- see the first step of `test`.
+  actions: write
+  # Only for the `test-hang` issue the last step of `test` files when HungTestReporter halted a
+  # fork. A fork's pull request gets a read-only token whatever this says; that step copes.
+  issues: write
+
+concurrency:
+  # A newer push to the same branch makes an in-flight run redundant. With `push` back to main only,
+  # a commit matches one event, so this no longer has two runs to reconcile -- it just keeps the
+  # newest run per branch.
+  #
+  # Still keyed on the bare branch name rather than `ref`: the two events spell the same branch
+  # differently (on push `ref` is `refs/heads/<branch>`, on pull_request `head_ref` is `<branch>`),
+  # so anything that has to hold for both wants `ref_name`.
+  group: tests-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  # The suite is split across runners that work at the same time, and the repository is public, so
+  # GitHub's standard runners cost nothing however many run at once. `prepare` decides what runs;
+  # `detekt`, `app`, `modules` (one runner per group of module suites) and `changed-tests` then
+  # run side by side; and `test` -- the check `main` requires -- reports and decides. One job doing
+  # all of it in turn took 45 to 70 minutes, almost all of it module suites waiting for each other.
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+      has_modules: ${{ steps.plan.outputs.has_modules }}
+    steps:
+      # A draft runs nothing -- and must not leave behind a `test` that counts as passing. A skipped
+      # job does count: #634 was opened as a draft and marked ready five seconds later, the `opened`
+      # run (still saying draft) was queued after the `ready_for_review` one, skipped `test`,
+      # cancelled the real run as the newer member of the concurrency group, and auto-merge merged
+      # it with no suite run at all. So a draft cancels its own run instead: a cancelled `test`
+      # blocks the merge, and the only `test` that can pass is one that ran the suite.
+      #
+      # Asked of the API rather than read from the event, whose draft flag can be stale -- a late
+      # `opened` sees the PR is ready by now and runs. `ready_for_review` is taken at its word.
+      # Fails open: if the lookup or the cancel does not work, the suite runs.
+      - name: Stop if the pull request is still a draft
+        if: github.event_name == 'pull_request' && github.event.action != 'ready_for_review'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if [ "$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json isDraft -q .isDraft)" = "true" ]; then
+            gh run cancel "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" || true
+            # The cancel lands asynchronously; wait for it rather than let the next step start.
+            sleep 120
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          # Reads the Gradle cache but never writes it: on Linux only test.yml's `app` job saves one, so
+          # main keeps one copy that every job restores from (setup-gradle falls back to the newest
+          # entry for the same OS) instead of a copy per job that pushes the rest out of the 10 GB.
+          cache-read-only: true
+
+      # Which modules' suites this change can affect, read off the build's own dependency graph
+      # (`./gradlew moduleGraph`): a module runs when a file in its directory changed or when a
+      # module it depends on -- transitively, test fixtures included -- did. .github/ci/affected_modules.py
+      # says what it does and the few files that run everything; .github/ci/plan_ci.py packs the
+      # affected suites into the `modules` job's groups. :composeApp runs regardless.
+      #
+      # The base is the pull request's or merge group's base commit, or the commit before a push.
+      # Only that one commit is fetched: `git diff` between two commits needs their trees, not the
+      # history between them. With no base -- workflow_dispatch, a new branch's all-zero `before` --
+      # or one that cannot be fetched, every suite runs.
+      - name: Which modules changed
+        id: plan
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+        run: |
+          python3 -m unittest discover -s .github/ci
+          chmod +x gradlew
+          ./gradlew -q moduleGraph > module-graph.txt
+          if [ -n "$BASE_SHA" ] && ! git fetch --no-tags --depth=1 origin "$BASE_SHA"; then
+            BASE_SHA=""
+          fi
+          python3 .github/ci/affected_modules.py --graph module-graph.txt --base "$BASE_SHA" > affected.txt
+          python3 .github/ci/plan_ci.py shards --affected affected.txt >> "$GITHUB_OUTPUT"
+
+  # Static analysis. No module has a detekt baseline: every module listed here has to be clean.
+  #
+  # NOT gated on which modules changed, deliberately. A module's detekt task costs seconds, and the
+  # gate is worth nothing if a change that breaks it can skip it: the shared config/detekt/detekt.yml
+  # governs every module at once, so "this PR didn't touch that folder" does not mean that folder
+  # still passes.
+  # The Gradle build's resolved dependency graph, submitted to GitHub so Dependabot alerts cover it
+  # (a Gradle build has no lockfile GitHub can read on its own), and on a pull request a review of
+  # what the change adds: a newly introduced dependency with a high or critical advisory fails
+  # this check. Not part of `test` -- an advisory published overnight must not block unrelated
+  # work -- and skipped on a fork's pull request, whose token cannot submit a graph.
+  dependencies:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - name: Submit the dependency graph
+        uses: gradle/actions/dependency-submission@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - name: Review the dependencies this change adds
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          retry-on-snapshot-warnings: true
+
+  detekt:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          # Reads the Gradle cache but never writes it: on Linux only test.yml's `app` job saves one, so
+          # main keeps one copy that every job restores from (setup-gradle falls back to the newest
+          # entry for the same OS) instead of a copy per job that pushes the rest out of the 10 GB.
+          cache-read-only: true
+      - name: Detekt
+        # Every module that applies detekt (cp.detekt), the app included -- a new one is in by default.
+        run: ./gradlew detekt
+      - name: Module layers
+        # Which modules may depend on which: AGENT.md, "Layers".
+        run: ./gradlew checkModuleLayers
+      - name: Live-safe allowlist
+        # Every line names a file that still exists: AGENT.md, "Live-safe output paths".
+        run: ./gradlew checkLiveSafeAllowlist
+
+  app:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      ORG_GRADLE_PROJECT_hangThresholdMs: '150000'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+      - name: App unit tests
+        id: unit_tests
+        # Tighter than the job's own deadline so a hang here is attributed to this step and the
+        # coverage steps and the results upload below (`!cancelled()`) still get to run. Two other
+        # things fire before this budget does: jvmTest's own 30-minute task timeout, and
+        # HungTestReporter, which halts a fork whose single test has outlived 150s (AGENT.md budgets
+        # ~1s a test) and writes a thread dump into the results.
+        timeout-minutes: 40
+        # Compiled first, then the Kotlin compile daemon is stopped before a single test forks. It is
+        # idle for the rest of the step but holds ~3-4 GB, and beside the Gradle daemon and the test
+        # forks (each well past its 1 GB heap in native Skia memory) it took the 16 GB runner to zero
+        # with swap full; GitHub then loses the runner and reports the step as "cancelled".
+        run: |
+          ./gradlew :composeApp:jvmTestClasses
+          pkill -f KotlinCompileDaemon || true
+          ./gradlew :composeApp:jvmTest -PhangThresholdMs=150000
+
+      # So an outlier explains itself instead of needing a guess.
+      - name: Slowest test classes
+        if: ${{ !cancelled() }}
+        run: |
+          python3 - <<'PY'
+          import glob, re
+          rows = []
+          for path in glob.glob('composeApp/build/test-results/jvmTest*/TEST-*.xml'):
+              head = open(path, errors='replace').read(4000)
+              m = re.search(r'<testsuite name="([^"]+)"[^>]*tests="(\d+)"[^>]*time="([\d.]+)"', head)
+              if m:
+                  rows.append((float(m.group(3)), int(m.group(2)), m.group(1)))
+          rows.sort(reverse=True)
+          print(f'{len(rows)} suites, {sum(r[0] for r in rows):.0f}s of test time')
+          print(f'{"time":>9}  {"tests":>5}  class')
+          for t, n, name in rows[:25]:
+              print(f'{t:>8.1f}s  {n:>5}  {name}')
+          PY
+
+      # The six JaCoCo counters, into the log and onto the run's summary page.
+      #
+      # `-x jvmTest -x jvmTestSerial`: jacocoTestReport `dependsOn` both, and after a FAILED suite
+      # that dependency is not up to date, so without it this step would relaunch the suite inside
+      # its own budget (and with only `jvmTest` excluded it once ran the serial classes alone and
+      # reported a 159-test "green suite" at 33% coverage). The step-summary path travels as a
+      # property because `System.getenv` in build logic reads the daemon's frozen environment.
+      #
+      # `!cancelled()`, not `always()`: after a cancelled run the suite stopped partway and the
+      # numbers would be meaningless. A step that hits its own timeout is failed, not cancelled.
+      - name: Coverage summary
+        if: ${{ !cancelled() }}
+        timeout-minutes: 10
+        run: ./gradlew :composeApp:jacocoTestReport -x jvmTest -x jvmTestSerial "-PstepSummary=$GITHUB_STEP_SUMMARY"
+
+      # The floors, off the execution data the suite just wrote. Advisory whenever the suite did not
+      # pass: the exec data is then from a run that did not finish, so a breach would be an artefact.
+      - name: Coverage floor
+        if: ${{ !cancelled() }}
+        continue-on-error: ${{ steps.unit_tests.outcome != 'success' }}
+        timeout-minutes: 10
+        run: ./gradlew :composeApp:jacocoTestCoverageVerification -x jvmTest -x jvmTestSerial
+
+      - name: Keep the results for the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          # Not `results-*`: every path here is under composeApp/build/, which the upload strips, so
+          # `test` downloads these back under that directory itself.
+          name: app-results
+          if-no-files-found: ignore
+          retention-days: 7
+          path: |
+            composeApp/build/test-results/
+            composeApp/build/reports/tests/
+            composeApp/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml
+
+  # The module suites, in the groups prepare packed them into: one runner per group. A group compiles
+  # in parallel, then runs its suites one at a time (`--max-workers=1`) -- several at once on one
+  # runner starved the tests that wait on a real clock. `--continue` so one failing module still
+  # lets the rest report. Each module's coverage floor runs in the same invocation as its suite.
+  modules:
+    needs: prepare
+    if: needs.prepare.outputs.has_modules == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJson(needs.prepare.outputs.shards) }}
+    name: modules (${{ matrix.shard.name }})
+    env:
+      ORG_GRADLE_PROJECT_hangThresholdMs: '150000'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          # Reads the Gradle cache but never writes it: on Linux only test.yml's `app` job saves one, so
+          # main keeps one copy that every job restores from (setup-gradle falls back to the newest
+          # entry for the same OS) instead of a copy per job that pushes the rest out of the 10 GB.
+          cache-read-only: true
+
+      - name: Module suites
+        env:
+          MODULES: ${{ matrix.shard.modules }}
+          TASKS: ${{ matrix.shard.tasks }}
+        # Compiled first and the compile daemon stopped, as the app job does, so the test JVMs have
+        # the runner's memory to themselves.
+        run: |
+          echo "Modules: $MODULES"
+          compile=()
+          for m in $MODULES; do compile+=(":$m:testClasses"); done
+          ./gradlew "${compile[@]}" --max-workers=4
+          pkill -f KotlinCompileDaemon || true
+          ./gradlew $TASKS --continue --max-workers=1
+
+      - name: Keep the results for the report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: results-modules-${{ strategy.job-index }}
+          if-no-files-found: ignore
+          retention-days: 7
+          path: |
+            */build/test-results/
+            */build/reports/tests/
+            */build/reports/jacoco/test/jacocoTestReport.xml
+
+  # AGENT.md's flake rule, enforced: every test class this change added or edited runs three more
+  # times. `--rerun` reruns only the test task; JaCoCo is off (-PfastTest) because coverage is
+  # measured elsewhere. .github/ci/changed_tests.py says which classes count. A pull request or
+  # merge group only: a push to main was already held to it.
+  changed-tests:
+    needs: prepare
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      ORG_GRADLE_PROJECT_hangThresholdMs: '150000'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          # Reads the Gradle cache but never writes it: on Linux only test.yml's `app` job saves one, so
+          # main keeps one copy that every job restores from (setup-gradle falls back to the newest
+          # entry for the same OS) instead of a copy per job that pushes the rest out of the 10 GB.
+          cache-read-only: true
+      - name: Changed tests pass three runs in a row
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          python3 .github/ci/changed_tests.py --base "$BASE_SHA" > changed-tests.txt
+          while read -r task classes; do
+            [ -n "$task" ] || continue
+            filters=()
+            for c in $classes; do filters+=(--tests "$c"); done
+            for run in 1 2 3; do
+              echo "::group::$task, run $run of 3"
+              ./gradlew "$task" --rerun -PfastTest "${filters[@]}" < /dev/null
+              echo "::endgroup::"
+            done
+          done < changed-tests.txt
+
+  # The check `main` requires. It runs whatever happened above (`always()`) and fails unless every
+  # job it waited on succeeded or was deliberately skipped -- a required check that is SKIPPED counts
+  # as passing, which is exactly how #634 merged with no suite run, so this job must never be the
+  # one that is skipped. It also gathers every job's results into the pull-request reports.
+  test:
+    needs: [prepare, detekt, app, modules, changed-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          # Reads the Gradle cache but never writes it: on Linux only test.yml's `app` job saves one, so
+          # main keeps one copy that every job restores from (setup-gradle falls back to the newest
+          # entry for the same OS) instead of a copy per job that pushes the rest out of the 10 GB.
+          cache-read-only: true
+
+      - name: Gather the results
+        if: ${{ !cancelled() }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: results-*
+          merge-multiple: true
+
+      # The app's own artifact was uploaded relative to composeApp/build/ -- see `app`.
+      - name: Gather the app's results
+        if: ${{ !cancelled() && needs.app.result != 'skipped' }}
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: app-results
+          path: composeApp/build/
+
+      # Puts the failure message and stack trace of every failed test in the pull request itself, and
+      # annotates the failing line. Only modules that ran in this build are listed (plan_ci.py
+      # report-inputs). It never fails the job on its own: the suites already decided that.
+      - name: Which test results to report
+        id: junit_inputs
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: python3 .github/ci/plan_ci.py report-inputs >> "$GITHUB_OUTPUT"
+
+      - name: Report failing tests on the pull request
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.junit_inputs.outputs.paths != '' }}
+        uses: mikepenz/action-junit-report@4a26df3e2ae132254ba12a53f65a388d0961e786 # v6.7.0
+        with:
+          report_paths: ${{ steps.junit_inputs.outputs.paths }}
+          check_name: ${{ steps.junit_inputs.outputs.names }}
+          detailed_summary: true
+          include_passed: false
+          verbose_summary: false
+          fail_on_failure: false
+          comment: true
+          updateComment: true
+
+      - name: Coverage table
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          ./gradlew coverageFloors -q > floors.csv || true
+          python3 - <<'PY' > coverage.md
+          import glob, os, xml.etree.ElementTree as ET
+
+          COUNTERS = ["INSTRUCTION", "BRANCH", "LINE", "COMPLEXITY", "METHOD", "CLASS"]
+          PATTERNS = [
+              "*/build/reports/jacoco/*/*.xml",
+          ]
+
+          # The floor as the verification task itself has it, so the cap reported is the cap enforced.
+          floors = {}
+          if os.path.exists("floors.csv"):
+              for line in open("floors.csv"):
+                  parts = line.strip().split(",")
+                  if len(parts) == 4 and parts[0] == "FLOOR":
+                      floors.setdefault(parts[1], {})[parts[2]] = float(parts[3]) * 100
+
+          # Each report's own totals. composeApp's report is built over exactly the classes its floor
+          # is (coverableAppClasses() in build-logic's cp.app-coverage), so these are the gated numbers.
+          def totals(root):
+              """Covered/total per counter, from the report's own totals."""
+              sums = {}
+              for c in root.findall("counter"):
+                  missed, covered = int(c.get("missed")), int(c.get("covered"))
+                  sums[c.get("type")] = (missed, covered)
+              return {t: 100 * k / (m + k) for t, (m, k) in sums.items() if m + k}
+
+          # Only modules that actually produced a report in THIS run. The sub-builds are gated on
+          # their own directories, so a run that skipped them simply has no section for them.
+          found = {}
+          for pattern in PATTERNS:
+              for path in glob.glob(pattern):
+                  module = os.path.basename(path.split("/build/reports/jacoco/")[0])
+                  try:
+                      root = ET.parse(path).getroot()
+                  except ET.ParseError:
+                      continue
+                  ratios = totals(root)
+                  if ratios:
+                      found[module] = ratios
+
+          def under(module, counter):
+              floor = floors.get(module, {}).get(counter)
+              if floor is None or module not in found or counter not in found[module]:
+                  return None
+              gap = floor - found[module][counter]
+              return gap if gap > 0 else None
+
+          breached = {
+              module: [c for c in COUNTERS if under(module, c) is not None]
+              for module in found
+          }
+          total_breached = sum(len(v) for v in breached.values())
+
+          print("<!-- coverage-table -->")
+          print("## Coverage")
+          if not found:
+              print()
+              print("No JaCoCo reports were produced in this run.")
+          elif total_breached:
+              print()
+              modules = ", ".join(f"`{m}`" for m in sorted(breached) if breached[m])
+              print(f":warning: **{total_breached} counter(s) below floor** in {modules}.")
+          for module in sorted(found, key=lambda m: (m != "composeApp", m)):
+              ratios = found[module]
+              print()
+              print(f"### {module}" + (" :warning:" if breached.get(module) else ""))
+              print()
+              print("| Counter | Floor | Actual |")
+              print("|---|---|---|")
+              for counter in COUNTERS:
+                  if counter not in ratios:
+                      continue
+                  floor = floors.get(module, {}).get(counter)
+                  cap = "" if floor is None else f"{floor:.0f}%"
+                  gap = under(module, counter)
+                  mark = "" if gap is None else f" :warning: -{gap:.2f}pt"
+                  print(f"| {counter.title()} | {cap} | {ratios[counter]:.2f}%{mark} |")
+          if found:
+              print()
+              print("Modules whose tests did not run in this build are not listed. The floors are")
+              print("enforced by the `jacocoTestCoverageVerification` steps, not by this table.")
+          PY
+
+          # Upsert: one comment per pull request, found by the marker on its first line.
+          id=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" --paginate \
+                 --jq '.[] | select(.body | startswith("<!-- coverage-table -->")) | .id' | head -1)
+          if [ -n "$id" ]; then
+            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/$id" -F body=@coverage.md >/dev/null
+          else
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/issues/${PR}/comments" -F body=@coverage.md >/dev/null
+          fi
+          cat coverage.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload test reports
+        if: ${{ !cancelled() && (needs.app.result == 'failure' || needs.modules.result == 'failure' || needs.changed-tests.result == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-reports
+          if-no-files-found: ignore
+          retention-days: 7
+          path: |
+            */build/test-results/
+            */build/reports/tests/
+
+      - name: Report a hung test as an issue
+        if: ${{ !cancelled() && (needs.app.result == 'failure' || needs.modules.result == 'failure') }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          BRANCH: ${{ github.head_ref || github.ref_name }}
+          PR: ${{ github.event.pull_request.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          DUMPS=$(find . -path '*/build/test-results/*' -name hung-test-dump.txt -type f 2>/dev/null | sort)
+          if [ -z "$DUMPS" ]; then
+            echo "No hung-test dump; nothing to file."
+            exit 0
+          fi
+          LABEL="test-hang"
+          {
+            echo "HungTestReporter halted a test fork in CI."
+            echo
+            echo "- Event: \`$EVENT\`"
+            if [ -n "$PR" ]; then
+              echo "- Branch: \`$BRANCH\` (#$PR)"
+            else
+              echo "- Branch: \`$BRANCH\`"
+            fi
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Run: $RUN_URL -- the full dump is in its \`test-reports\` artifact."
+            for dump in $DUMPS; do
+              HUNG=$(grep -m1 'HUNG TEST:' "$dump" | sed -e 's/^=== HUNG TEST: //' -e 's/ ===$//')
+              echo
+              echo "### ${dump#./}"
+              echo
+              echo "Hung: ${HUNG:-(no HUNG TEST line in the dump)}"
+              echo
+              echo '```'
+              head -n 120 "$dump"
+              echo '```'
+            done
+          } > hang-issue.md
+          cat hang-issue.md >> "$GITHUB_STEP_SUMMARY" || true
+          gh label create "$LABEL" --color FBCA04 \
+            --description "A CI test fork was halted by HungTestReporter" >/dev/null 2>&1 || true
+          if ! OPEN=$(gh issue list --label "$LABEL" --state open --limit 1 --json number -q '.[0].number // empty' 2>&1); then
+            echo "Cannot read issues with this token (a fork's pull request?): $OPEN -- not filing."
+            exit 0
+          fi
+          if [ -n "$OPEN" ]; then
+            gh issue comment "$OPEN" --body-file hang-issue.md \
+              || echo "Could not comment on #$OPEN (read-only token?) -- not filing."
+          else
+            gh issue create --title "Test suite hang in CI" --label "$LABEL" --body-file hang-issue.md \
+              || echo "Could not open an issue (read-only token?) -- not filing."
+          fi
+
+      # The verdict. Success or a deliberate skip (no module affected; the three-run check on a
+      # push) passes; anything else -- a failure, a cancellation, a job that never ran -- fails `test`.
+      - name: Every job passed
+        env:
+          RESULTS: ${{ toJson(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          needs = json.loads(os.environ["RESULTS"])
+          bad = {name: n["result"] for name, n in needs.items() if n["result"] not in ("success", "skipped")}
+          for name, n in needs.items():
+              print(f"{name}: {n['result']}")
+          if needs.get("prepare", {}).get("result") != "success":
+              bad["prepare"] = needs.get("prepare", {}).get("result")
+          if bad:
+              print(f"Not passing: {bad}")
+              sys.exit(1)
+          PY

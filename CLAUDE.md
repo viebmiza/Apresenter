@@ -1,0 +1,2 @@
+@AGENT.md
+@CODING_STANDARDS.md

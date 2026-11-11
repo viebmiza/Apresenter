@@ -1,0 +1,304 @@
+package org.churchpresenter.presentationengine.cache
+
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import org.churchpresenter.presentationengine.DeckRasterizer
+import org.churchpresenter.presentationengine.model.DeckFormat
+import org.churchpresenter.presentationengine.model.Fidelity
+import java.awt.image.BufferedImage
+import java.io.File
+import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
+import javax.imageio.ImageIO
+
+/**
+ * Thrown when a [SlideDiskCache.Writer] is asked to keep writing an entry that another writer (or
+ * an invalidate) has since taken over. The render that raised it must stop and not commit; the
+ * writer that superseded it owns the files now.
+ */
+class SlideCacheSupersededException(dir: File) :
+    IOException("Slide cache entry ${dir.absolutePath} was taken over by another writer")
+
+/**
+ * Disk cache of rendered final-frame slides, shared by the Presentation tab and the companion
+ * server (one render, both consumers).
+ *
+ * Layout per entry (`<baseDir>/<id>/`):
+ *  - `slide_%04d.jpg` — final-frame JPEG per slide
+ *  - `note_%04d.txt`  — speaker notes, only when non-blank
+ *  - `manifest.json`  — written last; its presence marks the entry valid (a crashed render
+ *    leaves no manifest and is re-rendered on next open)
+ *
+ * Schema v1 entries (bare `mtime.txt`, no manifest) are treated as invalid and re-rendered once.
+ */
+class SlideDiskCache(
+    private val baseDir: File = File(System.getProperty("user.home"), ".churchpresenter/slides")
+) {
+
+    companion object {
+        /** Cache directory names are the hash in hex — short, and filesystem-safe. */
+        private const val HEX_RADIX = 16
+
+        const val SCHEMA_VERSION = 2
+
+        /**
+         * The version of the *renderer* that produced the cached pixels, as opposed to
+         * [SCHEMA_VERSION], which describes the manifest around them.
+         *
+         * A cache entry is otherwise only checked against the source file's mtime, so an unchanged
+         * deck keeps serving the images it was first rendered with — for ever. That made engine
+         * fixes invisible: correcting Keynote's PostScript font names (`Arial-BoldMT` was
+         * resolving to Open Sans, which is wider and wrapped a line that fits) changed nothing on
+         * screen, because the deck still had its pre-fix JPEGs on disk and nobody had touched the
+         * file. Entries written before this field existed decode as 0 and are re-rendered once.
+         *
+         * **Bump it in the same commit as any change to what a rendered slide looks like** —
+         * layout, fonts, colour, fidelity gating. It costs one re-render per cached deck.
+         */
+        const val RENDERER_VERSION = 4
+
+        /** Stable id per source path — same derivation the companion API has always used. */
+        fun idFor(absolutePath: String): String = absolutePath.hashCode().toUInt().toString(HEX_RADIX)
+
+        /**
+         * The writer that currently owns each entry directory, keyed by its absolute path.
+         *
+         * An entry dir is keyed on the source path alone, so several renders can target the same
+         * one: the tab and the companion server render the same deck, and re-selecting a file
+         * starts a new render while the cancelled one is still in its loop. Every deletion path
+         * ([Writer.init], [Writer.abort], [invalidate], [cleanupOrphaned]) used to wipe the dir
+         * unconditionally, so whichever render lost the race carried on writing into a directory
+         * that no longer existed — `ImageIO.write` then failed with "Can't create an
+         * ImageOutputStream!" from the middle of the deck onwards.
+         *
+         * Ownership is process-wide because every [SlideDiskCache] instance shares one base dir.
+         */
+        private val activeWriters = ConcurrentHashMap<String, Writer>()
+
+        /**
+         * Entry directories a producer that is not a [Writer] currently owns, by absolute path,
+         * with the number of producers holding each.
+         *
+         * The instance-link remote load fills its `remote_*` entry by hand — `mkdirs`, write a
+         * temp file, `renameTo` — rather than through a [Writer], so it never appeared in
+         * [activeWriters] and [cleanupOrphaned], which deletes every `remote_*` entry
+         * unconditionally, could delete the directory out from under it mid-download. `renameTo`
+         * into a vanished parent fails, so every slide was skipped and the load landed zero of
+         * them. Counted rather than a plain set because two loads of the same schedule item can
+         * overlap, and the first to finish must not unprotect the second.
+         */
+        private val claimedDirs = ConcurrentHashMap<String, Int>()
+
+        /** Takes ownership of [dir] until the matching [releaseDir]; see [claimedDirs]. */
+        fun claimDir(dir: File) {
+            claimedDirs.merge(dir.absolutePath, 1) { a, b -> a + b }
+        }
+
+        /** Releases one [claimDir] hold on [dir]; the entry is protected until the last is gone. */
+        fun releaseDir(dir: File) {
+            claimedDirs.computeIfPresent(dir.absolutePath) { _, held -> if (held <= 1) null else held - 1 }
+        }
+
+        /** True while some producer holds [dir] — either a [Writer] or a [claimDir] caller. */
+        fun isOwned(dir: File): Boolean =
+            activeWriters.containsKey(dir.absolutePath) || claimedDirs.containsKey(dir.absolutePath)
+
+        /** Why a write could not happen, for the exception message. */
+        private fun diagnose(dir: File): String =
+            "dir exists=${dir.isDirectory}, writable=${dir.canWrite()}, usableBytes=${dir.usableSpace}"
+    }
+
+    @Serializable
+    data class Manifest(
+        val schemaVersion: Int,
+        /** Absent in entries written before the field existed, which is what makes them stale. */
+        val rendererVersion: Int = 0,
+        val sourcePath: String,
+        val sourceMtime: Long,
+        val format: DeckFormat,
+        val slideCount: Int,
+        val renderWidthPx: Int,
+        val slides: List<SlideEntry>
+    ) {
+        /**
+         * Whether this entry was written by this cache and renderer for [file] as it is now, at
+         * [renderWidthPx] -- any width when that is null.
+         */
+        internal fun isUsableFor(file: File, renderWidthPx: Int?): Boolean =
+            schemaVersion == SCHEMA_VERSION &&
+                rendererVersion == RENDERER_VERSION &&
+                sourceMtime == file.lastModified() &&
+                (renderWidthPx == null || this.renderWidthPx == renderWidthPx)
+    }
+
+    @Serializable
+    data class SlideEntry(val fidelity: Fidelity, val hasTimeline: Boolean)
+
+    data class CachedSlides(
+        val manifest: Manifest,
+        val slideFiles: List<File>,
+        val notes: List<String>
+    )
+
+    private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+
+    fun dirFor(file: File): File = File(baseDir, idFor(file.absolutePath))
+
+    /**
+     * Returns the cached slides when the entry is valid for the file's current mtime and render
+     * width, else null. Pass a null [renderWidthPx] to accept any width (consumers like the
+     * companion API that serve whatever resolution was rendered).
+     */
+    fun lookup(file: File, renderWidthPx: Int?): CachedSlides? {
+        val dir = dirFor(file)
+        val manifest = readManifest(File(dir, "manifest.json"))
+            ?.takeIf { it.isUsableFor(file, renderWidthPx) }
+            ?: return null
+        val slideFiles = (0 until manifest.slideCount).map { File(dir, slideName(it)) }
+        if (slideFiles.any { !it.isFile }) return null
+        // exists() then readText() is a check-then-act, and the prune can delete this directory
+        // between the two: on Windows that surfaced as "Access is denied" and "The system cannot
+        // find the path specified" for a note file the check had just seen. A cache entry that
+        // vanishes mid-read is a miss, not a failure — the caller re-renders — so the read decides,
+        // not the check.
+        val notes = (0 until manifest.slideCount).map { i ->
+            runCatching { File(dir, noteName(i)).readText() }.getOrDefault("")
+        }
+        return CachedSlides(manifest, slideFiles, notes)
+    }
+
+    /** The manifest at [manifestFile], or null when there is none or it does not parse. */
+    private fun readManifest(manifestFile: File): Manifest? {
+        if (!manifestFile.isFile) return null
+        return try {
+            json.decodeFromString(Manifest.serializer(), manifestFile.readText())
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Deletes the entry for [file]. An in-flight render of that file is disowned rather than left
+     * writing into a deleted directory: its next `putSlide` throws [SlideCacheSupersededException].
+     */
+    fun invalidate(file: File) {
+        val dir = dirFor(file)
+        activeWriters.remove(dir.absolutePath)
+        dir.deleteRecursively()
+    }
+
+    /**
+     * Deletes cache entries whose source path is not in [keepPaths]. Session-scoped entries
+     * (`remote_*`, used for instance-link mirrored slides) are deleted regardless of [keepPaths] —
+     * they are re-downloaded on demand. An entry someone is currently filling is left alone,
+     * whether that is a render holding a [Writer] or a download holding a [claimDir]; it is
+     * cleaned up by the next call once that producer has finished.
+     */
+    fun cleanupOrphaned(keepPaths: Collection<String>) {
+        if (!baseDir.exists()) return
+        val keepIds = keepPaths.map { idFor(it) }.toSet()
+        baseDir.listFiles()?.forEach { dir ->
+            if (dir.isDirectory && dir.name !in keepIds && !isOwned(dir)) dir.deleteRecursively()
+        }
+    }
+
+    /** True while some render owns [file]'s entry — a second render should wait rather than start. */
+    fun isWriting(file: File): Boolean = activeWriters.containsKey(dirFor(file).absolutePath)
+
+    fun beginWrite(file: File, format: DeckFormat, renderWidthPx: Int): Writer =
+        Writer(dirFor(file), file, format, renderWidthPx)
+
+    private fun slideName(index: Int) = "slide_%04d.jpg".format(index)
+    private fun noteName(index: Int) = "note_%04d.txt".format(index)
+
+    /**
+     * Incremental cache writer: slides are written as they render so a consumer can stream them,
+     * and the manifest lands last as the commit marker. [abort] (or a crash) leaves an invalid,
+     * self-healing entry.
+     *
+     * Creating a writer takes ownership of the entry directory (see [activeWriters]): a writer
+     * that has been superseded stops at its next [putSlide] or [commit] with a
+     * [SlideCacheSupersededException], and its [abort] no longer deletes the files that now
+     * belong to the newer writer.
+     */
+    inner class Writer internal constructor(
+        val dir: File,
+        private val sourceFile: File,
+        private val format: DeckFormat,
+        private val renderWidthPx: Int
+    ) {
+        private val entries = mutableListOf<SlideEntry>()
+        private val key = dir.absolutePath
+
+        init {
+            activeWriters[key] = this
+            var created = false
+            try {
+                dir.deleteRecursively()
+                ensureDir()
+                created = true
+            } finally {
+                if (!created) activeWriters.remove(key, this)
+            }
+        }
+
+        private fun isCurrent(): Boolean = activeWriters[key] === this
+
+        /** Creates the entry directory, failing loudly (and once) instead of per slide. */
+        private fun ensureDir() {
+            if (dir.isDirectory) return
+            if (!dir.mkdirs() && !dir.isDirectory) {
+                throw IOException("Cannot create slide cache directory $key (${diagnose(dir)})")
+            }
+        }
+
+        /** Writes one slide; returns the JPEG file. Alpha is flattened onto white for JPEG. */
+        fun putSlide(
+            index: Int,
+            image: BufferedImage,
+            note: String,
+            fidelity: Fidelity,
+            hasTimeline: Boolean
+        ): File {
+            if (!isCurrent()) throw SlideCacheSupersededException(dir)
+            ensureDir()
+            val slideFile = File(dir, slideName(index))
+            writeJpeg(index, image, slideFile)
+            if (note.isNotBlank()) File(dir, noteName(index)).writeText(note)
+            entries.add(SlideEntry(fidelity, hasTimeline))
+            return slideFile
+        }
+
+        /** Writes slide [index] as a JPEG; an [IOException] names the file and why it failed. */
+        private fun writeJpeg(index: Int, image: BufferedImage, slideFile: File) {
+            val written = try {
+                ImageIO.write(DeckRasterizer.flattenToRgb(image), "jpg", slideFile)
+            } catch (e: IOException) {
+                // The bare ImageIO message ("Can't create an ImageOutputStream!") names neither the
+                // file nor why it could not be opened; say both.
+                throw IOException("Failed to write slide $index to $slideFile (${diagnose(dir)})", e)
+            }
+            if (!written) throw IOException("No JPEG writer accepted slide $index for $slideFile")
+        }
+
+        fun commit() {
+            if (!activeWriters.remove(key, this)) throw SlideCacheSupersededException(dir)
+            val manifest = Manifest(
+                schemaVersion = SCHEMA_VERSION,
+                rendererVersion = RENDERER_VERSION,
+                sourcePath = sourceFile.absolutePath,
+                sourceMtime = sourceFile.lastModified(),
+                format = format,
+                slideCount = entries.size,
+                renderWidthPx = renderWidthPx,
+                slides = entries.toList()
+            )
+            File(dir, "manifest.json").writeText(json.encodeToString(Manifest.serializer(), manifest))
+        }
+
+        /** Discards this writer's entry — unless another writer owns it now, which leaves it alone. */
+        fun abort() {
+            if (activeWriters.remove(key, this)) dir.deleteRecursively()
+        }
+    }
+}

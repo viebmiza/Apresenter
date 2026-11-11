@@ -1,0 +1,97 @@
+package org.churchpresenter.sharedui.composables
+
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import org.churchpresenter.diagnostics.Log
+import java.awt.Cursor
+import java.awt.HeadlessException
+import java.awt.Point
+import java.awt.Toolkit
+import java.awt.image.BufferedImage
+import java.awt.Window as AwtWindow
+
+// Hiding the mouse pointer over an output window takes two layers, because one is not enough.
+// Compose sets the pointer it draws over its own content on every hover and falls back to the
+// arrow, so the content carries a blank pointer icon that overrides whatever its children ask for
+// ([hiddenOutputCursor]). Heavyweight views embedded in the window -- video and web pages -- are not
+// Compose's to draw over; they take the window's own cursor, so that is set too
+// ([HideOutputWindowCursor]), and put back when the setting is turned off.
+
+/**
+ * A cursor with nothing in it -- fully transparent, at the platform's own cursor size so Windows has
+ * no image to scale. Null when the platform cannot build one (no display, or the runtime's native
+ * AWT library can no longer be loaded); the pointer then simply stays visible.
+ */
+private val blankCursor: Cursor? by lazy {
+    cursorOrNull {
+        val toolkit = Toolkit.getDefaultToolkit()
+        val size = toolkit.getBestCursorSize(1, 1)
+        toolkit.createCustomCursor(
+            BufferedImage(size.width.coerceAtLeast(1), size.height.coerceAtLeast(1), BufferedImage.TYPE_INT_ARGB),
+            Point(0, 0),
+            "blank",
+        )
+    }
+}
+
+/** What [create] builds, or null when the platform cannot build a cursor at all. */
+internal fun cursorOrNull(create: () -> Cursor): Cursor? =
+    try {
+        create()
+    } catch (e: HeadlessException) {
+        Log.warn(TAG, "No blank cursor without a display: ${e.message}")
+        null
+    } catch (e: UnsatisfiedLinkError) {
+        Log.warn(TAG, "No blank cursor, native AWT library unavailable: ${e.message}")
+        null
+    }
+
+private const val TAG = "OutputCursor"
+
+/** Sets [window]'s own cursor to nothing while [hide] is on, and back to the arrow when it is not. */
+@Composable
+fun HideOutputWindowCursor(window: AwtWindow, hide: Boolean) {
+    DisposableEffect(window, hide) {
+        window.cursor = blankCursor?.takeIf { hide } ?: Cursor.getDefaultCursor()
+        onDispose { }
+    }
+}
+
+/**
+ * Whether the output this content is drawn on hides the mouse pointer.
+ *
+ * Provided by the output windows alongside [HideOutputWindowCursor], for the one child neither layer
+ * reaches: an embedded web page. Chromium's own native window sits inside the output and sets its own
+ * cursor, so the arrow showed over a live Web page with the setting on (found on Windows). The page
+ * is told instead -- see [outputCursorScript]. False everywhere else, so the Web tab's own browser in
+ * the main window keeps its pointer.
+ */
+val LocalOutputCursorHidden = staticCompositionLocalOf { false }
+
+/** The id of the style element [outputCursorScript] adds, so the same script can take it away. */
+private const val HIDE_CURSOR_STYLE_ID = "churchpresenter-hide-cursor"
+
+/**
+ * JavaScript that hides the pointer over a web page, or shows it again.
+ *
+ * A style rule rather than anything done to the window: Chromium then hides the pointer itself, the
+ * same way on every platform, and reapplying it is harmless. Run again after every page load, since
+ * a new page starts without it.
+ */
+fun outputCursorScript(hide: Boolean): String =
+    if (hide) {
+        "(function(){var s=document.getElementById('$HIDE_CURSOR_STYLE_ID');" +
+            "if(!s){s=document.createElement('style');s.id='$HIDE_CURSOR_STYLE_ID';" +
+            "(document.head||document.documentElement).appendChild(s);}" +
+            "s.textContent='*,*::before,*::after{cursor:none!important}';})();"
+    } else {
+        "(function(){var s=document.getElementById('$HIDE_CURSOR_STYLE_ID');if(s){s.remove();}})();"
+    }
+
+/** A blank pointer over this content and everything in it, while [hide] is on. */
+fun Modifier.hiddenOutputCursor(hide: Boolean): Modifier =
+    blankCursor?.takeIf { hide }?.let { pointerHoverIcon(PointerIcon(it), overrideDescendants = true) } ?: this

@@ -1,0 +1,149 @@
+# `:planning-center` — Agent Notes
+
+Rules, structure and commands for this module only. The repo-wide rules are in the root `AGENT.md`.
+
+## What it is
+
+**The Planning Center Online client**: the OAuth2 conversation, the Services/People REST calls, and
+the one-shot loopback listener that catches the consent redirect — and, under `ui/`, **the import
+window** that turns a plan into schedule items. A real Gradle module of this build:
+`include(":planning-center")`, `implementation(projects.planningCenter)`.
+
+The module holds no credentials. The app's build injects one shared PCO OAuth application's client
+id and secret (`BuildConfig`, from CI secrets), passed in through `PlanningCenterImportServices`;
+each church authorizes that one app and keeps only its own tokens (`PlanningCenterSettings`). The
+shared secret ships inside every build, so it is not a secret from anyone holding the binary —
+which is why each sign-in also carries a `state` and a PKCE challenge (`OAuthAttempt`): a code
+caught on its way to the loopback callback cannot be redeemed without the attempt's verifier.
+**One-way pull only** — nothing is ever written back to Planning Center.
+
+**The package is `org.churchpresenter.planningcenter`**, with the import window in `.ui`. It held two of the
+app's own (`…churchpresenter.data` for the client and formatter, `…churchpresenter.server` for the
+callback listener), which `:composeApp` still owns and fills with 34 and 32 files respectively.
+Splitting this module's three files across two shared package names bought nothing: they are one
+integration, and the `data`/`server` divide was an artifact of where they happened to sit in the
+app.
+
+## What lives here
+
+| Path | Owns |
+|---|---|
+| `PlanningCenterClient.kt` | `object PlanningCenterClient` — OAuth token exchange and refresh, `/people/v2/me`, service types, plans, plan items, arrangement lyrics, attachment metadata, attachment download |
+| `PlanningCenterLyricsFormatter.kt` | Chord-chart → plain lyrics, and PCO's `html_details` rich text → plain text |
+| `OAuthAttempt.kt` | One sign-in's `state` and PKCE verifier, and the S256 challenge sent for it |
+| `PlanningCenterAuthServer.kt` | The loopback listener on the registered redirect port, started per connect attempt and torn down when the callback lands. The JDK's own `HttpServer`, not Ktor — see **Rules** |
+| `ui/PlanningCenterImportDialog.kt` | The connect window and the import window, the OAuth round trip (`connectToPlanningCenter`) |
+| `ui/PlanningCenterImportViewModel.kt` | The import's state: service types, plans, plan items, what is ticked; matching a plan song to the library and writing a new one (`matchLocalSong`, `createLocalSong`) |
+| `ui/PlanningCenterImportItems.kt`, `ui/PlanningCenterAttachments.kt` | One plan row, its scripture and its files |
+| `ui/PcoImportActions.kt` | What an import brings into the schedule from what is ticked |
+| `ui/PlanningCenterImportServices.kt` | What the import needs from its host, `planningCenterServices` that builds it, and `PlanningCenterScripture` |
+| `PlanningCenterScriptureDetector.kt`, `PlanningCenterPrimaryBible.kt` | The scripture a plan item's text names, read from the operator's primary Bible (`:bible`), loaded once per import |
+
+## Seams to the app
+
+The import window takes from the app, as parameters of `PlanningCenterImportDialog`:
+- **`services`** (`PlanningCenterImportServices`, built by `planningCenterServices`): the OAuth
+  client id and secret this build is registered as (`BuildConfig`), the abbreviation tables a book
+  typed short is read with (`BibleBookAbbreviations`, a `BookAbbreviationResolver` — it reads
+  Compose string resources, and `:bible-tab` is too heavy an edge for one lookup), and a downloaded
+  deck's slide count (`:presentation-engine`, so POI stays off this module's classpath).
+- **`window`**: opens a window for a `PlanningCenterWindowSpec`. The app opens a `DialogWindow`
+  centred on the main window and wraps it in `AppWindowRoot`; a test draws the content in place,
+  which is how the entry point is tested headless.
+- **`editSong`**: the app's song editor, for a plan song the library lacks.
+
+`composeApp/…/PlanningCenterImportWiring.kt` fills them in and adds what is picked to the
+Schedule. `PlanningCenterSettings` is in `:settings`, where every persisted settings class lives.
+
+## Rules
+
+- **The callback listener is the JDK's `com.sun.net.httpserver.HttpServer`, and must stay a server
+  that writes synchronously.** It was Ktor on Netty, and the callback page was intermittently cut
+  short (#678): Netty writes a response's last part without flushing it and flushes on a later
+  task, so `ResponseSent` fired with the bytes still queued and `stop()` took the event loop away
+  under them. The JDK server has written the whole page before its handler returns, and the handler
+  hands the result over only after that, so tearing the server down cannot truncate it. Ktor's
+  server libraries are test-only here now, for `PlanningCenterDownloadTest`'s fake host.
+- **The import window never opens a window itself.** It asks `window` for one, so nothing in `ui/`
+  needs a display and every line of it runs in the suite.
+- **Anything `:composeApp` calls has to be public here.** `internal` no longer reaches the app —
+  which is why the `@Serializable` DTOs' construction test moved with the code, as
+  `PlanningCenterDtoConstructionTest`.
+- **Every request function returns an outcome; none of them throws.** Each catches exactly four
+  things, and the order matters:
+  1. `IOException` — refused, reset, timed out. A retry is worth offering: `NetworkError`.
+  2. `GeneralSecurityException` — a certificate the JVM will not trust (an HTTPS-inspecting proxy
+     or antivirus). ktor CIO's own TLS raises it raw, not as an `SSLException`, so the clause above
+     never sees it, and uncaught it ends the app. Also `NetworkError`.
+  3. `UnresolvedAddressException` — no DNS answer, which is what being offline looks like. It is an
+     `IllegalArgumentException` subclass, so it **must** be caught before the next clause or an
+     offline operator is told their plan is malformed.
+  4. `IllegalArgumentException` — the body was not what the API documents. `SerializationException`
+     (not JSON at all) and the `jsonObject`/`jsonPrimitive` accessors (JSON of the wrong shape) both
+     land here, and both mean `Failure`: retrying returns the same page.
+
+  Anything else propagates, `CancellationException` included — a cancelled import must cancel, not
+  come back as a network error. **Do not widen these back to `catch (e: Exception)`.**
+- **The redirect port is `Constants.PLANNING_CENTER_OAUTH_PORT` (47850), from `:settings`.** It is
+  the one thing this module reads from there, and it cannot be chosen at runtime: PCO OAuth apps
+  require an exact pre-registered redirect URI, so `redirectUri()` and the callback server have to
+  spell the same number the operator registered. Nothing else here may read a setting.
+- **An attachment's `url` attribute is not a download link.** It is a `services.planningcenteronline.com`
+  web-app link with browser-session auth; an OAuth bearer token 302s to the login page, which is
+  what silently got saved as "the image" before this was found. Resolve the real file through
+  `resolveAttachmentDownloadUrl` (a POST, as PCO's API requires) and then `downloadFile`.
+
+## Gates
+
+- **detekt**: the app's `config/detekt/detekt.yml`, **no baseline**, main and test both in scope.
+  One `@Suppress` at the declaration, with its reason: `TooManyFunctions` on `PlanningCenterClient`,
+  which is 14 request functions, one per PCO endpoint this integration uses. Its eight
+  `TooGenericExceptionCaught` entries were **not** carried over from `:composeApp`'s baseline — the
+  catches were narrowed to the four clauses above instead, which is what the rule was asking for.
+- **Coverage**: `cp.test`'s default six counters at 85%, all of them — **no**
+  `coverageFloors`, **no** `coverageExcludes`. It currently runs 87.0% complexity / 89.3% branches,
+  the tightest counters, so a new untested branch is what will break it first.
+  The import window is held to the same floor: its rows, its import and its entry point are
+  driven directly (`PcoImportSelectionTest`, `PlanningCenterImportRowsTest`,
+  `PlanningCenterImportDialogTest`).
+
+## Tests
+
+- **Nothing here touches the real Planning Center API.** Every request function takes
+  `http: HttpClient = defaultHttp`, and the suites pass their own: `MockEngine` for the API calls,
+  a local Netty host for the download and thumbnail paths.
+- **The fake attachment host is one per class, started on first use.** It used to be one per test —
+  eighteen Netty start/stops in a few seconds, each stopped with a zero grace period while the next
+  bound — and roughly one run in six a host never reached the point of serving inside its deadline,
+  failing whichever test happened to be next. Nothing mutates the host and each test downloads into
+  its own temp dir, so there is nothing to isolate.
+- **A "dead" port is port 1, never a closed `ServerSocket(0)`.** A port from an ephemeral socket
+  closed again immediately goes straight back into the pool, and the next host binds port 0 and can
+  be handed the same number: the download is then answered **404 by a server whose routes are gone**,
+  which is `Failure`, not the `NetworkError` a refused connection gives. Port 1 is privileged, never
+  bound, and refuses instantly.
+- **`PlanningCenterAuthServerTest` binds the real 47850**, because that port is the point — it is
+  the redirect the provider was told about, so `testPort()` would aim the callback somewhere PCO
+  will never send it. That is safe here: this module's `test` task is a single JVM. It was in
+  `:composeApp`'s `serialTestClasses` list for exactly this reason and was removed from it when the
+  suite moved.
+
+## Commands
+
+```bash
+./gradlew :planning-center:test
+./gradlew :planning-center:detekt                            # gate — no baseline, must be clean
+./gradlew :planning-center:jacocoTestCoverageVerification
+```
+
+All three run in CI, gated on this directory or the shared build files changing.
+
+## Dependencies
+
+`api(libs.ktor.client.core)` — `api` rather than `implementation` because every request function
+takes an `HttpClient`, so the type is part of this module's public surface and has to resolve at a
+caller that supplies its own engine. Then `ktor-client-cio` for the default engine,
+`kotlinx-serialization-json`,
+`:settings` for the one port constant, and `:diagnostics` for `CrashReporter.reportWarning`. The import
+window adds Compose, `:shared-ui`, `:strings`, `:theme` and `:core-models` (the song model a plan's
+songs are matched against and saved as). No dependency on `:composeApp`.

@@ -1,0 +1,207 @@
+package org.churchpresenter.settings
+
+import org.churchpresenter.controlin.ControlSettings
+import kotlinx.serialization.Serializable
+import org.churchpresenter.settings.utils.Constants
+import org.churchpresenter.settings.utils.UpdateCheckInterval
+import org.churchpresenter.core.models.songs.SongTuning
+
+@Serializable
+data class AppSettings(
+    /**
+     * Schema version of this settings document, used by `SettingsManager` to decide which
+     * migrations still need to run. A file written before versioning existed has no such key and
+     * is therefore treated as version 0 — every migration runs, exactly as it did before.
+     *
+     * See [CURRENT_SETTINGS_VERSION] for the bump procedure.
+     */
+    val settingsVersion: Int = CURRENT_SETTINGS_VERSION,
+    /** Only [SONG_GLOBAL_KEYS] is saved here; the main window reads the rest via [operatorSongSettings]. */
+    val songSettings: SongSettings = SongSettings(),
+    /** Only [BIBLE_GLOBAL_KEYS] and the stack's names are saved here; see [operatorBibleSettings]. */
+    val bibleSettings: BibleSettings = BibleSettings(),
+    /** Not saved: each [OutputProfile] carries its own. Outputs read it through [resolvedFor]. */
+    val dictionarySettings: DictionarySettings = DictionarySettings(),
+    val backgroundSettings: BackgroundSettings = BackgroundSettings(),
+    val stockPhotoSettings: StockPhotoSettings = StockPhotoSettings(),
+    val projectionSettings: ProjectionSettings = ProjectionSettings(),
+    val pictureSettings: PictureSettings = PictureSettings(),
+    val presentationSettings: PresentationSettings = PresentationSettings(),
+    val streamingSettings: StreamingSettings = StreamingSettings(),
+    val announcementsSettings: AnnouncementsSettings = AnnouncementsSettings(),
+    /** Only [QA_GLOBAL_KEYS] is saved here; the rest is each [OutputProfile]'s, read via [resolvedFor]. */
+    val qaSettings: QASettings = QASettings(),
+    val presentationRemoteSettings: PresentationRemoteSettings = PresentationRemoteSettings(),
+    /** Only [STT_GLOBAL_KEYS] is saved here; the rest is each [OutputProfile]'s, read via [resolvedFor]. */
+    val sttSettings: STTSettings = STTSettings(),
+    /** Not saved: each [OutputProfile] carries its own. Outputs read it through [resolvedFor]. */
+    val mediaSettings: MediaSettings = MediaSettings(),
+    val bibleEngineSettings: BibleEngineSettings = BibleEngineSettings(),
+    val serverSettings: ServerSettings = ServerSettings(),
+    val stageMonitorSettings: StageMonitorSettings = StageMonitorSettings(),
+    val keyboardShortcutSettings: KeyboardShortcutSettings = KeyboardShortcutSettings(),
+    val presentationStorageDirectory: String = "",
+    val mediaStorageDirectory: String = "",
+    /** How video meets the output -- the Media tab's scale button. */
+    val mediaScaleMode: OutputScaleMode = OutputScaleMode.FIT,
+    /**
+     * Where `calendar.json` and `presets.json` are kept. Blank means the app data folder, which is
+     * where they have always been; a path is what makes two computers share one calendar -- point
+     * both at the same synced folder. Resolved by [calendarFolder].
+     */
+    val calendarStorageDirectory: String = "",
+    /**
+     * Where the signage setup is kept: the paired screens, the playlists added by hand, rotations,
+     * schedules and what each screen plays. Blank means the app data folder's `signage` folder,
+     * where it has always been; a shared or synced folder lets any computer pointed at it run the
+     * screens. Resolved by [signageFolder].
+     */
+    val signageStorageDirectory: String = "",
+    /**
+     * The SmugMug API key the Signage tab's SmugMug slideshows read public galleries with; blank when
+     * none is set. A credential, so a shared export leaves it out ([withoutSecrets]).
+     */
+    val smugMugApiKey: String = "",
+    /** Where the schedule's Open and Save As dialogs start. Blank means the home folder. */
+    val scheduleStorageDirectory: String = "",
+    /**
+     * The song book the last new song was saved into, which the next new song starts in. Blank is
+     * the top of the songs folder -- no song book.
+     */
+    val newSongSongbook: String = "",
+    val schedulePanelWidthDp: Int = 280,
+    val schedulePanelCollapsed: Boolean = false,
+    val scheduleItemZoomPercent: Int = 100,
+    /**
+     * Legacy schedule card layout: the item's buttons sit on their own line under the title and are
+     * always visible, instead of the hover overlay that paints over the title's right-hand end.
+     */
+    val scheduleLegacyRowActions: Boolean = false,
+    /**
+     * How large the schedule toolbar's icons are drawn, by `ScheduleToolbarIconSize` name. A name
+     * this build does not know falls back to the smallest, which is the size they always had.
+     */
+    val scheduleToolbarIconSize: String = "SMALL",
+    /**
+     * Whether Settings → Profiles lists every setting (Advanced) or only the ones most operators
+     * change (Basic). How the operator likes to work, not part of any profile.
+     */
+    val profilesAdvanced: Boolean = false,
+    /**
+     * The settings groups the operator has folded away on each page of Settings → Profiles: the
+     * page's key to the keys of its folded groups. Like [profilesAdvanced], how the operator likes to
+     * work -- one set per page, whichever profile is open.
+     */
+    val profilesFoldedGroups: Map<String, Set<String>> = emptyMap(),
+    /**
+     * Schedule toolbar buttons the operator has turned off, by `ScheduleToolbarButton` name — the
+     * same shape as [hiddenTabs], so an unknown name from a newer build is simply ignored.
+     *
+     * `CALENDAR` starts here: opening the planner is not part of running a service, and a toolbar
+     * that grows a button per window would become a place to hunt rather than a place to work.
+     * Turned on from the panel's own options menu, and once on it stays on. Existing settings are
+     * brought to the same starting point by the migration to schema 11.
+     */
+    val hiddenScheduleButtons: Set<String> = setOf("CALENDAR"),
+    val previewPanelWidthDp: Int = 280,
+    val previewPanelCollapsed: Boolean = false,
+    val maximizedLayout: WindowLayoutSettings = WindowLayoutSettings(),
+    val windowedLayout: WindowLayoutSettings = WindowLayoutSettings(),
+    val theme: String = Constants.SYSTEM,
+    /**
+     * The accent the Custom theme is generated from, as `#RRGGBB`. Empty until one is picked, which
+     * leaves the theme module's own default accent in place.
+     */
+    val customThemeAccent: String = "",
+    /** The Custom theme's optional per-role colours; each empty one is derived from the accent. */
+    val customThemeColors: CustomThemeColors = CustomThemeColors(),
+    /** Whether the Custom theme is built on a dark base rather than a light one. */
+    val customThemeDark: Boolean = true,
+    /** The font family the app's own UI is set in. Empty is the platform default. */
+    val uiFontFamily: String = "",
+    /** The UI text size, as a multiplier of the platform's font scale. Output windows ignore it. */
+    val uiFontScale: Float = 1f,
+    /** The interface size: everything in the app's own windows, not only text. Output windows ignore it. */
+    val uiScale: Float = 1f,
+    /** How much room list rows leave around their text. Output windows ignore it. */
+    val uiRowSpacing: ListRowSpacing = ListRowSpacing.NORMAL,
+    val language: String = "en",
+    val eulaAcceptedVersion: Int = 0,
+    val webBookmarks: List<WebBookmark> = emptyList(),
+    val windowPlacement: String = "maximized",
+    val windowWidth: Int = 1280,
+    val windowHeight: Int = 800,
+    val windowX: Int = -1,
+    val windowY: Int = -1,
+    val hiddenTabs: Set<String> = setOf("QA", "STT", "SIGNAGE"),
+    val tabLabelStyle: TabLabelStyle = TabLabelStyle.TEXT,
+    val tabLabelMargin: TabLabelMargin = TabLabelMargin.NORMAL,
+    val crosswordUnlockedLevel: Int = 0,
+    val crosswordProgress: Map<Int, String> = emptyMap(),
+    val obsSettings: OBSSettings = OBSSettings(),
+    val atemSettings: AtemSettings = AtemSettings(),
+    val planningCenterSettings: PlanningCenterSettings = PlanningCenterSettings(),
+    val calendarSync: CalendarSyncSettings = CalendarSyncSettings(),
+    val companionSatelliteConnections: List<CompanionSatelliteSettings> = listOf(CompanionSatelliteSettings()),
+    val instanceLink: InstanceLinkSettings = InstanceLinkSettings(),
+    val songFavorites: List<String> = emptyList(),
+    val songFavoritesPanelHeightDp: Int = 120,
+    val songBpm: Map<String, Int> = emptyMap(), // songId -> metronome BPM (0 = off), not stored in the .song file
+    val songCapo: Map<String, Int> = emptyMap(), // songId -> capo fret (0 = none), not stored in the .song file
+    val songColOrder: List<String> = emptyList(),
+    // The song list's Order column width, in dp. Here rather than in SongSettings, which is at the
+    // JVM's limit on constructor parameters.
+    val songColWidthOrder: Int = 150,
+    val songHiddenCols: Set<String> = setOf(
+        SongColumnId.TUNE, SongColumnId.PLAY_COUNT, SongColumnId.AUTHOR, SongColumnId.COMPOSER,
+        SongColumnId.ORDER,
+    ),
+    val setupWizardShown: Boolean = false,
+    val analyticsReportingEnabled: Boolean = true,
+    val participateInPrereleases: Boolean = false,
+    val updateCheckInterval: UpdateCheckInterval = UpdateCheckInterval.EVERY_LAUNCH,
+    val lastUpdateCheckTimestamp: Long = 0L,
+    /** The version the operator chose to skip; the launch check stops offering it, a manual check does not. */
+    val skippedUpdateVersion: String = "",
+    val storyPrompt: StoryPromptState = StoryPromptState(),
+    /** Spreads the dialogs that open unasked at startup across launches — see [StartupPromptPacing]. */
+    val startupPrompts: StartupPromptPacing = StartupPromptPacing(),
+    /** The helper lamp in the main window's corner — shown or not, and what it was told to keep quiet. */
+    val helper: HelperSettings = HelperSettings(),
+    /** The backgrounds the preview panel's quick tray offers, in the order it shows them. */
+    val quickBackgrounds: List<QuickBackground> = emptyList(),
+    /** Whether that tray is open or shut — a panel-local choice, switched from the panel itself. */
+    val quickBackgroundsExpanded: Boolean = true,
+    /** The messages saved to go live again -- see [MessageTemplate]. */
+    val messageTemplates: List<MessageTemplate> = emptyList(),
+    /** The props an operator can put up -- see [PropDefinition]. */
+    val props: List<PropDefinition> = emptyList(),
+    /** The layer sets an operator clears in one go -- see [ClearGroup]. */
+    val clearGroups: List<ClearGroup> = emptyList(),
+    /** The action lists an operator runs by name -- see [Macro]. */
+    val macros: List<Macro> = emptyList(),
+    /** The MIDI and OSC ports, and what arriving and leaving messages do -- see [ControlSettings]. */
+    val control: ControlSettings = ControlSettings(),
+) {
+    /** What the song identified by [songId] is played at — tempo and capo together. */
+    fun tuningFor(songId: String): SongTuning =
+        SongTuning(bpm = songBpm[songId] ?: 0, capo = songCapo[songId] ?: 0)
+
+    /** These settings with [songId]'s tuning replaced by [tuning]. */
+    fun withTuning(songId: String, tuning: SongTuning): AppSettings = copy(
+        songBpm = songBpm + (songId to tuning.bpm),
+        songCapo = songCapo + (songId to tuning.capo),
+    )
+
+    companion object {
+        /**
+         * The schema version this build writes. Bump by one whenever a settings field changes in a
+         * way plain defaults can't absorb — a rename, a type change, or a restructure — and add the
+         * matching step to `SettingsManager`'s migration chain with that same target version.
+         *
+         * Purely *additive* fields need no bump: `ignoreUnknownKeys` plus a default already handles
+         * those in both directions.
+         */
+        const val CURRENT_SETTINGS_VERSION = 25
+    }
+}

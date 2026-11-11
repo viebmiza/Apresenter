@@ -1,0 +1,1480 @@
+/**
+ * DeckLink JNI native library for ChurchPresenter.
+ *
+ * This is a compiled C++ bridge (JNI) between the Java/Kotlin application and
+ * the BlackMagic DeckLink SDK. It's written in C++ because the DeckLink SDK is
+ * a native C++/COM library — there is no Java API for DeckLink hardware.
+ * This bridge exposes device enumeration, video output configuration,
+ * frame delivery, and video input capture to the Kotlin side via JNI
+ * (Java Native Interface).
+ *
+ * The compiled output (decklink_jni.dll / .dylib / .so) is bundled with the app.
+ * End users do NOT need the SDK — only the BlackMagic Desktop Video drivers.
+ *
+ * Supports multiple simultaneous device outputs (e.g. SDI + HDMI on separate cards)
+ * and video input capture from DeckLink devices.
+ *
+ * Build requirements:
+ *   - BlackMagic DeckLink SDK (free download from blackmagicdesign.com)
+ *   - BlackMagic Desktop Video drivers installed
+ *   - JDK with JNI headers
+ *   - CMake 3.15+ (or Visual Studio directly)
+ *
+ * Windows: uses COM (CoInitializeEx / CoCreateInstance)
+ * macOS:   uses CoreFoundation / DeckLinkAPI.framework
+ *
+ * See BUILD.md for step-by-step compilation instructions.
+ */
+
+#include "org_churchpresenter_app_churchpresenter_composables_DeckLinkManager.h"
+
+#include <atomic>
+#include <cstring>
+#include <string>
+#include <vector>
+#include <map>
+#include <mutex>
+
+// ── Platform-specific DeckLink SDK includes ─────────────────────────
+
+#ifdef _WIN32
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
+    #include <comdef.h>
+    #include "DeckLinkAPI_h.h"
+    // DeckLinkAPI_i.c provides CLSID/IID definitions (compiled separately)
+
+    // Helper: convert BSTR to std::string
+    static std::string bstrToString(BSTR bstr) {
+        if (!bstr) return "";
+        int len = SysStringLen(bstr);
+        int size = WideCharToMultiByte(CP_UTF8, 0, bstr, len, nullptr, 0, nullptr, nullptr);
+        std::string result(size, 0);
+        WideCharToMultiByte(CP_UTF8, 0, bstr, len, &result[0], size, nullptr, nullptr);
+        return result;
+    }
+
+    // Ensure COM is initialized on the calling thread
+    static void ensureCOM() {
+        static thread_local bool initialized = false;
+        if (!initialized) {
+            CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+            initialized = true;
+        }
+    }
+
+#elif defined(__APPLE__)
+    #include "DeckLinkAPI.h"
+    #include "DeckLinkAPIVideoFrame_v14_2_1.h"
+
+    // Helper: convert CFString to std::string
+    static std::string cfStringToString(CFStringRef cfStr) {
+        if (!cfStr) return "";
+        CFIndex len = CFStringGetLength(cfStr);
+        CFIndex maxSize = CFStringGetMaximumSizeForEncoding(len, kCFStringEncodingUTF8) + 1;
+        std::string result(maxSize, 0);
+        if (CFStringGetCString(cfStr, &result[0], maxSize, kCFStringEncodingUTF8)) {
+            result.resize(std::strlen(result.c_str()));
+        } else {
+            result.clear();
+        }
+        return result;
+    }
+
+#else
+    #include "DeckLinkAPI.h"
+    #include "DeckLinkAPIVideoFrame_v14_2_1.h"
+    // Linux: DeckLink SDK uses COM-like interfaces with AddRef/Release
+#endif
+
+
+// ── Per-device state ─────────────────────────────────────────────────
+
+struct DeviceState {
+    IDeckLinkOutput* output = nullptr;
+    IDeckLink* device = nullptr;
+    IDeckLinkKeyer* keyer = nullptr;
+    bool playbackStarted = false;
+    bool audioEnabled = false;
+    long frameCount = 0;
+    double fps = 30.0;
+    BMDTimeScale timeScale = 30000;
+    BMDTimeValue frameDuration = 1001;
+    int outputWidth = 0;
+    int outputHeight = 0;
+};
+
+static std::mutex g_mutex;
+static std::map<int, DeviceState> g_devices;
+
+
+// ── Per-device input state ──────────────────────────────────────────
+
+struct InputState {
+    IDeckLinkInput* input = nullptr;
+    IDeckLink* device = nullptr;
+    IDeckLinkConfiguration* config = nullptr;  // kept alive so connection setting persists
+    uint32_t* frameData = nullptr;
+    int frameWidth = 0;
+    int frameHeight = 0;
+    bool hasNewFrame = false;
+    std::mutex frameMutex;
+    // Audio capture buffer (ring buffer of 16-bit PCM samples)
+    bool audioEnabled = false;
+    int audioChannels = 0;
+    int16_t* audioData = nullptr;
+    int audioCapacity = 0;     // max sample frames in buffer
+    int audioWritePos = 0;
+    int audioAvailable = 0;    // sample frames available for reading
+    bool hasNewAudio = false;
+};
+
+static std::mutex g_inputMutex;
+static std::map<int, InputState*> g_inputs;
+
+
+// ── Input callback ──────────────────────────────────────────────────
+
+class DeckLinkInputCallback : public IDeckLinkInputCallback {
+public:
+    DeckLinkInputCallback(int deviceIndex) : m_deviceIndex(deviceIndex), m_refCount(1) {}
+
+    // IUnknown
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID, LPVOID*) override { return E_NOINTERFACE; }
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++m_refCount; }
+    ULONG STDMETHODCALLTYPE Release() override {
+        ULONG ref = --m_refCount;
+        if (ref == 0) delete this;
+        return ref;
+    }
+
+    HRESULT STDMETHODCALLTYPE VideoInputFormatChanged(
+        BMDVideoInputFormatChangedEvents events,
+        IDeckLinkDisplayMode* newMode,
+        BMDDetectedVideoInputFormatFlags flags) override
+    {
+        // Auto-mode: restart input with the detected format
+        std::lock_guard<std::mutex> lock(g_inputMutex);
+        auto it = g_inputs.find(m_deviceIndex);
+        if (it == g_inputs.end() || !it->second->input) return S_OK;
+
+        int w = static_cast<int>(newMode->GetWidth());
+        int h = static_cast<int>(newMode->GetHeight());
+
+        // Determine pixel format based on detection flags
+        BMDPixelFormat pixFmt = bmdFormat8BitYUV;
+        if (flags & bmdDetectedVideoInputRGB444) {
+            pixFmt = bmdFormat8BitBGRA;
+        }
+
+        it->second->input->PauseStreams();
+        it->second->input->EnableVideoInput(
+            newMode->GetDisplayMode(), pixFmt,
+            bmdVideoInputEnableFormatDetection);
+        it->second->input->FlushStreams();
+        it->second->input->StartStreams();
+
+        return S_OK;
+    }
+
+    HRESULT STDMETHODCALLTYPE VideoInputFrameArrived(
+        IDeckLinkVideoInputFrame* videoFrame,
+        IDeckLinkAudioInputPacket* audioPacket) override
+    {
+        // ── Audio capture ──
+        if (audioPacket) {
+            std::lock_guard<std::mutex> lock(g_inputMutex);
+            auto it = g_inputs.find(m_deviceIndex);
+            if (it != g_inputs.end() && it->second->audioEnabled) {
+                InputState* state = it->second;
+                void* audioBytes = nullptr;
+                if (audioPacket->GetBytes(&audioBytes) == S_OK && audioBytes) {
+                    long sampleFrames = audioPacket->GetSampleFrameCount();
+                    int totalSamples = sampleFrames * state->audioChannels;
+                    const int16_t* src = reinterpret_cast<const int16_t*>(audioBytes);
+                    std::lock_guard<std::mutex> frameLock(state->frameMutex);
+                    // Write into ring buffer
+                    int capSamples = state->audioCapacity * state->audioChannels;
+                    for (int i = 0; i < totalSamples && capSamples > 0; i++) {
+                        int writeIdx = (state->audioWritePos * state->audioChannels + i) % capSamples;
+                        state->audioData[writeIdx] = src[i];
+                    }
+                    state->audioWritePos = (state->audioWritePos + sampleFrames) % state->audioCapacity;
+                    state->audioAvailable += sampleFrames;
+                    if (state->audioAvailable > state->audioCapacity)
+                        state->audioAvailable = state->audioCapacity;
+                    state->hasNewAudio = true;
+                }
+            }
+        }
+
+        if (!videoFrame) return S_OK;
+
+        // No input signal — clear the frame so the UI goes blank
+        if (videoFrame->GetFlags() & bmdFrameHasNoInputSource) {
+            std::lock_guard<std::mutex> lock(g_inputMutex);
+            auto it = g_inputs.find(m_deviceIndex);
+            if (it != g_inputs.end()) {
+                it->second->hasNewFrame = false;
+                delete[] it->second->frameData;
+                it->second->frameData = nullptr;
+                it->second->frameWidth = 0;
+                it->second->frameHeight = 0;
+            }
+            return S_OK;
+        }
+
+        int w = static_cast<int>(videoFrame->GetWidth());
+        int h = static_cast<int>(videoFrame->GetHeight());
+        if (w <= 0 || h <= 0) return S_OK;
+
+        // Get raw frame bytes — try SDK 15.3+ IDeckLinkVideoBuffer first,
+        // fall back to legacy IDeckLinkVideoFrame_v14_2_1::GetBytes() for
+        // older devices (e.g. Intensity Shuttle) whose frames may not
+        // support the newer interface.
+        void* frameBytes = nullptr;
+        IDeckLinkVideoBuffer* videoBuffer = nullptr;
+        IDeckLinkVideoFrame_v14_2_1* legacyFrame = nullptr;
+        bool useLegacy = false;
+
+        if (videoFrame->QueryInterface(IID_IDeckLinkVideoBuffer, reinterpret_cast<void**>(&videoBuffer)) == S_OK && videoBuffer) {
+            videoBuffer->StartAccess(bmdBufferAccessRead);
+            if (videoBuffer->GetBytes(&frameBytes) != S_OK || !frameBytes) {
+                videoBuffer->EndAccess(bmdBufferAccessRead);
+                videoBuffer->Release();
+                return S_OK;
+            }
+        } else if (videoFrame->QueryInterface(IID_IDeckLinkVideoFrame_v14_2_1, reinterpret_cast<void**>(&legacyFrame)) == S_OK && legacyFrame) {
+            if (legacyFrame->GetBytes(&frameBytes) != S_OK || !frameBytes) {
+                legacyFrame->Release();
+                return S_OK;
+            }
+            useLegacy = true;
+        } else {
+            return S_OK;
+        }
+
+        int totalPixels = w * h;
+        BMDPixelFormat pixFmt = videoFrame->GetPixelFormat();
+
+        // Allocate/resize buffer if needed
+        std::lock_guard<std::mutex> lock(g_inputMutex);
+        auto it = g_inputs.find(m_deviceIndex);
+        if (it == g_inputs.end()) {
+            if (useLegacy) {
+                legacyFrame->Release();
+            } else {
+                videoBuffer->EndAccess(bmdBufferAccessRead);
+                videoBuffer->Release();
+            }
+            return S_OK;
+        }
+        InputState* state = it->second;
+
+        if (state->frameWidth != w || state->frameHeight != h) {
+            delete[] state->frameData;
+            state->frameData = new uint32_t[totalPixels];
+            state->frameWidth = w;
+            state->frameHeight = h;
+        }
+
+        if (pixFmt == bmdFormat8BitBGRA) {
+            // BGRA → ARGB: swap byte order
+            const uint8_t* src = reinterpret_cast<const uint8_t*>(frameBytes);
+            for (int i = 0; i < totalPixels; i++) {
+                uint8_t b = src[i * 4 + 0];
+                uint8_t g = src[i * 4 + 1];
+                uint8_t r = src[i * 4 + 2];
+                uint8_t a = src[i * 4 + 3];
+                state->frameData[i] = (a << 24) | (r << 16) | (g << 8) | b;
+            }
+        } else if (pixFmt == bmdFormat8BitYUV) {
+            // UYVY (packed YUV 4:2:2) → ARGB
+            const uint8_t* src = reinterpret_cast<const uint8_t*>(frameBytes);
+            for (int i = 0; i < totalPixels; i += 2) {
+                int j = i * 2; // 4 bytes per 2 pixels
+                uint8_t u  = src[j + 0];
+                uint8_t y0 = src[j + 1];
+                uint8_t v  = src[j + 2];
+                uint8_t y1 = src[j + 3];
+
+                auto clamp = [](int val) -> uint8_t {
+                    return static_cast<uint8_t>(val < 0 ? 0 : (val > 255 ? 255 : val));
+                };
+                int c0 = y0 - 16, c1 = y1 - 16;
+                int d = u - 128, e = v - 128;
+
+                state->frameData[i] = (0xFF << 24) |
+                    (clamp((298 * c0 + 409 * e + 128) >> 8) << 16) |
+                    (clamp((298 * c0 - 100 * d - 208 * e + 128) >> 8) << 8) |
+                    clamp((298 * c0 + 516 * d + 128) >> 8);
+
+                if (i + 1 < totalPixels) {
+                    state->frameData[i + 1] = (0xFF << 24) |
+                        (clamp((298 * c1 + 409 * e + 128) >> 8) << 16) |
+                        (clamp((298 * c1 - 100 * d - 208 * e + 128) >> 8) << 8) |
+                        clamp((298 * c1 + 516 * d + 128) >> 8);
+                }
+            }
+        } else if (pixFmt == bmdFormat10BitYUV) {
+            // v210 format — treat as black (unsupported for now)
+            memset(state->frameData, 0, totalPixels * 4);
+        } else {
+            // Unknown format — try raw copy as BGRA
+            const uint8_t* src = reinterpret_cast<const uint8_t*>(frameBytes);
+            for (int i = 0; i < totalPixels; i++) {
+                uint8_t b = src[i * 4 + 0];
+                uint8_t g = src[i * 4 + 1];
+                uint8_t r = src[i * 4 + 2];
+                state->frameData[i] = (0xFF << 24) | (r << 16) | (g << 8) | b;
+            }
+        }
+
+        state->hasNewFrame = true;
+        if (useLegacy) {
+            legacyFrame->Release();
+        } else {
+            videoBuffer->EndAccess(bmdBufferAccessRead);
+            videoBuffer->Release();
+        }
+        return S_OK;
+    }
+
+private:
+    int m_deviceIndex;
+    std::atomic<ULONG> m_refCount;
+};
+
+
+// ── Helper: get device by index ──────────────────────────────────────
+
+static IDeckLink* getDeviceByIndex(int deviceIndex) {
+    IDeckLinkIterator* iterator = nullptr;
+#ifdef _WIN32
+    ensureCOM();
+    HRESULT hr = CoCreateInstance(
+        CLSID_CDeckLinkIterator, nullptr, CLSCTX_ALL,
+        IID_IDeckLinkIterator, reinterpret_cast<void**>(&iterator));
+    if (FAILED(hr) || !iterator) return nullptr;
+#else
+    iterator = CreateDeckLinkIteratorInstance();
+    if (!iterator) return nullptr;
+#endif
+
+    IDeckLink* device = nullptr;
+    int idx = 0;
+    while (iterator->Next(&device) == S_OK) {
+        if (idx == deviceIndex) break;
+        device->Release();
+        device = nullptr;
+        idx++;
+    }
+    iterator->Release();
+    return device;
+}
+
+
+// ── Helper: get device display name (platform-specific) ──────────────
+
+static std::string getDeviceName(IDeckLink* device) {
+#ifdef _WIN32
+    BSTR name = nullptr;
+    if (device->GetDisplayName(&name) == S_OK && name) {
+        std::string result = bstrToString(name);
+        SysFreeString(name);
+        return result;
+    }
+#elif defined(__APPLE__)
+    CFStringRef name = nullptr;
+    if (device->GetDisplayName(&name) == S_OK && name) {
+        std::string result = cfStringToString(name);
+        CFRelease(name);
+        return result;
+    }
+#else
+    const char* name = nullptr;
+    if (device->GetDisplayName(&name) == S_OK && name) {
+        std::string result(name);
+        free(const_cast<char*>(name));
+        return result;
+    }
+#endif
+    return "";
+}
+
+// ── Helper: get display mode name (platform-specific) ────────────────
+
+static std::string getModeName(IDeckLinkDisplayMode* mode) {
+#ifdef _WIN32
+    BSTR name = nullptr;
+    if (mode->GetName(&name) == S_OK && name) {
+        std::string result = bstrToString(name);
+        SysFreeString(name);
+        return result;
+    }
+#elif defined(__APPLE__)
+    CFStringRef name = nullptr;
+    if (mode->GetName(&name) == S_OK && name) {
+        std::string result = cfStringToString(name);
+        CFRelease(name);
+        return result;
+    }
+#else
+    const char* name = nullptr;
+    if (mode->GetName(&name) == S_OK && name) {
+        std::string result(name);
+        free(const_cast<char*>(name));
+        return result;
+    }
+#endif
+    return "";
+}
+
+
+// ── Helper: get the device's default output mode from DeckLink Setup ──
+
+static IDeckLinkDisplayMode* getConfiguredDisplayMode(IDeckLink* device, IDeckLinkOutput* output) {
+    IDeckLinkConfiguration* config = nullptr;
+    if (device->QueryInterface(IID_IDeckLinkConfiguration, reinterpret_cast<void**>(&config)) == S_OK && config) {
+        int64_t modeValue = 0;
+        // bmdDeckLinkConfigDefaultVideoOutputMode = 'dvom' = 0x64766F6D
+        if (config->GetInt(static_cast<BMDDeckLinkConfigurationID>(0x64766F6D), &modeValue) == S_OK && modeValue != 0) {
+            BMDDisplayMode configuredModeId = static_cast<BMDDisplayMode>(modeValue);
+            IDeckLinkDisplayModeIterator* modeIter = nullptr;
+            if (output->GetDisplayModeIterator(&modeIter) == S_OK && modeIter) {
+                IDeckLinkDisplayMode* mode = nullptr;
+                while (modeIter->Next(&mode) == S_OK) {
+                    if (mode->GetDisplayMode() == configuredModeId) {
+                        modeIter->Release();
+                        config->Release();
+                        return mode;
+                    }
+                    mode->Release();
+                }
+                modeIter->Release();
+            }
+        } else {
+        }
+        config->Release();
+    }
+    return nullptr;
+}
+
+// ── Helper: find display mode matching resolution ─────────────────────
+
+static IDeckLinkDisplayMode* findDisplayMode(IDeckLinkOutput* output, int width, int height) {
+    IDeckLinkDisplayModeIterator* modeIter = nullptr;
+    if (output->GetDisplayModeIterator(&modeIter) != S_OK || !modeIter) return nullptr;
+
+    IDeckLinkDisplayMode* mode = nullptr;
+    IDeckLinkDisplayMode* bestMode = nullptr;
+    double bestFps = 0.0;
+    bool bestIs5994 = false;
+
+    while (modeIter->Next(&mode) == S_OK) {
+        if (mode->GetWidth() == width && mode->GetHeight() == height) {
+            BMDFieldDominance fieldDom = mode->GetFieldDominance();
+            bool isProgressive = (fieldDom == bmdProgressiveFrame || fieldDom == bmdProgressiveSegmentedFrame);
+            if (!isProgressive) { mode->Release(); continue; }
+
+            BMDTimeValue duration; BMDTimeScale scale;
+            mode->GetFrameRate(&duration, &scale);
+            double fps = (duration > 0) ? static_cast<double>(scale) / static_cast<double>(duration) : 0.0;
+            bool is5994 = (duration == 1001 && scale == 60000);
+
+            bool isBetter = (is5994 && !bestIs5994) || (!bestIs5994 && fps > bestFps) || (is5994 && bestIs5994 && fps > bestFps);
+            if (isBetter) {
+                if (bestMode) bestMode->Release();
+                bestMode = mode;
+                bestFps = fps;
+                bestIs5994 = is5994;
+            } else {
+                mode->Release();
+            }
+        } else {
+            mode->Release();
+        }
+    }
+    modeIter->Release();
+    return bestMode;
+}
+
+
+// ── Helper: create a DeckLink video frame from pixel data ───────────
+
+static IDeckLinkMutableVideoFrame* createFrame(IDeckLinkOutput* output, const jint* pixels, int width, int height) {
+    IDeckLinkMutableVideoFrame* frame = nullptr;
+    HRESULT hr = output->CreateVideoFrame(
+        width, height, width * 4,
+        bmdFormat8BitBGRA, bmdFrameFlagDefault, &frame
+    );
+    if (hr != S_OK || !frame) return nullptr;
+
+    // Get writable frame bytes — try SDK 15.3+ IDeckLinkVideoBuffer first,
+    // fall back to legacy IDeckLinkVideoFrame_v14_2_1::GetBytes() for
+    // older devices (e.g. Intensity Shuttle).
+    void* frameBytes = nullptr;
+    IDeckLinkVideoBuffer* buffer = nullptr;
+    IDeckLinkVideoFrame_v14_2_1* legacyFrame = nullptr;
+    bool useLegacy = false;
+
+    if (frame->QueryInterface(IID_IDeckLinkVideoBuffer, reinterpret_cast<void**>(&buffer)) == S_OK && buffer) {
+        buffer->StartAccess(bmdBufferAccessWrite);
+        buffer->GetBytes(&frameBytes);
+    } else if (frame->QueryInterface(IID_IDeckLinkVideoFrame_v14_2_1, reinterpret_cast<void**>(&legacyFrame)) == S_OK && legacyFrame) {
+        legacyFrame->GetBytes(&frameBytes);
+        useLegacy = true;
+    }
+
+    if (!frameBytes) {
+        if (useLegacy) {
+            legacyFrame->Release();
+        } else if (buffer) {
+            buffer->EndAccess(bmdBufferAccessWrite);
+            buffer->Release();
+        }
+        frame->Release();
+        return nullptr;
+    }
+
+    if (pixels) {
+        const uint32_t* src = reinterpret_cast<const uint32_t*>(pixels);
+        uint8_t* dst = reinterpret_cast<uint8_t*>(frameBytes);
+        int totalPixels = width * height;
+        for (int i = 0; i < totalPixels; i++) {
+            uint32_t argb = src[i];
+            dst[i * 4 + 0] = argb & 0xFF;           // B
+            dst[i * 4 + 1] = (argb >> 8) & 0xFF;    // G
+            dst[i * 4 + 2] = (argb >> 16) & 0xFF;   // R
+            dst[i * 4 + 3] = (argb >> 24) & 0xFF;   // A
+        }
+    }
+
+    if (useLegacy) {
+        legacyFrame->Release();
+    } else if (buffer) {
+        buffer->EndAccess(bmdBufferAccessWrite);
+        buffer->Release();
+    }
+
+    return frame;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// JNI implementations
+// ═══════════════════════════════════════════════════════════════════
+
+JNIEXPORT jobjectArray JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeListDevices(
+    JNIEnv* env, jclass)
+{
+#ifdef _WIN32
+    ensureCOM();
+#endif
+
+    std::vector<std::string> names;
+    IDeckLinkIterator* iterator = nullptr;
+
+#ifdef _WIN32
+    HRESULT hr = CoCreateInstance(
+        CLSID_CDeckLinkIterator, nullptr, CLSCTX_ALL,
+        IID_IDeckLinkIterator, reinterpret_cast<void**>(&iterator));
+    if (FAILED(hr) || !iterator) {
+        jclass stringClass = env->FindClass("java/lang/String");
+        return env->NewObjectArray(0, stringClass, nullptr);
+    }
+#else
+    iterator = CreateDeckLinkIteratorInstance();
+    if (!iterator) {
+        jclass stringClass = env->FindClass("java/lang/String");
+        return env->NewObjectArray(0, stringClass, nullptr);
+    }
+#endif
+
+    IDeckLink* device = nullptr;
+    while (iterator->Next(&device) == S_OK) {
+#ifdef _WIN32
+        BSTR name = nullptr;
+        if (device->GetDisplayName(&name) == S_OK && name) {
+            names.push_back(bstrToString(name));
+            SysFreeString(name);
+        }
+#elif defined(__APPLE__)
+        CFStringRef name = nullptr;
+        if (device->GetDisplayName(&name) == S_OK && name) {
+            names.push_back(cfStringToString(name));
+            CFRelease(name);
+        }
+#else
+        const char* name = nullptr;
+        if (device->GetDisplayName(&name) == S_OK && name) {
+            names.push_back(name);
+            free(const_cast<char*>(name));
+        }
+#endif
+        device->Release();
+    }
+    iterator->Release();
+
+    jclass stringClass = env->FindClass("java/lang/String");
+    jobjectArray result = env->NewObjectArray(static_cast<jsize>(names.size()), stringClass, nullptr);
+    for (size_t i = 0; i < names.size(); i++) {
+        jstring jstr = env->NewStringUTF(names[i].c_str());
+        env->SetObjectArrayElement(result, static_cast<jsize>(i), jstr);
+        env->DeleteLocalRef(jstr);
+    }
+    return result;
+}
+
+
+JNIEXPORT jboolean JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeOpen(
+    JNIEnv* env, jclass, jint deviceIndex, jint width, jint height)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+
+#ifdef _WIN32
+    ensureCOM();
+#endif
+
+    // Close existing output for this device index if any
+    auto it = g_devices.find(deviceIndex);
+    if (it != g_devices.end()) {
+        if (it->second.output) {
+            it->second.output->DisableVideoOutput();
+            it->second.output->Release();
+        }
+        if (it->second.device) it->second.device->Release();
+        g_devices.erase(it);
+    }
+
+    IDeckLinkIterator* iterator = nullptr;
+
+#ifdef _WIN32
+    HRESULT hr = CoCreateInstance(
+        CLSID_CDeckLinkIterator, nullptr, CLSCTX_ALL,
+        IID_IDeckLinkIterator, reinterpret_cast<void**>(&iterator));
+    if (FAILED(hr) || !iterator) return JNI_FALSE;
+#else
+    iterator = CreateDeckLinkIteratorInstance();
+    if (!iterator) return JNI_FALSE;
+#endif
+
+    IDeckLink* device = nullptr;
+    int idx = 0;
+    while (iterator->Next(&device) == S_OK) {
+        if (idx == deviceIndex) break;
+        device->Release();
+        device = nullptr;
+        idx++;
+    }
+    iterator->Release();
+    if (!device) return JNI_FALSE;
+
+    IDeckLinkOutput* output = nullptr;
+    if (device->QueryInterface(IID_IDeckLinkOutput, reinterpret_cast<void**>(&output)) != S_OK || !output) {
+        device->Release();
+        return JNI_FALSE;
+    }
+
+    IDeckLinkDisplayMode* displayMode = getConfiguredDisplayMode(device, output);
+    if (displayMode) {
+    } else {
+        displayMode = findDisplayMode(output, width, height);
+    }
+    if (!displayMode) {
+        output->Release(); device->Release();
+        return JNI_FALSE;
+    }
+
+    DeviceState state;
+    BMDDisplayMode modeId = displayMode->GetDisplayMode();
+    displayMode->GetFrameRate(&state.frameDuration, &state.timeScale);
+    state.outputWidth = static_cast<int>(displayMode->GetWidth());
+    state.outputHeight = static_cast<int>(displayMode->GetHeight());
+    state.fps = (state.timeScale > 0 && state.frameDuration > 0)
+        ? static_cast<double>(state.timeScale) / static_cast<double>(state.frameDuration) : 30.0;
+    displayMode->Release();
+
+
+    HRESULT enableResult = output->EnableVideoOutput(modeId, bmdVideoOutputFlagDefault);
+    if (enableResult != S_OK) {
+        fprintf(stderr, "[DeckLink] Device %d: EnableVideoOutput failed: 0x%08lx\n",
+                deviceIndex, (unsigned long)enableResult);
+        output->Release(); device->Release();
+        return JNI_FALSE;
+    }
+
+    state.output = output;
+    state.device = device;
+    g_devices[deviceIndex] = state;
+
+    return JNI_TRUE;
+}
+
+
+JNIEXPORT void JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeSendFrame(
+    JNIEnv* env, jclass, jint deviceIndex, jintArray pixels, jint width, jint height)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    auto it = g_devices.find(deviceIndex);
+    if (it == g_devices.end() || !it->second.output) return;
+
+    jint* pixelData = env->GetIntArrayElements(pixels, nullptr);
+    if (!pixelData) return;
+
+    IDeckLinkMutableVideoFrame* frame = createFrame(it->second.output, pixelData, width, height);
+    env->ReleaseIntArrayElements(pixels, pixelData, JNI_ABORT);
+
+    if (frame) {
+        it->second.output->DisplayVideoFrameSync(frame);
+        frame->Release();
+    }
+}
+
+
+JNIEXPORT jboolean JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeStartScheduledPlayback(
+    JNIEnv* env, jclass, jint deviceIndex, jdouble fps)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    auto it = g_devices.find(deviceIndex);
+    if (it == g_devices.end() || !it->second.output) return JNI_FALSE;
+
+    it->second.fps = fps;
+    it->second.frameCount = 0;
+
+    if (it->second.output->StartScheduledPlayback(0, it->second.timeScale, 1.0) != S_OK) {
+        return JNI_FALSE;
+    }
+
+    it->second.playbackStarted = true;
+    return JNI_TRUE;
+}
+
+
+JNIEXPORT void JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeScheduleFrame(
+    JNIEnv* env, jclass, jint deviceIndex, jintArray pixels, jint width, jint height)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    auto it = g_devices.find(deviceIndex);
+    if (it == g_devices.end() || !it->second.output || !it->second.playbackStarted) return;
+
+    jint* pixelData = env->GetIntArrayElements(pixels, nullptr);
+    if (!pixelData) return;
+
+    IDeckLinkMutableVideoFrame* frame = createFrame(it->second.output, pixelData, width, height);
+    env->ReleaseIntArrayElements(pixels, pixelData, JNI_ABORT);
+
+    if (frame) {
+        BMDTimeValue displayTime = it->second.frameCount * it->second.frameDuration;
+        it->second.output->ScheduleVideoFrame(frame, displayTime, it->second.frameDuration, it->second.timeScale);
+        it->second.frameCount++;
+    }
+}
+
+
+JNIEXPORT void JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeStopPlayback(
+    JNIEnv* env, jclass, jint deviceIndex)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    auto it = g_devices.find(deviceIndex);
+    if (it == g_devices.end() || !it->second.output) return;
+
+    if (it->second.playbackStarted) {
+        it->second.output->StopScheduledPlayback(0, nullptr, 0);
+        it->second.playbackStarted = false;
+    }
+}
+
+
+JNIEXPORT void JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeClose(
+    JNIEnv* env, jclass, jint deviceIndex)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    auto it = g_devices.find(deviceIndex);
+    if (it == g_devices.end()) return;
+
+    if (it->second.keyer) {
+        it->second.keyer->Disable();
+        it->second.keyer->Release();
+    }
+    if (it->second.output) {
+        if (it->second.playbackStarted) {
+            it->second.output->StopScheduledPlayback(0, nullptr, 0);
+        }
+        if (it->second.audioEnabled) {
+            it->second.output->DisableAudioOutput();
+        }
+        it->second.output->DisableVideoOutput();
+        it->second.output->Release();
+    }
+    if (it->second.device) {
+        it->second.device->Release();
+    }
+    g_devices.erase(it);
+
+}
+
+
+JNIEXPORT jintArray JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeGetOutputInfo(
+    JNIEnv* env, jclass, jint deviceIndex)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+
+    jint info[4] = {0, 0, 0, 0};
+    auto it = g_devices.find(deviceIndex);
+    if (it != g_devices.end()) {
+        info[0] = it->second.outputWidth;
+        info[1] = it->second.outputHeight;
+        info[2] = static_cast<jint>(it->second.timeScale);
+        info[3] = static_cast<jint>(it->second.frameDuration);
+    }
+
+    jintArray result = env->NewIntArray(4);
+    if (result) {
+        env->SetIntArrayRegion(result, 0, 4, info);
+    }
+    return result;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Input capture JNI implementations
+// ═══════════════════════════════════════════════════════════════════
+
+// Helper to build a JNI string array
+static jobjectArray toStringArray(JNIEnv* env, const std::vector<std::string>& vec) {
+    jclass stringClass = env->FindClass("java/lang/String");
+    jobjectArray result = env->NewObjectArray(static_cast<jsize>(vec.size()), stringClass, nullptr);
+    for (size_t i = 0; i < vec.size(); i++) {
+        jstring jstr = env->NewStringUTF(vec[i].c_str());
+        env->SetObjectArrayElement(result, static_cast<jsize>(i), jstr);
+        env->DeleteLocalRef(jstr);
+    }
+    return result;
+}
+
+
+JNIEXPORT jobjectArray JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeListInputModes(
+    JNIEnv* env, jclass, jint deviceIndex)
+{
+#ifdef _WIN32
+    ensureCOM();
+#endif
+
+    std::vector<std::string> modes;
+    IDeckLink* device = getDeviceByIndex(deviceIndex);
+    if (!device) return toStringArray(env, modes);
+
+    IDeckLinkInput* input = nullptr;
+    if (device->QueryInterface(IID_IDeckLinkInput, reinterpret_cast<void**>(&input)) == S_OK && input) {
+        IDeckLinkDisplayModeIterator* modeIter = nullptr;
+        if (input->GetDisplayModeIterator(&modeIter) == S_OK && modeIter) {
+            IDeckLinkDisplayMode* mode = nullptr;
+            while (modeIter->Next(&mode) == S_OK) {
+                std::string name = getModeName(mode);
+                int w = static_cast<int>(mode->GetWidth());
+                int h = static_cast<int>(mode->GetHeight());
+                BMDTimeValue dur; BMDTimeScale scale;
+                mode->GetFrameRate(&dur, &scale);
+                double fps = (dur > 0) ? static_cast<double>(scale) / static_cast<double>(dur) : 0;
+                BMDFieldDominance fd = mode->GetFieldDominance();
+                const char* scan = (fd == bmdProgressiveFrame || fd == bmdProgressiveSegmentedFrame) ? "p" : "i";
+
+                // Format: "name|WxH@fps_scan" e.g. "HD 1080p 30|1920x1080@30p"
+                char encoded[256];
+                snprintf(encoded, sizeof(encoded), "%s|%dx%d@%.2f%s",
+                    name.c_str(), w, h, fps, scan);
+                modes.push_back(encoded);
+                mode->Release();
+            }
+            modeIter->Release();
+        }
+        input->Release();
+    }
+    device->Release();
+
+    return toStringArray(env, modes);
+}
+
+
+JNIEXPORT jobjectArray JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeListVideoConnections(
+    JNIEnv* env, jclass, jint deviceIndex)
+{
+#ifdef _WIN32
+    ensureCOM();
+#endif
+
+    std::vector<std::string> connections;
+    IDeckLink* device = getDeviceByIndex(deviceIndex);
+    if (!device) return toStringArray(env, connections);
+
+    IDeckLinkProfileAttributes* attrs = nullptr;
+    if (device->QueryInterface(IID_IDeckLinkProfileAttributes, reinterpret_cast<void**>(&attrs)) == S_OK && attrs) {
+        int64_t availableConnections = 0;
+        // bmdDeckLinkVideoInputConnections = 'vicn' = 0x7669636E
+        if (attrs->GetInt(static_cast<BMDDeckLinkAttributeID>(0x7669636E), &availableConnections) == S_OK) {
+            // Encode as "name|value" pairs
+            if (availableConnections & bmdVideoConnectionSDI)
+                connections.push_back("SDI|1");
+            if (availableConnections & bmdVideoConnectionHDMI)
+                connections.push_back("HDMI|2");
+            if (availableConnections & bmdVideoConnectionOpticalSDI)
+                connections.push_back("Optical SDI|4");
+            if (availableConnections & bmdVideoConnectionComponent)
+                connections.push_back("Component|8");
+            if (availableConnections & bmdVideoConnectionComposite)
+                connections.push_back("Composite|16");
+            if (availableConnections & bmdVideoConnectionSVideo)
+                connections.push_back("S-Video|32");
+        }
+        attrs->Release();
+    }
+    device->Release();
+
+    return toStringArray(env, connections);
+}
+
+
+JNIEXPORT jboolean JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeOpenInput(
+    JNIEnv* env, jclass, jint deviceIndex, jstring modeStr, jint connectionType)
+{
+#ifdef _WIN32
+    ensureCOM();
+#endif
+
+    // Close existing input for this device
+    {
+        std::lock_guard<std::mutex> lock(g_inputMutex);
+        auto it = g_inputs.find(deviceIndex);
+        if (it != g_inputs.end()) {
+            InputState* old = it->second;
+            if (old->input) {
+                old->input->StopStreams();
+                old->input->DisableVideoInput();
+                old->input->Release();
+            }
+            if (old->config) old->config->Release();
+            if (old->device) old->device->Release();
+            delete[] old->frameData;
+            delete old;
+            g_inputs.erase(it);
+        }
+    }
+
+    IDeckLink* device = getDeviceByIndex(deviceIndex);
+    if (!device) return JNI_FALSE;
+
+    // Set video connection BEFORE getting input interface.
+    // Keep config alive — releasing it reverts the setting on some cards.
+    IDeckLinkConfiguration* config = nullptr;
+    if (connectionType > 0) {
+        if (device->QueryInterface(IID_IDeckLinkConfiguration, reinterpret_cast<void**>(&config)) == S_OK && config) {
+            // bmdDeckLinkConfigVideoInputConnection = 'vicn' = 0x7669636E
+            config->SetInt(static_cast<BMDDeckLinkConfigurationID>(0x7669636E),
+                           static_cast<int64_t>(connectionType));
+        }
+    }
+
+    IDeckLinkInput* input = nullptr;
+    if (device->QueryInterface(IID_IDeckLinkInput, reinterpret_cast<void**>(&input)) != S_OK || !input) {
+        device->Release();
+        fprintf(stderr, "[DeckLink Input] Device %d: no input interface\n", deviceIndex);
+        return JNI_FALSE;
+    }
+
+    // Parse mode string to find display mode, or use auto-detect
+    const char* modeChars = modeStr ? env->GetStringUTFChars(modeStr, nullptr) : nullptr;
+    std::string modeString = modeChars ? modeChars : "";
+    if (modeChars) env->ReleaseStringUTFChars(modeStr, modeChars);
+
+    BMDDisplayMode selectedMode = bmdModeNTSC; // fallback
+    BMDVideoInputFlags inputFlags = bmdVideoInputEnableFormatDetection;
+    bool autoMode = modeString.empty();
+
+    if (!autoMode) {
+        // Parse "WxH@fps" from the encoded mode string (after '|')
+        size_t pipePos = modeString.find('|');
+        std::string encoded = (pipePos != std::string::npos) ? modeString.substr(pipePos + 1) : modeString;
+        int tw = 0, th = 0;
+        double tfps = 0;
+        if (sscanf(encoded.c_str(), "%dx%d@%lf", &tw, &th, &tfps) >= 2) {
+            // Find matching mode
+            IDeckLinkDisplayModeIterator* modeIter = nullptr;
+            if (input->GetDisplayModeIterator(&modeIter) == S_OK && modeIter) {
+                IDeckLinkDisplayMode* mode = nullptr;
+                while (modeIter->Next(&mode) == S_OK) {
+                    if (mode->GetWidth() == tw && mode->GetHeight() == th) {
+                        BMDTimeValue dur; BMDTimeScale scale;
+                        mode->GetFrameRate(&dur, &scale);
+                        double fps = (dur > 0) ? static_cast<double>(scale) / static_cast<double>(dur) : 0;
+                        if (tfps <= 0 || (fps > tfps - 1.0 && fps < tfps + 1.0)) {
+                            selectedMode = mode->GetDisplayMode();
+                            mode->Release();
+                            break;
+                        }
+                    }
+                    mode->Release();
+                }
+                modeIter->Release();
+            }
+        }
+    } else {
+        // Auto mode: pick the first available mode as a starting point,
+        // format detection will switch to the actual input signal
+        IDeckLinkDisplayModeIterator* modeIter = nullptr;
+        if (input->GetDisplayModeIterator(&modeIter) == S_OK && modeIter) {
+            IDeckLinkDisplayMode* mode = nullptr;
+            if (modeIter->Next(&mode) == S_OK) {
+                selectedMode = mode->GetDisplayMode();
+                mode->Release();
+            }
+            modeIter->Release();
+        }
+    }
+
+    // Set up callback
+    InputState* state = new InputState();
+    state->input = input;
+    state->device = device;
+    state->config = config;  // keep alive so connection setting persists
+
+    DeckLinkInputCallback* callback = new DeckLinkInputCallback(deviceIndex);
+    input->SetCallback(callback);
+    callback->Release(); // input holds a reference
+
+    // Store state before enabling (callback may fire immediately)
+    {
+        std::lock_guard<std::mutex> lock(g_inputMutex);
+        g_inputs[deviceIndex] = state;
+    }
+
+    HRESULT hr = input->EnableVideoInput(selectedMode, bmdFormat8BitYUV, inputFlags);
+    if (hr != S_OK) {
+        fprintf(stderr, "[DeckLink Input] Device %d: EnableVideoInput failed: 0x%08lx\n",
+                deviceIndex, (unsigned long)hr);
+        std::lock_guard<std::mutex> lock(g_inputMutex);
+        g_inputs.erase(deviceIndex);
+        input->SetCallback(nullptr);
+        input->Release();
+        device->Release();
+        delete state;
+        return JNI_FALSE;
+    }
+
+    hr = input->StartStreams();
+    if (hr != S_OK) {
+        fprintf(stderr, "[DeckLink Input] Device %d: StartStreams failed: 0x%08lx\n",
+                deviceIndex, (unsigned long)hr);
+        input->DisableVideoInput();
+        std::lock_guard<std::mutex> lock(g_inputMutex);
+        g_inputs.erase(deviceIndex);
+        input->SetCallback(nullptr);
+        input->Release();
+        device->Release();
+        delete state;
+        return JNI_FALSE;
+    }
+
+    return JNI_TRUE;
+}
+
+
+JNIEXPORT jintArray JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeGetInputFrame(
+    JNIEnv* env, jclass, jint deviceIndex)
+{
+    std::lock_guard<std::mutex> lock(g_inputMutex);
+    auto it = g_inputs.find(deviceIndex);
+    if (it == g_inputs.end()) return nullptr;
+
+    InputState* state = it->second;
+    std::lock_guard<std::mutex> frameLock(state->frameMutex);
+
+    if (!state->hasNewFrame || !state->frameData || state->frameWidth <= 0 || state->frameHeight <= 0)
+        return nullptr;
+
+    state->hasNewFrame = false;
+    int totalPixels = state->frameWidth * state->frameHeight;
+
+    // First 2 elements are width and height, followed by pixel data
+    jintArray result = env->NewIntArray(2 + totalPixels);
+    if (!result) return nullptr;
+
+    jint header[2] = { state->frameWidth, state->frameHeight };
+    env->SetIntArrayRegion(result, 0, 2, header);
+    env->SetIntArrayRegion(result, 2, totalPixels, reinterpret_cast<jint*>(state->frameData));
+
+    return result;
+}
+
+
+JNIEXPORT void JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeCloseInput(
+    JNIEnv* env, jclass, jint deviceIndex)
+{
+    std::lock_guard<std::mutex> lock(g_inputMutex);
+    auto it = g_inputs.find(deviceIndex);
+    if (it == g_inputs.end()) return;
+
+    InputState* state = it->second;
+    if (state->input) {
+        state->input->StopStreams();
+        state->input->SetCallback(nullptr);
+        if (state->audioEnabled) state->input->DisableAudioInput();
+        state->input->DisableVideoInput();
+        state->input->Release();
+    }
+    if (state->config) state->config->Release();
+    if (state->device) state->device->Release();
+    delete[] state->frameData;
+    delete[] state->audioData;
+    delete state;
+    g_inputs.erase(it);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Audio input capture
+// ═══════════════════════════════════════════════════════════════════
+
+JNIEXPORT jboolean JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeEnableAudioInput(
+    JNIEnv* env, jclass, jint deviceIndex, jint channels)
+{
+    std::lock_guard<std::mutex> lock(g_inputMutex);
+    auto it = g_inputs.find(deviceIndex);
+    if (it == g_inputs.end() || !it->second->input) return JNI_FALSE;
+
+    InputState* state = it->second;
+    if (state->audioEnabled) return JNI_TRUE; // already enabled
+
+    int ch = (channels > 0) ? channels : 2;
+    HRESULT hr = state->input->EnableAudioInput(
+        bmdAudioSampleRate48kHz, bmdAudioSampleType16bitInteger, ch);
+    if (hr != S_OK) return JNI_FALSE;
+
+    // Allocate ring buffer for ~1 second of audio at 48kHz
+    state->audioChannels = ch;
+    state->audioCapacity = 48000;
+    state->audioData = new int16_t[state->audioCapacity * ch];
+    memset(state->audioData, 0, state->audioCapacity * ch * sizeof(int16_t));
+    state->audioWritePos = 0;
+    state->audioAvailable = 0;
+    state->audioEnabled = true;
+
+    return JNI_TRUE;
+}
+
+
+JNIEXPORT jshortArray JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeGetInputAudio(
+    JNIEnv* env, jclass, jint deviceIndex)
+{
+    std::lock_guard<std::mutex> lock(g_inputMutex);
+    auto it = g_inputs.find(deviceIndex);
+    if (it == g_inputs.end()) return nullptr;
+
+    InputState* state = it->second;
+    std::lock_guard<std::mutex> frameLock(state->frameMutex);
+
+    if (!state->hasNewAudio || !state->audioData || state->audioAvailable <= 0)
+        return nullptr;
+
+    int sampleFrames = state->audioAvailable;
+    int ch = state->audioChannels;
+    int totalSamples = sampleFrames * ch;
+    int capSamples = state->audioCapacity * ch;
+
+    // Read from ring buffer: data starts at (writePos - available)
+    int readStart = ((state->audioWritePos - sampleFrames + state->audioCapacity) % state->audioCapacity) * ch;
+
+    // Header: [sampleFrames, channels, ...samples...]
+    jshortArray result = env->NewShortArray(2 + totalSamples);
+    if (!result) return nullptr;
+
+    jshort header[2] = { static_cast<jshort>(sampleFrames > 32767 ? 32767 : sampleFrames),
+                         static_cast<jshort>(ch) };
+    env->SetShortArrayRegion(result, 0, 2, header);
+
+    // Copy from ring buffer handling wrap-around
+    if (readStart + totalSamples <= capSamples) {
+        env->SetShortArrayRegion(result, 2, totalSamples, &state->audioData[readStart]);
+    } else {
+        int firstPart = capSamples - readStart;
+        env->SetShortArrayRegion(result, 2, firstPart, &state->audioData[readStart]);
+        env->SetShortArrayRegion(result, 2 + firstPart, totalSamples - firstPart, &state->audioData[0]);
+    }
+
+    state->audioAvailable = 0;
+    state->hasNewAudio = false;
+
+    return result;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Audio output
+// ═══════════════════════════════════════════════════════════════════
+
+JNIEXPORT jboolean JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeEnableAudioOutput(
+    JNIEnv* env, jclass, jint deviceIndex, jint channels)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    auto it = g_devices.find(deviceIndex);
+    if (it == g_devices.end() || !it->second.output) return JNI_FALSE;
+
+    int ch = (channels > 0) ? channels : 2;
+    HRESULT hr = it->second.output->EnableAudioOutput(
+        bmdAudioSampleRate48kHz, bmdAudioSampleType16bitInteger, ch,
+        bmdAudioOutputStreamContinuous);
+    if (hr != S_OK) return JNI_FALSE;
+
+    it->second.audioEnabled = true;
+    return JNI_TRUE;
+}
+
+
+JNIEXPORT jint JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeWriteAudioSamples(
+    JNIEnv* env, jclass, jint deviceIndex, jshortArray samples, jint sampleFrameCount)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    auto it = g_devices.find(deviceIndex);
+    if (it == g_devices.end() || !it->second.output || !it->second.audioEnabled) return 0;
+
+    jshort* data = env->GetShortArrayElements(samples, nullptr);
+    if (!data) return 0;
+
+    unsigned int written = 0;
+    it->second.output->WriteAudioSamplesSync(data, sampleFrameCount, &written);
+    env->ReleaseShortArrayElements(samples, data, JNI_ABORT);
+
+    return static_cast<jint>(written);
+}
+
+
+JNIEXPORT void JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeDisableAudioOutput(
+    JNIEnv* env, jclass, jint deviceIndex)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    auto it = g_devices.find(deviceIndex);
+    if (it == g_devices.end() || !it->second.output) return;
+
+    it->second.output->DisableAudioOutput();
+    it->second.audioEnabled = false;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Keyer (hardware overlay)
+// ═══════════════════════════════════════════════════════════════════
+
+JNIEXPORT jboolean JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeEnableKeyer(
+    JNIEnv* env, jclass, jint deviceIndex, jboolean isExternal)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    auto it = g_devices.find(deviceIndex);
+    if (it == g_devices.end() || !it->second.device) return JNI_FALSE;
+
+    // Get keyer interface if not already cached
+    if (!it->second.keyer) {
+        IDeckLinkKeyer* keyer = nullptr;
+        if (it->second.device->QueryInterface(IID_IDeckLinkKeyer, reinterpret_cast<void**>(&keyer)) != S_OK || !keyer)
+            return JNI_FALSE;
+        it->second.keyer = keyer;
+    }
+
+    HRESULT hr = it->second.keyer->Enable(isExternal != 0);
+    if (hr != S_OK) return JNI_FALSE;
+
+    // Default to full opacity
+    it->second.keyer->SetLevel(255);
+
+    return JNI_TRUE;
+}
+
+
+JNIEXPORT void JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeSetKeyerLevel(
+    JNIEnv* env, jclass, jint deviceIndex, jint level)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    auto it = g_devices.find(deviceIndex);
+    if (it == g_devices.end() || !it->second.keyer) return;
+
+    unsigned char clampedLevel = static_cast<unsigned char>(level < 0 ? 0 : (level > 255 ? 255 : level));
+    it->second.keyer->SetLevel(clampedLevel);
+}
+
+
+JNIEXPORT void JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeKeyerRampUp(
+    JNIEnv* env, jclass, jint deviceIndex, jint frames)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    auto it = g_devices.find(deviceIndex);
+    if (it == g_devices.end() || !it->second.keyer) return;
+
+    it->second.keyer->RampUp(frames > 0 ? frames : 30);
+}
+
+
+JNIEXPORT void JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeKeyerRampDown(
+    JNIEnv* env, jclass, jint deviceIndex, jint frames)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    auto it = g_devices.find(deviceIndex);
+    if (it == g_devices.end() || !it->second.keyer) return;
+
+    it->second.keyer->RampDown(frames > 0 ? frames : 30);
+}
+
+
+JNIEXPORT void JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeDisableKeyer(
+    JNIEnv* env, jclass, jint deviceIndex)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    auto it = g_devices.find(deviceIndex);
+    if (it == g_devices.end() || !it->second.keyer) return;
+
+    it->second.keyer->Disable();
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Output connection selection
+// ═══════════════════════════════════════════════════════════════════
+
+JNIEXPORT jboolean JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeSetOutputConnection(
+    JNIEnv* env, jclass, jint deviceIndex, jint connectionType)
+{
+    std::lock_guard<std::mutex> lock(g_mutex);
+    auto it = g_devices.find(deviceIndex);
+    if (it == g_devices.end() || !it->second.device) return JNI_FALSE;
+
+    IDeckLinkConfiguration* config = nullptr;
+    if (it->second.device->QueryInterface(IID_IDeckLinkConfiguration, reinterpret_cast<void**>(&config)) != S_OK || !config)
+        return JNI_FALSE;
+
+    // bmdDeckLinkConfigVideoOutputConnection = 0x766F636E
+    HRESULT hr = config->SetInt(static_cast<BMDDeckLinkConfigurationID>(0x766F636E),
+                                static_cast<int64_t>(connectionType));
+    config->Release();
+
+    return (hr == S_OK) ? JNI_TRUE : JNI_FALSE;
+}
+
+
+JNIEXPORT jobjectArray JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeListOutputConnections(
+    JNIEnv* env, jclass, jint deviceIndex)
+{
+#ifdef _WIN32
+    ensureCOM();
+#endif
+
+    std::vector<std::string> connections;
+    IDeckLink* device = getDeviceByIndex(deviceIndex);
+    if (!device) return toStringArray(env, connections);
+
+    IDeckLinkProfileAttributes* attrs = nullptr;
+    if (device->QueryInterface(IID_IDeckLinkProfileAttributes, reinterpret_cast<void**>(&attrs)) == S_OK && attrs) {
+        int64_t availableConnections = 0;
+        // bmdDeckLinkVideoOutputConnections = 'vocn' = 0x766F636E
+        if (attrs->GetInt(static_cast<BMDDeckLinkAttributeID>(0x766F636E), &availableConnections) == S_OK) {
+            if (availableConnections & bmdVideoConnectionSDI)
+                connections.push_back("SDI|1");
+            if (availableConnections & bmdVideoConnectionHDMI)
+                connections.push_back("HDMI|2");
+            if (availableConnections & bmdVideoConnectionOpticalSDI)
+                connections.push_back("Optical SDI|4");
+            if (availableConnections & bmdVideoConnectionComponent)
+                connections.push_back("Component|8");
+            if (availableConnections & bmdVideoConnectionComposite)
+                connections.push_back("Composite|16");
+            if (availableConnections & bmdVideoConnectionSVideo)
+                connections.push_back("S-Video|32");
+        }
+        attrs->Release();
+    }
+    device->Release();
+
+    return toStringArray(env, connections);
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
+// Status monitoring
+// ═══════════════════════════════════════════════════════════════════
+
+JNIEXPORT jintArray JNICALL
+Java_org_churchpresenter_app_churchpresenter_composables_DeckLinkManager_nativeGetDeviceStatus(
+    JNIEnv* env, jclass, jint deviceIndex)
+{
+#ifdef _WIN32
+    ensureCOM();
+#endif
+
+    // Returns [signalLocked, busy, detectedModeCode]
+    // signalLocked: 1 = locked, 0 = no signal
+    // busy: bitmask from bmdDeckLinkStatusBusy
+    // detectedModeCode: raw BMDDisplayMode fourcc value
+
+    jint status[3] = {0, 0, 0};
+
+    IDeckLink* device = getDeviceByIndex(deviceIndex);
+    if (!device) {
+        jintArray result = env->NewIntArray(3);
+        if (result) env->SetIntArrayRegion(result, 0, 3, status);
+        return result;
+    }
+
+    IDeckLinkStatus* deckStatus = nullptr;
+    if (device->QueryInterface(IID_IDeckLinkStatus, reinterpret_cast<void**>(&deckStatus)) == S_OK && deckStatus) {
+        // bmdDeckLinkStatusVideoInputSignalLocked = 0x7669736C
+#ifdef _WIN32
+        BOOL locked = FALSE;
+#else
+        bool locked = false;
+#endif
+        if (deckStatus->GetFlag(static_cast<BMDDeckLinkStatusID>(0x7669736C), &locked) == S_OK) {
+            status[0] = locked ? 1 : 0;
+        }
+
+        // bmdDeckLinkStatusBusy = 0x62757379
+        int64_t busy = 0;
+        if (deckStatus->GetInt(static_cast<BMDDeckLinkStatusID>(0x62757379), &busy) == S_OK) {
+            status[1] = static_cast<jint>(busy);
+        }
+
+        // bmdDeckLinkStatusDetectedVideoInputMode = 0x6476696D
+        int64_t detectedMode = 0;
+        if (deckStatus->GetInt(static_cast<BMDDeckLinkStatusID>(0x6476696D), &detectedMode) == S_OK) {
+            status[2] = static_cast<jint>(detectedMode);
+        }
+
+        deckStatus->Release();
+    }
+    device->Release();
+
+    jintArray result = env->NewIntArray(3);
+    if (result) env->SetIntArrayRegion(result, 0, 3, status);
+    return result;
+}

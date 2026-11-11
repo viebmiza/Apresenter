@@ -1,0 +1,487 @@
+package org.churchpresenter.settings.utils
+
+import org.churchpresenter.core.models.schedule.TimerModes
+
+object Constants {
+    /** Localhost port used to enforce single-instance via ServerSocket lock. */
+    const val SINGLE_INSTANCE_PORT = 47632
+
+    /**
+     * Fixed loopback port for the Planning Center OAuth redirect catcher. Fixed (not
+     * auto-selected like the Companion Server's [findFreePort]-style ports) because PCO OAuth
+     * apps require an exact, pre-registered redirect URI — this value must match what the user
+     * registers as their PCO Developer app's redirect URI: http://127.0.0.1:47850/callback
+     */
+    const val PLANNING_CENTER_OAUTH_PORT = 47850
+
+    // Defined in :core, where ScheduleItem reads them; aliased here so every call site keeps
+    // spelling them Constants.TIMER_MODE_*.
+    const val TIMER_MODE_DURATION = TimerModes.DURATION
+    const val TIMER_MODE_CLOCK = TimerModes.CLOCK
+    const val TIMER_MODE_COUNT_UP = TimerModes.COUNT_UP
+    const val TIMER_MODE_CLOCK_DISPLAY = TimerModes.CLOCK_DISPLAY
+
+    const val NONE = "None"
+
+    /**
+     * How presented text is re-cased on its way to the screen.
+     *
+     * Stored rather than applied at edit time: a song's own words keep whatever case they were
+     * written in, and the screen decides how to show them — so switching back to [TEXT_TRANSFORM_NONE]
+     * gives the original text, which re-casing the source could never do.
+     */
+    const val TEXT_TRANSFORM_NONE = "None"
+    const val TEXT_TRANSFORM_UPPERCASE = "Uppercase"
+    const val TEXT_TRANSFORM_LOWERCASE = "Lowercase"
+    const val TEXT_TRANSFORM_CAPITALIZE = "Capitalize"
+
+    const val FIRST_PAGE = "First Page"
+    const val EVERY_PAGE = "Every Page"
+    const val TOP = "Top"
+
+    const val ABOVE_VERSE = "AboveVerse"
+    const val BELOW_VERSE = "BelowVerse"
+
+    /**
+     * A song element held against the lyrics block itself -- directly above or below it, moving
+     * wherever the lyrics' alignment or offset puts them. [ABOVE_VERSE] and [BELOW_VERSE], despite
+     * their names, have always meant the content area's top and bottom edge, and keep that meaning.
+     */
+    const val ABOVE_LYRICS = "AboveLyrics"
+    const val BELOW_LYRICS = "BelowLyrics"
+    const val MIDDLE = "Middle"
+    const val BOTTOM = "Bottom"
+    const val LEFT = "Left"
+    const val CENTER = "Center"
+    const val RIGHT = "Right"
+    const val TOP_LEFT = "Top Left"
+    const val TOP_CENTER = "Top Center"
+    const val TOP_RIGHT = "Top Right"
+    const val CENTER_LEFT = "Center Left"
+    const val CENTER_RIGHT = "Center Right"
+    const val BOTTOM_LEFT = "Bottom Left"
+    const val BOTTOM_CENTER = "Bottom Center"
+    const val BOTTOM_RIGHT = "Bottom Right"
+    const val LIGHT = "LIGHT"
+
+    const val DARK = "DARK"
+
+    const val SYSTEM = "SYSTEM"
+
+    const val OTHER = "Other"
+
+    const val CONTAINS = "Contains"
+
+    const val STARTS_WITH = "Starts with"
+
+    const val EXACT_MATCH = "Exact match"
+
+    // Background Types
+    const val BACKGROUND_DEFAULT = "Default"
+    const val BACKGROUND_COLOR = "Color"
+    const val BACKGROUND_IMAGE = "Image"
+    const val BACKGROUND_VIDEO = "Video"
+    const val BACKGROUND_CAMERA = "Camera"
+    const val BACKGROUND_TRANSPARENT = "Transparent"
+    const val BACKGROUND_GRADIENT = "Gradient"
+    const val BACKGROUND_FOLLOW_DEFAULT = "FollowDefault" // Lower third follows the default background
+    const val BACKGROUND_LOTTIE = "Lottie" // Animated Lottie band that carries the text itself
+
+    /** A background-colour field set to no colour at all, rather than to a hex value. */
+    const val COLOR_VALUE_TRANSPARENT = "transparent"
+
+    // Position Options
+    const val POSITION_ABOVE = "Above"
+    const val POSITION_BELOW = "Below"
+
+    // Language Options
+    const val LANGUAGE_INTERFACE = "Interface"
+    const val LANGUAGE_DATABASE = "Database"
+
+    /**
+     * The Bibles folder, relative to the app data directory [AppDataDir] resolves. Seeded with the
+     * bundled KJV on first run.
+     */
+    const val DEFAULT_BIBLES_FOLDER = "Bibles"
+
+    // How many translations the parallel Bible stack may hold. Full screen gives each one an equal
+    // band of the output height, and auto-fit shrinks the text until it fits its band -- with no
+    // floor, so a deeper stack does not overflow, it just goes on getting smaller. Six bands is
+    // already past what an audience can read; the cap is where that stops being the operator's
+    // problem to notice.
+    const val MAX_BIBLE_TRANSLATIONS = 6
+
+    // File Extensions
+    const val EXTENSION_SPS = "sps"
+    const val EXTENSION_SPB = "spb"
+    const val EXTENSION_SONG = "song"
+
+    /** The service schedule the app saves and reopens — "Church Presenter Schedule". */
+    const val EXTENSION_CPS = "cps"
+
+    // Song Display Modes
+    const val SONG_DISPLAY_MODE_VERSE = "verse"
+    const val SONG_DISPLAY_MODE_LINE = "line"
+
+    // Song Language Display
+    const val SONG_LANG_BOTH = "both"
+    const val SONG_LANG_PRIMARY = "primary"
+    const val SONG_LANG_SECONDARY = "secondary"
+    const val SONG_LANG_THIRD = "third"
+    const val SONG_LANG_FOURTH = "fourth"
+    const val SONG_LANG_OFF = "off"
+
+    // Bilingual Layout
+    //
+    // Every value a bilingual/multilingual band or full screen can be arranged in, as a row×col
+    // grid holding 1 to 4 languages. The two original values keep their original names and
+    // strings -- no settings migration needed -- and read as 1 row × 2 cols and 2 rows × 1 col
+    // respectively; see [bilingualGrid] below for the full mapping, including these two.
+    const val BILINGUAL_SIDE_BY_SIDE = "side_by_side"
+    const val BILINGUAL_TOP_BOTTOM = "top_bottom"
+    const val BILINGUAL_GRID_1X3 = "grid_1x3"
+    const val BILINGUAL_GRID_3X1 = "grid_3x1"
+    const val BILINGUAL_GRID_1X4 = "grid_1x4"
+    const val BILINGUAL_GRID_4X1 = "grid_4x1"
+    const val BILINGUAL_GRID_2X2 = "grid_2x2"
+
+    // Section Types
+    const val SECTION_TYPE_SONG = "song"
+    const val SECTION_TYPE_VERSE = "verse"
+    const val SECTION_TYPE_CHORUS = "chorus"
+
+    /** The synthetic section the Songs tab puts in front of a song when title slides are on. */
+    const val SECTION_TYPE_TITLE_SLIDE = "title_slide"
+
+    /**
+     * The section markers the song editor offers on its Insert row, in the order shown.
+     *
+     * Not interface text and deliberately not translated: these are written into the song file and
+     * read back by [isHeaderLine]/[isChorusHeader], which key the chorus off braces. The New Song
+     * template writes the same markers.
+     */
+    val SONG_SECTION_MARKERS = listOf(
+        "[Intro]",
+        "[Verse 1]", "[Verse 2]", "[Verse 3]", "[Verse 4]", "[Verse 5]", "[Verse 6]",
+        "{Chorus}",
+        "[Bridge]",
+    )
+
+    // Fallback Resource
+    const val FALLBACK_SONG_RESOURCE = "pv3300.sps"
+
+    // Sort Columns
+    const val SORT_NUMBER = "number"
+    const val SORT_TITLE = "title"
+    const val SORT_SONGBOOK = "songbook"
+    const val SORT_TUNE = "tune"
+    const val SORT_PLAY_COUNT = "play_count"
+    const val SORT_FAVORITES = "favorites"
+    const val SORT_AUTHOR = "author"
+    const val SORT_COMPOSER = "composer"
+
+    const val CURRENT_BOOK = "Current Book"
+
+    const val ENTIRE_BIBLE = "Entire Bible"
+
+    // Animation Types
+    const val ANIMATION_CROSSFADE = "CROSSFADE"
+    const val ANIMATION_FADE = "FADE"
+    const val ANIMATION_SLIDE_LEFT = "SLIDE_LEFT"
+    const val ANIMATION_SLIDE_RIGHT = "SLIDE_RIGHT"
+    const val ANIMATION_SLIDE_UP = "SLIDE_UP"
+    const val ANIMATION_SLIDE_TO_CENTER = "SLIDE_TO_CENTER"
+    const val ANIMATION_NONE = "NONE"
+
+    // Announcement directional animation types (full edge-to-edge)
+    const val ANIMATION_SLIDE_FROM_LEFT   = "SLIDE_FROM_LEFT"
+    const val ANIMATION_SLIDE_FROM_RIGHT  = "SLIDE_FROM_RIGHT"
+    const val ANIMATION_SLIDE_FROM_TOP    = "SLIDE_FROM_TOP"
+    const val ANIMATION_SLIDE_FROM_BOTTOM = "SLIDE_FROM_BOTTOM"
+    const val ANIMATION_SLIDE_ALONG_TOP_LTR = "SLIDE_ALONG_TOP_LTR"
+    const val ANIMATION_SLIDE_ALONG_TOP_RTL = "SLIDE_ALONG_TOP_RTL"
+    const val ANIMATION_SLIDE_ALONG_BOTTOM_LTR = "SLIDE_ALONG_BOTTOM_LTR"
+    const val ANIMATION_SLIDE_ALONG_BOTTOM_RTL = "SLIDE_ALONG_BOTTOM_RTL"
+
+    // Media Types
+    const val MEDIA_TYPE_LOCAL = "local"
+    const val MEDIA_TYPE_AUDIO = "audio"
+    const val MEDIA_TYPE_URL = "url"
+
+    // Audio file extensions (VLC supports all common formats)
+    val AUDIO_EXTENSIONS = setOf("mp3", "wav", "flac", "aac", "ogg", "wma", "m4a", "aiff", "opus")
+    val VIDEO_EXTENSIONS = setOf("mp4", "mov", "avi", "mkv", "wmv", "flv", "webm", "m4v")
+
+    /** Default max media-file upload size accepted from a companion device (700 MB).
+     *  Operator-overridable via AppSettings.maxMediaUploadMb. */
+    const val DEFAULT_MAX_MEDIA_UPLOAD_MB = 700
+    const val MAX_MEDIA_UPLOAD_BYTES = DEFAULT_MAX_MEDIA_UPLOAD_MB.toLong() * 1024 * 1024
+
+    // Display Mode Types (for screen assignments)
+    const val DISPLAY_MODE_FULLSCREEN = "fullscreen"
+    const val DISPLAY_MODE_LOWER_THIRD_HORIZONTAL = "lower_third"
+    const val DISPLAY_MODE_LOWER_THIRD_VERTICAL = "lower_third_vertical"
+    const val DISPLAY_MODE_STAGE_MONITOR = "stage_monitor"
+
+    // ── Preview output selection ────────────────────────────────────────────────────────────────
+    // Which output a content tab previews. Stored in ProjectionSettings.previewOutputSelections,
+    // keyed by tab, valued by an output key that says which of the three output lists an entry
+    // came from as well as where in it -- index alone would confuse a Browser Source with a screen.
+
+    const val PREVIEW_TAB_MEDIA = "media"
+    const val PREVIEW_TAB_ANNOUNCEMENTS = "announcements"
+    const val PREVIEW_TAB_LOWER_THIRD = "lowerThird"
+    const val PREVIEW_TAB_WEB = "web"
+    const val PREVIEW_TAB_SONGS = "songs"
+    const val PREVIEW_TAB_BIBLE = "bible"
+    const val PREVIEW_TAB_BACKGROUND = "background"
+
+    const val PREVIEW_OUTPUT_SCREEN = "screen"
+    const val PREVIEW_OUTPUT_BROWSER_SOURCE = "browserSource"
+    const val PREVIEW_OUTPUT_NDI = "ndi"
+    const val PREVIEW_OUTPUT_OMT = "omt"
+
+    /** The Preview bus's tile, while preview mode is on: one of its kind, so no index. */
+    const val PREVIEW_OUTPUT_PREVIEW_BUS = "preview"
+
+    /** The stored identity of one output: which list it came from, and its index in that list. */
+    fun previewOutputKey(kind: String, index: Int): String = "$kind:$index"
+
+    // Screen assignment target types
+    const val TARGET_TYPE_SCREEN = "screen"
+    const val TARGET_TYPE_DECKLINK = "decklink"
+
+    // Output Role (fill+key for video mixers)
+    const val OUTPUT_ROLE_NORMAL = "normal"
+    const val OUTPUT_ROLE_FILL = "fill"
+    const val OUTPUT_ROLE_KEY = "key"
+
+    // Key output target sentinel: no key output configured
+    const val KEY_TARGET_NONE = -2
+
+    // What an NDI output puts on the network. Persisted as strings for the same reason the display
+    // modes are: a settings file written by a newer build must stay readable by an older one, and an
+    // enum ordinal would silently shift the meaning of every stored value if the list ever grew in
+    // the middle. The `:ndi` module's NdiOutputMode is the behaviour; these are the stored names.
+    const val NDI_MODE_ALPHA = "alpha"
+    const val NDI_MODE_FILL = "fill"
+    const val NDI_MODE_FILL_AND_KEY = "fill_key"
+
+    // What an OMT output puts on the network, stored as strings for the reason the NDI modes are.
+    // Two where NDI has three: OMT carries alpha in the one stream, so it has no separate key source.
+    const val OMT_MODE_ALPHA = "alpha"
+    const val OMT_MODE_FILL = "fill"
+
+    // An OMT output's encoding quality. The `:omt` module's OmtQuality is the behaviour.
+    const val OMT_QUALITY_DEFAULT = "default"
+    const val OMT_QUALITY_LOW = "low"
+    const val OMT_QUALITY_MEDIUM = "medium"
+    const val OMT_QUALITY_HIGH = "high"
+
+    // Seek amount in ms
+    const val MEDIA_SEEK_MS = 10_000L
+
+    // Companion Server (Ktor)
+    const val SERVER_DEFAULT_PORT = 8765
+    const val SERVER_APP_NAME = "ChurchPresenter"
+    const val SERVER_VERSION = "1.0"
+
+    // REST endpoints
+    const val ENDPOINT_INFO              = "/api/info"
+    const val ENDPOINT_CALENDAR_ENROLL = "/api/calendar/enroll"
+    const val ENDPOINT_STATUS            = "/api/status"
+    const val ENDPOINT_SONGS             = "/api/songs"
+    const val ENDPOINT_SONG_DETAIL       = "/api/songs/{number}"
+    const val ENDPOINT_SONG_CATALOG      = "/api/song-catalog"
+    const val ENDPOINT_BIBLE             = "/api/bible"
+    const val ENDPOINT_BIBLE_SECONDARY   = "/api/bible/secondary"
+    const val ENDPOINT_SCHEDULE          = "/api/schedule"
+    const val ENDPOINT_SCHEDULE_ADD       = "/api/schedule/add"
+    const val ENDPOINT_SCHEDULE_ADD_BATCH = "/api/schedule/add-batch"
+    const val ENDPOINT_PROJECT            = "/api/project"
+    const val ENDPOINT_CLEAR              = "/api/clear"
+    const val ENDPOINT_DRAWING_FRAME      = "/api/drawing/frame"
+    const val ENDPOINT_DRAWING_END        = "/api/drawing/end"
+    const val ENDPOINT_CLEAR_GROUPS       = "/api/clear-groups"
+    const val ENDPOINT_TAKE               = "/api/take"
+    const val ENDPOINT_MESSAGE            = "/api/message"
+    const val ENDPOINT_PROPS              = "/api/props"
+    const val ENDPOINT_MACROS             = "/api/macros"
+    const val ENDPOINT_MACRO              = "/api/macro"
+    const val ENDPOINT_PRESENTATIONS          = "/api/presentations"
+    const val ENDPOINT_PRESENTATIONS_UPLOAD  = "/api/presentations/upload"
+    const val ENDPOINT_PICTURES               = "/api/pictures"
+    const val ENDPOINT_WS                = "/ws"
+    const val ENDPOINT_BROWSER_SOURCE    = "/browser-source"
+    const val ENDPOINT_MEDIA_STREAM      = "/api/media/stream"
+    const val ENDPOINT_MEDIA_UPLOAD      = "/api/media/upload"
+    const val ENDPOINT_BIBLE_FILE        = "/api/bible/file"
+    const val ENDPOINT_LOWER_THIRDS      = "/api/lowerthirds"
+    const val ENDPOINT_BACKGROUNDS       = "/api/backgrounds"
+    const val ENDPOINT_DICTIONARY        = "/api/dictionary"
+    const val ENDPOINT_DICTIONARY_ENTRY  = "/api/dictionary/{number}"
+    const val ENDPOINT_DICTIONARY_VERSES = "/api/dictionary/{number}/verses"
+
+    // Background asset slot names — shared vocabulary between CompanionServer's
+    // GET /api/backgrounds/asset/{slot} and InstanceLinkClient's fetchBackgroundAsset(), since a
+    // slot key (not a raw local file path) is what crosses the wire.
+    const val BACKGROUND_SLOT_DEFAULT             = "default"
+    const val BACKGROUND_SLOT_DEFAULT_LOWER_THIRD = "defaultLowerThird"
+    const val BACKGROUND_SLOT_BIBLE               = "bible"
+    const val BACKGROUND_SLOT_BIBLE_LOWER_THIRD   = "bibleLowerThird"
+    const val BACKGROUND_SLOT_SONG                = "song"
+    const val BACKGROUND_SLOT_SONG_LOWER_THIRD    = "songLowerThird"
+
+    // WebSocket event types (server → client)
+    const val WS_EVENT_SONGS_UPDATED              = "songs_updated"
+    const val WS_EVENT_BIBLE_UPDATED              = "bible_updated"
+    const val WS_EVENT_SECONDARY_BIBLE_UPDATED    = "secondary_bible_updated"
+    const val WS_EVENT_BACKGROUNDS_UPDATED        = "backgrounds_updated"
+    const val WS_EVENT_COMMAND_ACK                = "command_ack"
+    const val WS_EVENT_SCHEDULE_UPDATED           = "schedule_updated"
+    const val WS_EVENT_PRESENTATION_UPDATED       = "presentation_updated"
+    const val WS_EVENT_PICTURES_UPDATED           = "pictures_updated"
+    const val WS_EVENT_DISPLAY_CLEARED            = "display_cleared"
+    const val WS_EVENT_SONG_SECTION_SELECTED      = "song_section_selected"
+    const val WS_EVENT_QUESTIONS_UPDATED                  = "questions_updated"
+    const val WS_EVENT_PRESENTATION_SLIDE_CHANGED         = "presentation_slide_changed"
+    const val WS_EVENT_PRESENTATION_FREEZE_CHANGED        = "presentation_freeze_changed"
+    const val WS_EVENT_PRESENTATION_LIVE_CHANGED          = "presentation_live_changed"
+    const val WS_EVENT_PRESENTATION_AUTO_SCROLL_CHANGED   = "presentation_auto_scroll_changed"
+    const val WS_EVENT_PRESENTATION_LOOP_CHANGED          = "presentation_looping_changed"
+    const val WS_EVENT_LIVE_STATE_CHANGED                 = "live_state_changed"
+    const val WS_EVENT_MEDIA_STATE_CHANGED                = "media_state_changed"
+
+    // WebSocket command types (client → server)
+    const val WS_CMD_SELECT_SONG            = "select_song"
+    const val WS_CMD_SELECT_PICTURE         = "select_picture"
+    const val WS_CMD_SELECT_SONG_SECTION    = "select_song_section"
+    const val WS_CMD_SELECT_SLIDE           = "select_slide"
+    const val WS_CMD_SELECT_BIBLE_VERSE     = "select_bible_verse"
+    const val WS_CMD_ADD_TO_SCHEDULE        = "add_to_schedule"
+    const val WS_CMD_ADD_BATCH_TO_SCHEDULE  = "add_batch_to_schedule"
+    const val WS_CMD_REMOVE_FROM_SCHEDULE   = "remove_from_schedule"
+    const val WS_CMD_PROJECT                = "project"
+    const val WS_CMD_CLEAR                  = "clear"
+    const val WS_CMD_TAKE                   = "take"
+    const val WS_CMD_MESSAGE                = "message"
+    const val WS_CMD_PROP                   = "prop"
+    const val WS_CMD_MACRO                  = "macro"
+    const val WS_CMD_BIBLE_HOLD             = "bible_hold"
+
+    /** ID-less navigation commands — operate on whatever the primary currently has live, since a
+     *  Controller has no way to learn the primary's internally-assigned folderId/presentationId
+     *  (see PicturesViewModel.goLive's KDoc for why select_picture/select_slide can't be reused here). */
+    const val WS_CMD_NEXT_PICTURE           = "next_picture"
+    const val WS_CMD_PREVIOUS_PICTURE       = "previous_picture"
+    const val WS_CMD_NEXT_SLIDE             = "next_slide"
+    const val WS_CMD_PREVIOUS_SLIDE         = "previous_slide"
+
+    // Media transport controls (companion "just controls" remote — no video on the device)
+    const val WS_CMD_MEDIA_PLAY_PAUSE       = "media_play_pause"
+    const val WS_CMD_MEDIA_STOP             = "media_stop"
+    const val WS_CMD_MEDIA_SEEK_FORWARD     = "media_seek_forward"
+    const val WS_CMD_MEDIA_SEEK_BACKWARD    = "media_seek_backward"
+    const val WS_CMD_MEDIA_SEEK_TO          = "media_seek_to"       // payload = position in ms
+    const val WS_CMD_MEDIA_SET_VOLUME       = "media_set_volume"    // payload = 0.0 – 1.0
+    const val WS_CMD_MEDIA_MUTE_TOGGLE      = "media_mute_toggle"
+
+    // Instant-select endpoints (no approval dialog)
+    const val ENDPOINT_BIBLE_SELECT         = "/api/bible/select"
+
+    // Item type strings shared by REST and WS payloads
+    const val ITEM_TYPE_SONG         = "song"
+    const val ITEM_TYPE_BIBLE        = "bible"
+    const val ITEM_TYPE_PRESENTATION = "presentation"
+    const val ITEM_TYPE_PICTURE      = "picture"
+    const val ITEM_TYPE_MEDIA        = "media"
+
+    // API key authentication
+    const val HEADER_PRESENTATION_PASSWORD = "X-Presentation-Password"
+    const val HEADER_API_KEY        = "X-Api-Key"
+    const val HEADER_DEVICE_ID      = "X-Device-Id"
+    const val HEADER_APP_VERSION    = "X-App-Version"
+    const val HEADER_SERVER_VERSION = "X-Server-Version"
+
+    /** Sent by InstanceLinkClient (value "instance_link") so the primary can tell a following
+     *  ChurchPresenter instance apart from a regular mobile/browser companion client. */
+    const val HEADER_CLIENT_ROLE    = "X-Client-Role"
+    const val CLIENT_ROLE_INSTANCE_LINK = "instance_link"
+    const val QUERY_PARAM_API_KEY   = "apiKey"
+    const val QUERY_PARAM_SONGBOOK  = "songbook"
+    const val QUERY_PARAM_MARKUP    = "markup"
+    const val QUERY_PARAM_BOOK      = "book"
+    const val QUERY_PARAM_CHAPTER   = "chapter"
+
+    // SSL / TLS (self-signed cert for companion server)
+    const val SSL_KEYSTORE_TYPE     = "JKS"
+    const val SSL_KEY_ALGORITHM     = "RSA"
+    const val SSL_KEY_ALIAS         = "churchpresenter"
+    const val SSL_KEYSTORE_PASSWORD = "churchpresenter_ssl"
+
+    object DBus {
+        const val DESKTOP_OBJECT_NAME = "org.freedesktop.portal.Desktop"
+        const val DESKTOP_OBJECT_PATH = "/org/freedesktop/portal/desktop"
+
+        object Options {
+            const val MULTIPLE = "multiple"
+            const val DIRECTORY = "directory"
+            const val FILTERS = "filters"
+            const val CURRENT_FOLDER = "current_folder"
+            const val CURRENT_NAME = "current_name"
+            const val HANDLE_TOKEN = "handle_token"
+        }
+    }
+
+    object SystemProperties {
+        const val OS_NAME = "os.name"
+        const val USER_HOME = "user.home"
+    }
+}
+
+/**
+ * [value] (one of the `Constants.BILINGUAL_*` strings) as the rows × cols grid it lays languages
+ * out in -- the single place that mapping is made, so a picker offering these values and a
+ * presenter laying blocks out by them can never disagree.
+ *
+ * An unrecognized value (a settings file from before a grid this large existed, or simply
+ * corrupted) reads as [Constants.BILINGUAL_SIDE_BY_SIDE] always has: one row, two columns.
+ */
+fun bilingualGrid(value: String): Pair<Int, Int> = when (value) {
+    Constants.BILINGUAL_TOP_BOTTOM -> BILINGUAL_ROWS_2 to BILINGUAL_COLS_1
+    Constants.BILINGUAL_GRID_1X3 -> BILINGUAL_ROWS_1 to BILINGUAL_COLS_3
+    Constants.BILINGUAL_GRID_3X1 -> BILINGUAL_ROWS_3 to BILINGUAL_COLS_1
+    Constants.BILINGUAL_GRID_1X4 -> BILINGUAL_ROWS_1 to BILINGUAL_COLS_4
+    Constants.BILINGUAL_GRID_4X1 -> BILINGUAL_ROWS_4 to BILINGUAL_COLS_1
+    Constants.BILINGUAL_GRID_2X2 -> BILINGUAL_ROWS_2 to BILINGUAL_COLS_2
+    else -> BILINGUAL_ROWS_1 to BILINGUAL_COLS_2
+}
+
+/**
+ * How many columns [layout] lays [count] parallel parts out in.
+ *
+ * The two original arrangements are counts, not fixed grids: side by side is one row however many
+ * parts there are, and top/bottom one column. Every named grid means exactly what it says, and the
+ * rows follow from how many parts there are to place.
+ *
+ * One definition because the full screen and the band both lay parallel translations out and must
+ * not disagree about what an arrangement means -- the full screen read the setting as a
+ * side-by-side boolean and ignored every grid, while the band read the grid and quietly dropped any
+ * translation past its cell count.
+ */
+fun bilingualColumns(layout: String, count: Int): Int = when (layout) {
+    Constants.BILINGUAL_SIDE_BY_SIDE -> count.coerceAtLeast(1)
+    Constants.BILINGUAL_TOP_BOTTOM -> 1
+    else -> bilingualGrid(layout).second.coerceAtLeast(1)
+}
+
+// Named rather than left as literals: `bilingualGrid`'s own `when` tripped detekt's MagicNumber
+// rule on the ones past 2, which it leaves alone by default.
+private const val BILINGUAL_ROWS_1 = 1
+private const val BILINGUAL_ROWS_2 = 2
+private const val BILINGUAL_ROWS_3 = 3
+private const val BILINGUAL_ROWS_4 = 4
+private const val BILINGUAL_COLS_1 = 1
+private const val BILINGUAL_COLS_2 = 2
+private const val BILINGUAL_COLS_3 = 3
+private const val BILINGUAL_COLS_4 = 4

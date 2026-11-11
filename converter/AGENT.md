@@ -1,0 +1,100 @@
+# `:converter` — Agent Notes
+
+Rules, structure and commands for this module only. The repo-wide rules are in the root
+`AGENT.md`; the user-facing description of the tool is in this directory's `README.md`.
+
+## What it is
+
+A song/Bible **format converter**: it reads other presentation software's libraries and writes
+ChurchPresenter's own `.sps` songs and `.spb` Bibles. It ships inside the app, as the window the
+Help menu opens. It is not released on its own; `./gradlew :converter:run` starts it alone for
+development.
+
+A real Gradle module of this build: `include(":converter")` in `settings.gradle.kts`, and
+`:composeApp` takes it as `implementation(projects.converter)`. Not a submodule, not a mounted
+source directory.
+
+## What `:composeApp` uses from it
+
+Only these symbols — keep them public, and treat a signature change here as an app change:
+
+| Symbol | Used by |
+|---|---|
+| `ui.App` (as `ConverterApp`), `ui.Strings`, `ui.ConverterTab` | `dialogs/AboutDialog.kt`, `main.kt` — the Help-menu window |
+| `ui.SongSources`, `ui.BIBLE_CONVERSION` | `utils/UsageEventMappings.kt` — naming a conversion in usage events |
+
+The Bible converters (`XmlToSpbConverter`, `UsfxToSpbConverter`, `SpbVersePatcher`, the catalogue
+naming) live in `:bible-formats`, which this module and the app both depend on.
+
+The app's own `data/SpsConverter.kt` is a different thing with a similar name — it is app code and
+does not live here.
+
+## Layout
+
+`src/main/kotlin/`
+
+| Package | Owns |
+|---|---|
+| `converter/song/` | One converter per source format, plus the shared lyric/section machinery (`LyricBlocks`, `SectionLabel`, `SongOutput`, the `SongFormatConverter` registry) and format helpers (`ParadoxTable`, `ProtoMessage`, `LooseJson`, `XmlRepair`, `XmlSupport`, `ChordLines`, `DocumentTextExtractor`) |
+| `converter/library/` | Library-wide passes: `DuplicateFinder`, `RtfText`, `TextUtils` |
+| `ui/` | The Compose Desktop GUI: `App` and the shared helpers, one file per tab (`SongsTab`, `BibleConverterTab`, `DuplicateFinder*`, `BulkRenameTab`), theme, widgets, `Strings` |
+| `Main.kt` | `mainClass = "MainKt"` — the entry point `:converter:run` starts it alone with |
+
+Source formats currently handled: SongBeamer `.sng`, OpenLP (`songs.sqlite` and OpenLyrics),
+OpenSong, FreeShow, Free Worship, EasySlides, EasyWorship (including schedules), Quelea,
+ProPresenter, MediaShout, SoftProjector `.sps`, VideoPsalm `.json` song books, Markdown, and lyrics
+extracted from PDF/Word/PowerPoint/Keynote documents (`.pdf`, `.docx`, `.pptx`, `.ppt`, `.key`).
+
+## Commands
+
+```bash
+./gradlew :converter:test                              # its suite
+./gradlew :converter:run                               # the converter alone, without the app
+./gradlew :converter:detekt                            # gate — no baseline, must be clean
+./gradlew :converter:jacocoTestCoverageVerification    # the coverage floor
+./gradlew :converter:packageDmg                        # installer (Msi/Deb also available)
+```
+
+Its suite and coverage floor run in CI when the change can affect it (`.github/ci/affected_modules.py`),
+in one of the `modules` groups; detekt runs on every change.
+
+## Gates
+
+- **detekt**: same `config/detekt/detekt.yml` as the app, **no baseline**, and everything it
+  analyzes is clean — keep it that way. `source` is the whole of `src/main/kotlin` and
+  `src/test/kotlin`, with `**/ui/**` excluded on the task: that is the pre-existing Compose GUI, the
+  kind of code `:composeApp` keeps in its own baseline rather than gating. **Everything that parses
+  a file is analyzed.**
+
+  **Name what is excluded, never what is included.** `source` used to be
+  `src/main/kotlin/converter`, carving `ui/**` out by not listing it. When the sources moved under
+  `org/churchpresenter/` that path matched nothing, and main-source analysis switched itself off
+  **silently** — detekt over zero files is a passing detekt — so the module was gating only its
+  tests until it was noticed. An exclude cannot fail that way round: if `**/ui/**` stops matching,
+  the gate analyzes too much and says so.
+- **Coverage** (`cp.test`'s six counters — see the root `AGENT.md`): no
+  `extra["coverageFloors"]`: all six counters are held at the 85% default — never add a floor
+  below it. `extra["coverageExcludes"]` is the default (`**/ComposableSingletons*`) and nothing
+  more: `ui/**` and `main` are measured. That `extra` block must stay **above everything else** in
+  the build file, and the module must never re-declare the JaCoCo tasks themselves.
+- **UI tests** drive the tabs headless with `runComposeUiTest`. The tabs open their native choosers
+  through `LocalConverterPickers`, so a test provides `FakePickers` (`ConverterUiTestSupport.kt`)
+  instead of a Swing dialog. Clicks inside a `DialogWindow` (the compare windows) must run on the
+  EDT (`onEdt`), and what such a window shows is awaited with `awaitInWindow`. Left uncovered:
+  `main`, the Swing choosers themselves (`SwingPickers`, `pickFiles`, `pickDirectory`,
+  `pickSourceFiles`), `Desktop.open`, and the file dropdowns inside the compare windows.
+
+## Dependencies
+
+- POI: `poi-ooxml:5.3.0` **with `poi-ooxml-lite` excluded** plus `poi-ooxml-full:5.3.0`. This jar
+  is on the app's classpath, and **exactly ONE POI schema jar may be there** — the same exclusion
+  is mirrored in `composeApp/build.gradle.kts` and in the Presentation Engine.
+  `poi-scratchpad` is here too, for the legacy binary `.ppt` the Documents source reads: HSLF is a
+  separate hierarchy from the XSLF that reads `.pptx`.
+- `:presentation-engine`, for Keynote. `KeynoteText.slideTexts` is the only thing taken from it —
+  the Documents source needs a `.key`'s words, and the IWA reader that answers that already lives
+  there. **Do not parse Keynote a second time here.**
+- `pdfbox:2.0.33` for document text extraction, `sqlite-jdbc` for the OpenLP/MediaShout databases,
+  `kotlinx-serialization-json` for the JSON-shaped formats.
+- Versions come from `gradle/libs.versions.toml` where the catalogue has them; the POI/PDFBox
+  literals here are pinned deliberately and must match the app's.

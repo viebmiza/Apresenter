@@ -1,0 +1,479 @@
+package org.churchpresenter.bibleformats.catalog
+
+import io.ktor.client.plugins.HttpRequestTimeoutException
+import kotlinx.coroutines.CancellationException
+import java.io.File
+import java.nio.file.Files
+import javax.net.ssl.SSLException
+import java.nio.channels.UnresolvedAddressException
+import java.net.SocketTimeoutException
+import java.net.ConnectException
+import java.io.IOException
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import java.security.cert.CertificateException
+
+/**
+ * The small decisions the install pipelines are built from: is this file a Bible module, what comes
+ * out of an archive, how long to wait before retrying, and where the raw downloads are fetched from.
+ *
+ * Each is reached directly rather than through a download, because each is the part that decides
+ * something. The pipelines around them are covered by the per-source suites, which drive a
+ * `MockEngine`; nothing here touches a network or a clock.
+ */
+class InstallHelpersTest {
+
+    private lateinit var dir: File
+    private val restore = mutableMapOf<String, String?>()
+
+    @BeforeTest
+    fun setUp() {
+        dir = Files.createTempDirectory("cp-install-helpers-test").toFile()
+    }
+
+    @AfterTest
+    fun cleanUp() {
+        restore.forEach { (k, v) -> if (v == null) System.clearProperty(k) else System.setProperty(k, v) }
+        restore.clear()
+        dir.deleteRecursively()
+    }
+
+    private fun setProperty(key: String, value: String?) {
+        restore.putIfAbsent(key, System.getProperty(key))
+        if (value == null) System.clearProperty(key) else System.setProperty(key, value)
+    }
+
+    private fun zipOf(vararg entries: Pair<String, String>): File {
+        val zip = File(dir, "archive.zip")
+        ZipOutputStream(zip.outputStream()).use { out ->
+            entries.forEach { (name, body) ->
+                out.putNextEntry(ZipEntry(name))
+                out.write(body.toByteArray())
+                out.closeEntry()
+            }
+        }
+        return zip
+    }
+
+    // ── looksLikeModule ─────────────────────────────────────────────────────────
+
+    /**
+     * `.spb` modules open with a `##Title:` header. The check reads only the first line, because it
+     * runs on every candidate an archive yields and those can be tens of megabytes.
+     */
+    @Test
+    fun `a file whose first line is a module header looks like a module`() {
+        val module = File(dir, "kjv.spb").apply { writeText("##Title: KJV\n1 Genesis 50\n") }
+
+        assertTrue(BibleInstallSupport.looksLikeModule(module))
+    }
+
+    @Test
+    fun `a file that opens with anything else does not`() {
+        val readme = File(dir, "README.txt").apply { writeText("This archive contains a Bible.\n") }
+
+        assertFalse(BibleInstallSupport.looksLikeModule(readme))
+    }
+
+    @Test
+    fun `an empty file does not look like a module rather than throwing`() {
+        assertFalse(BibleInstallSupport.looksLikeModule(File(dir, "empty.spb").apply { createNewFile() }))
+    }
+
+    /** A path that is not there at all is the same answer, not an exception out of the installer. */
+    @Test
+    fun `a file that does not exist does not look like a module`() {
+        assertFalse(BibleInstallSupport.looksLikeModule(File(dir, "absent.spb")))
+    }
+
+    // ── extractEntries ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `only the wanted entries come out of the archive`() {
+        val zip = zipOf("bible.spb" to "##Title: KJV", "readme.txt" to "ignore me")
+
+        val extracted = BibleInstallSupport.extractEntries(zip, dir) { it.endsWith(".spb") }
+
+        assertEquals(setOf("bible.spb"), extracted.keys)
+        assertEquals("##Title: KJV", extracted.getValue("bible.spb").readText())
+    }
+
+    @Test
+    fun `an entry nested in folders is matched on its file name`() {
+        val zip = zipOf("modules/en/kjv.spb" to "##Title: KJV")
+
+        val extracted = BibleInstallSupport.extractEntries(zip, dir) { it == "kjv.spb" }
+
+        assertEquals(setOf("kjv.spb"), extracted.keys)
+    }
+
+    @Test
+    fun `an archive with nothing wanted in it yields nothing`() {
+        val zip = zipOf("readme.txt" to "no modules here")
+
+        assertTrue(BibleInstallSupport.extractEntries(zip, dir) { it.endsWith(".spb") }.isEmpty())
+    }
+
+    /** A file that is not a zip at all is an empty result, not a thrown ZipException. */
+    @Test
+    fun `a file that is not an archive yields nothing`() {
+        val notAZip = File(dir, "corrupt.zip").apply { writeText("this is not a zip") }
+
+        assertTrue(BibleInstallSupport.extractEntries(notAZip, dir) { true }.isEmpty())
+    }
+
+    // ── prepareScratch ──────────────────────────────────────────────────────────
+
+    @Test
+    fun `a scratch folder that does not exist is created`() {
+        val scratch = BibleInstallSupport.scratchIn(dir)
+        assertEquals(scratch, BibleInstallSupport.prepareScratch(scratch))
+        assertTrue(scratch.isDirectory)
+    }
+
+    @Test
+    fun `a scratch folder left over from an earlier install is emptied`() {
+        val scratch = BibleInstallSupport.scratchIn(dir).apply { mkdirs() }
+        File(scratch, "module.zip").writeText("half a download")
+
+        assertEquals(scratch, BibleInstallSupport.prepareScratch(scratch))
+
+        assertTrue(scratch.isDirectory)
+        assertEquals(0, scratch.listFiles()?.size)
+    }
+
+    @Test
+    fun `a scratch folder that cannot be created is refused rather than left to fail later`() {
+        val notADirectory = File(dir, "plain-file").apply { writeText("x") }
+        assertEquals(null, BibleInstallSupport.prepareScratch(File(notADirectory, ".cp-install")))
+    }
+
+    @Test
+    fun `an install into a usable directory gets an empty scratch folder inside it`() {
+        val scratch = BibleInstallSupport.prepareInstall(dir)!!
+        // Inside the target, so the finishing move stays a rename on one filesystem.
+        assertEquals(dir, scratch.parentFile)
+        assertTrue(scratch.name.startsWith(BibleInstallSupport.SCRATCH_PREFIX + "-"), scratch.name)
+        assertTrue(scratch.isDirectory)
+        assertEquals(0, scratch.listFiles()?.size)
+    }
+
+    @Test
+    fun `two installs into the same folder do not clobber each other's scratch`() {
+        // Each catalogue tab runs its own install into the one Bible folder. The second starting
+        // used to empty the first's scratch, and either ending deleted the other's.
+        val first = BibleInstallSupport.prepareInstall(dir)!!
+        val firstDownload = File(first, "module.xml").apply { writeText("half of the first download") }
+
+        val second = BibleInstallSupport.prepareInstall(dir)!!
+        assertTrue(first != second, "each install has a folder of its own")
+        assertTrue(firstDownload.isFile, "starting the second install left the first's download alone")
+
+        second.deleteRecursively() // what the second install's finally does
+        assertEquals("half of the first download", firstDownload.readText())
+    }
+
+    @Test
+    fun `a module being written is never an spb file in the scratch folder`() {
+        val scratch = BibleInstallSupport.prepareInstall(dir)!!
+        val part = BibleInstallSupport.partFileIn(scratch, "kjv.spb")
+        assertEquals(scratch, part.parentFile)
+        assertFalse(part.extension.equals("spb", ignoreCase = true), part.name)
+    }
+
+    @Test
+    fun `scratch left by a crash is swept, and a live install's is not`() {
+        val now = System.currentTimeMillis()
+        val dayAndMore = 25L * 60 * 60 * 1000
+        val legacy = File(dir, ".cp-install").apply { mkdirs() }
+        File(legacy, "kjv.spb").writeText("##Title:\tleft over")
+        val abandoned = File(dir, ".cp-install-old").apply { mkdirs() }
+        File(abandoned, "module.zip").writeText("x")
+        abandoned.setLastModified(now - dayAndMore)
+        val live = File(dir, ".cp-install-live").apply { mkdirs() }
+        val probeLike = File(dir, ".cp-install-write-test-1").apply { writeText("") }
+        probeLike.setLastModified(now - dayAndMore)
+        val unrelated = File(dir, "Old Bibles").apply { mkdirs() }
+        unrelated.setLastModified(now - dayAndMore)
+
+        BibleInstallSupport.sweepStaleScratch(dir, now = now)
+
+        assertFalse(legacy.exists(), "the old shared folder is never in use any more")
+        assertFalse(abandoned.exists(), "untouched for a day")
+        assertTrue(live.isDirectory, "another install may be writing into it")
+        assertTrue(probeLike.isFile, "only folders are swept")
+        assertTrue(unrelated.isDirectory, "only scratch folders are swept")
+    }
+
+    @Test
+    fun `preparing an install sweeps what a crash left behind`() {
+        val legacy = File(dir, ".cp-install").apply { mkdirs() }
+        BibleInstallSupport.prepareInstall(dir)
+        assertFalse(legacy.exists())
+    }
+
+    @Test
+    fun `an install into a plain file gets no scratch folder`() {
+        val file = File(dir, "not-a-directory").apply { writeText("x") }
+        assertEquals(null, BibleInstallSupport.prepareInstall(file))
+    }
+
+    // ── usableDirectory ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `an existing writable directory is usable`() {
+        assertTrue(BibleInstallSupport.usableDirectory(dir))
+    }
+
+    @Test
+    fun `a missing directory is created and is then usable`() {
+        val missing = File(dir, "not-yet-created")
+        assertTrue(BibleInstallSupport.usableDirectory(missing))
+        assertTrue(missing.isDirectory)
+    }
+
+    @Test
+    fun `a plain file is not a usable directory`() {
+        val file = File(dir, "not-a-directory").apply { writeText("x") }
+        assertFalse(BibleInstallSupport.usableDirectory(file))
+    }
+
+    /**
+     * `exists()`/`isDirectory` alone accepted this exact folder — a Start Menu shortcuts folder was
+     * reported as `bibleSettings.storageDirectory` on one machine, existed, and still failed three
+     * calls deep inside `copyChannel`'s `FileOutputStream` open with a raw `FileNotFoundException`
+     * (Sentry CHURCH-PRESENTER-DESKTOP-6K). `usableDirectory` has to catch that itself by actually
+     * proving a file can be created, not just that the directory is there.
+     */
+    @Test
+    fun `a directory that exists but cannot be written into is not usable`() {
+        val readOnly = File(dir, "read-only").apply { mkdirs() }
+        assertTrue(readOnly.setWritable(false), "test precondition: the OS must honour the read-only bit")
+        try {
+            assertFalse(BibleInstallSupport.usableDirectory(readOnly))
+        } finally {
+            readOnly.setWritable(true)
+        }
+    }
+
+    @Test
+    fun `checking usability leaves no probe file behind`() {
+        BibleInstallSupport.usableDirectory(dir)
+        assertTrue(dir.listFiles()?.isEmpty() != false, "the write-test probe must clean up after itself")
+    }
+
+    // ── downloadRetryDelayMs ────────────────────────────────────────────────────
+
+    /**
+     * The backoff doubles per attempt and is jittered, so what is pinned is the envelope: never
+     * below the floor it was given, never above the ceiling, and growing with the attempt.
+     */
+    @Test
+    fun `the retry delay never drops below its floor`() {
+        repeat(6) { attempt ->
+            val delay = BibleInstallSupport.downloadRetryDelayMs(attempt, floorMs = 100)
+            assertTrue(delay >= 100, "attempt $attempt gave ${delay}ms, under the 100ms floor")
+        }
+    }
+
+    @Test
+    fun `the retry delay grows with the attempt and then stops growing`() {
+        val first = BibleInstallSupport.downloadRetryDelayMs(0, floorMs = 100)
+        val later = BibleInstallSupport.downloadRetryDelayMs(4, floorMs = 100)
+
+        assertTrue(later > first, "a later attempt should wait longer: ${first}ms then ${later}ms")
+        val past = BibleInstallSupport.downloadRetryDelayMs(9, floorMs = 100)
+        assertTrue(past <= later * 2, "the shift is clamped, so attempt 9 cannot run away: ${past}ms")
+    }
+
+    /** Called without a floor it uses the production default — the shape every caller but a test gets. */
+    @Test
+    fun `the default floor applies when none is given`() {
+        assertTrue(BibleInstallSupport.downloadRetryDelayMs(0) >= 1)
+    }
+
+    // ── rawBase ─────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `raw downloads come from the archive's own host by default`() {
+        setProperty("churchpresenter.bebliaRawBase", null)
+
+        assertEquals(
+            "https://raw.githubusercontent.com/${BebliaCatalogIndex.OWNER}/${BebliaCatalogIndex.REPO}",
+            BebliaCatalogIndex.rawBase(),
+        )
+    }
+
+    /**
+     * The override exists so a test — or a church behind a mirror — can point the downloads
+     * somewhere else without touching the catalogue URL, which is a separate property.
+     */
+    @Test
+    fun `an override redirects the raw downloads`() {
+        setProperty("churchpresenter.bebliaRawBase", "https://mirror.invalid/raw")
+
+        assertEquals("https://mirror.invalid/raw", BebliaCatalogIndex.rawBase())
+        assertTrue(BebliaCatalogIndex.rawUrlFor("abc", "KJV.xml").startsWith("https://mirror.invalid/raw/abc/"))
+    }
+
+    @Test
+    fun `a blank override falls back rather than producing an empty host`() {
+        setProperty("churchpresenter.bebliaRawBase", "   ")
+
+        assertTrue(BebliaCatalogIndex.rawBase().startsWith("https://raw.githubusercontent.com/"))
+    }
+
+    // ── Which failures are the operator's own network or disk ───────────────────
+
+    private fun isEnvironment(e: Throwable): Boolean =
+        with(BibleInstallSupport) { e.isOperatorEnvironment() }
+
+    @Test
+    fun `a network that never resolved or connected is the operator's, not a defect`() {
+        // A DNS failure and a full disk had become separate Sentry issues that both meant "a Bible
+        // download did not finish" — a fact about the church's network, not about the app.
+        assertTrue(isEnvironment(UnresolvedAddressException()))
+        assertTrue(isEnvironment(ConnectException("refused")))
+        // A reset mid-fetch is the same fact as a refusal, and was reported separately until
+        // SocketException — which ConnectException extends — replaced the narrower type.
+        assertTrue(isEnvironment(java.net.SocketException("Connection reset")))
+        assertTrue(isEnvironment(SocketTimeoutException("timed out")))
+        assertTrue(isEnvironment(SSLException("bad certificate")))
+    }
+
+    @Test
+    fun `a certificate the JVM will not trust is the operator's network, wrapped or not`() {
+        // ktor CIO's own TLS raises it raw rather than as an SSLException: an HTTPS-inspecting
+        // proxy or antivirus re-signing the traffic, which is the church's network, not a defect.
+        val rejected = CertificateException("PKIX path building failed")
+
+        assertTrue(isEnvironment(rejected))
+        assertTrue(isEnvironment(IOException("request failed", rejected)), "ktor wraps, so the cause chain counts")
+    }
+
+    @Test
+    fun `a disk with no room left is the operator's too`() {
+        assertTrue(
+            isEnvironment(
+                BibleInstallSupport.InsufficientDiskSpaceException(0, IOException("write failed"))
+            )
+        )
+    }
+
+    @Test
+    fun `a connection the server closed mid-response is the operator's`() {
+        // ktor CIO raises EOFException("...the server prematurely closed the connection") when the
+        // bytes stop arriving. Reported once from a church whose network does that to
+        // raw.githubusercontent.com; it is TruncatedBodyException's fact, one layer lower.
+        assertTrue(isEnvironment(java.io.EOFException("the server prematurely closed the connection")))
+    }
+
+    @Test
+    fun `a catalogue body that stopped short is the operator's line, and is recognised at all`() {
+        // ktor's own check on a buffered body, and a plain IllegalStateException — so no catch in
+        // any of the three catalogue sources saw it and it came out of the coroutine as a fatal
+        // crash from the Bible tab. Matched on ktor's wording, which unlike an OS message is the
+        // same in every locale; anything else with that type still has to be thrown.
+        val truncated = IllegalStateException(
+            "Content-Length mismatch: expected 731082 bytes, but received 20192 bytes"
+        )
+
+        assertTrue(with(BibleInstallSupport) { truncated.isContentLengthMismatch() })
+        assertTrue(isEnvironment(truncated), "the church's connection, not a defect to file")
+        assertFalse(
+            with(BibleInstallSupport) { IllegalStateException("not initialised").isContentLengthMismatch() },
+            "an ordinary IllegalStateException means this code has a bug and must not be swallowed",
+        )
+    }
+
+    @Test
+    fun `a request that timed out is the operator's line, not a defect`() {
+        // ktor raises this rather than SocketTimeoutException when its own request timeout fires,
+        // and it is a different type entirely — so the two have to be listed separately. A church
+        // in Jamaica on a slow line filed "Holy Bible XML catalogue fetch failed" against a
+        // 30-second timeout to raw.githubusercontent.com, which is a fact about the line.
+        assertTrue(isEnvironment(HttpRequestTimeoutException("https://example.invalid", 30_000)))
+        assertTrue(
+            isEnvironment(IOException("fetch failed", HttpRequestTimeoutException("https://example.invalid", 30_000))),
+            "ktor wraps, so the cause chain has to find it too",
+        )
+    }
+
+    @Test
+    fun `a cancelled download is the user changing their mind, not a fault`() {
+        // Closing the download browser cancels whatever it started, and ktor delivers that to the
+        // request's own catch as an IOException over a channel closed underneath it — which is how
+        // "eBible catalogue fetch failed" got filed against someone who had merely closed a dialog.
+        assertTrue(isEnvironment(CancellationException("Job was cancelled")))
+        assertTrue(isEnvironment(IOException("channel closed", CancellationException("Job was cancelled"))))
+    }
+
+    @Test
+    fun `something this code got wrong is still reported`() {
+        assertFalse(isEnvironment(IllegalStateException("a bug in the unpacker")))
+        assertFalse(isEnvironment(IOException("a read that failed for no stated reason")))
+    }
+
+    @Test
+    fun `a wrapped cause is found, because ktor wraps`() {
+        val wrapped = IOException("request failed", UnresolvedAddressException())
+
+        assertTrue(isEnvironment(wrapped))
+    }
+
+    @Test
+    fun `the cause chain is not walked for ever`() {
+        // Matches isStall's bound: deep enough for ktor's wrapping, shallow enough to stay cheap.
+        var deep: Throwable = UnresolvedAddressException()
+        repeat(8) { deep = IOException("layer", deep) }
+
+        assertFalse(isEnvironment(deep), "a cause buried past the bound is not searched for")
+    }
+
+    // ── Which stalls are worth reporting ────────────────────────────────────────
+
+    /**
+     * A stall that never received a byte is the church's line, not this code.
+     *
+     * Sentry CHURCH-PRESENTER-DESKTOP-63 was exactly that shape — `bytes_written=0`, cause a
+     * `SocketTimeoutException` against ebible.org, which [isOperatorEnvironment] already rules out
+     * everywhere else. The user is separately told the download kept stopping and given the
+     * dialog's only Retry button, so the event added nothing, and it fires once per attempt across
+     * three catalogue sources.
+     */
+    @Test
+    fun `a stall that never moved is not worth reporting`() {
+        val stalled = BibleInstallSupport.DownloadStalledException(
+            attempts = 3,
+            bytesWritten = 0,
+            cause = SocketTimeoutException("timed out"),
+        )
+        with(BibleInstallSupport) {
+            assertFalse(stalled.isWorthReporting(), "never connecting is the operator's network")
+        }
+    }
+
+    /**
+     * A stall that moved and then gave up is the case the reporting was built for.
+     *
+     * The link works, so resuming should have finished it — that is the half that can be ours, and
+     * it is the distinction the original change set out to capture.
+     */
+    @Test
+    fun `a stall that made progress is still reported`() {
+        val stalled = BibleInstallSupport.DownloadStalledException(
+            attempts = 3,
+            bytesWritten = 4_096,
+            cause = SocketTimeoutException("timed out"),
+        )
+        with(BibleInstallSupport) {
+            assertTrue(stalled.isWorthReporting(), "a download that moved and stopped may be ours")
+        }
+    }
+}

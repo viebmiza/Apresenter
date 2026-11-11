@@ -1,0 +1,69 @@
+package org.churchpresenter.app.churchpresenter
+
+import org.churchpresenter.server.RemoteEvent
+import org.churchpresenter.server.RemoteEventType
+import org.churchpresenter.sharedui.models.Presenting
+import org.churchpresenter.updater.UpdateCheckResult
+import org.churchpresenter.theme.ThemeMode
+
+/*
+ * The main window's decisions, held apart from AppRootState and the composables that act on them:
+ * which update result to show, what the remote-approval prompt settles, and the small judgements
+ * the wiring makes. Everything here is pure.
+ */
+
+/**
+ * What a finished update check leaves to show, and whether it shows as if asked for. The first check
+ * ever shows its result whatever it is, so the operator learns the app checks; later ones show only an
+ * available update, and not the version the operator chose to skip ([skippedVersion]). Null leaves
+ * whatever was pending as it was.
+ */
+internal fun pendingUpdateFor(
+    isFirstEverCheck: Boolean,
+    result: UpdateCheckResult,
+    skippedVersion: String = "",
+): Pair<UpdateCheckResult, Boolean>? =
+    when {
+        isFirstEverCheck -> result to true
+        result is UpdateCheckResult.Available && result.info.latestVersion != skippedVersion -> result to false
+        else -> null
+    }
+
+/**
+ * Whether the launch runs its update check. The first check ever always opens a dialog, so it waits for
+ * a start the pacing leaves free ([promptAllowed]) — not the one the setup wizard took. A later check
+ * only opens one for a real update, and runs whenever it is due.
+ */
+internal fun shouldRunStartupUpdateCheck(isDue: Boolean, isFirstEverCheck: Boolean, promptAllowed: Boolean): Boolean =
+    isDue && (!isFirstEverCheck || promptAllowed)
+
+/** Whether the story prompt shows: when it is due, and not on top of an update waiting to be shown. */
+internal fun shouldShowStoryPrompt(isDue: Boolean, updatePending: Boolean): Boolean = isDue && !updatePending
+
+/**
+ * Whether the operator has something of their own on screen, so a cue must not take over: anything is
+ * live, and it is not the row the calendar engine itself put there ([engineItemShowing]).
+ */
+internal fun isOperatorLive(slideContent: Presenting, engineItemShowing: Boolean?): Boolean =
+    slideContent != Presenting.NONE && engineItemShowing != true
+
+/** A remote action's toast title: Clear Display has a fixed one of its own, everything else is named by the phone. */
+internal fun remoteActivityTitle(type: RemoteEventType, clearDisplayTitle: String, sentTitle: String): String =
+    if (type == RemoteEventType.CLEAR) clearDisplayTitle else sentTitle
+
+/**
+ * Whether Customize Theme opens with custom colours on: unless a custom look exists and a preset has been
+ * picked since, in which case opening it is more likely about the font or the size.
+ */
+internal fun customColorsByDefault(theme: ThemeMode, customAccent: String): Boolean =
+    theme == ThemeMode.CUSTOM || customAccent.isBlank()
+
+/** Whether a session allow or block should record [clientId]: an attributable client not already in [recorded]. */
+internal fun shouldRecordSessionClient(clientId: String, recorded: List<String>): Boolean =
+    clientId.isNotBlank() && clientId !in recorded
+
+/** The queued remote requests a decision about [clientId] settles -- see remoteEventTargetsClient. */
+internal fun <A, B> remoteEventsSettledBy(
+    queue: List<Triple<RemoteEvent, A, B>>,
+    clientId: String,
+): List<Triple<RemoteEvent, A, B>> = queue.filter { remoteEventTargetsClient(it.first.clientId, clientId) }

@@ -1,0 +1,957 @@
+package org.churchpresenter.diagnostics
+
+import io.sentry.ITransaction
+import io.sentry.Attachment
+import io.sentry.Breadcrumb
+import io.sentry.Sentry
+import io.sentry.SentryEvent
+import io.sentry.SentryLevel
+import io.sentry.SentryOptions
+import io.sentry.SpanStatus
+import io.sentry.protocol.Feedback
+import io.sentry.protocol.Message
+import io.sentry.protocol.User
+import java.io.File
+import java.io.PrintWriter
+import java.io.StringWriter
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.UUID
+import java.util.zip.ZipException
+import kotlin.system.exitProcess
+
+private const val FLUSH_TIMEOUT_MS = 3_000L
+private const val SHUTDOWN_FLUSH_TIMEOUT_MS = 5_000L
+private const val DSN_PREFIX_CHARS = 12
+private const val DSN_KEY_VISIBLE_CHARS = 6
+private const val MIN_SCRUBBED_NAME_LENGTH = 3
+private const val RELEASE_SAMPLE_RATE = 0.2
+
+/**
+ * Exit code for a fatal uncaught exception, once it has been logged and flushed to Sentry.
+ *
+ * Distinct from the clean-shutdown `0` (`main.kt`'s "already running" bail-out) so a supervisor or
+ * a developer reading a terminal can tell "the app closed on purpose" from "the app died". `70` is
+ * `EX_SOFTWARE` in the BSD sysexits convention — an internal software error, which is exactly what
+ * an uncaught exception on any thread is by the time it reaches this handler.
+ */
+const val EXIT_CODE_FATAL_CRASH = 70
+
+/**
+ * The AWT clipboard peers, which throw when the OS will not hand the clipboard over.
+ *
+ * The shared superclass covers every platform's peer; the Windows one is named as well because it
+ * is the only platform that refuses, and naming it is what says so to whoever reads this next.
+ */
+private val CLIPBOARD_PEERS = setOf(
+    "sun.awt.datatransfer.SunClipboard",
+    "sun.awt.windows.WClipboard",
+)
+
+/** The JDK's Windows shell-folder classes, which throw when Explorer will not bind an item. */
+private const val WINDOWS_SHELL_FOLDER = "sun.awt.shell.Win32ShellFolder"
+
+/** The JDK's file chooser list, whose focus listener repaints a selected row that has no cell. */
+private const val FILE_CHOOSER_PANE = "sun.swing.FilePane"
+
+/**
+ * What the reporter says this build is: the version it stamps on a crash log and a Sentry event,
+ * and whether it is a release.
+ *
+ * A parameter rather than a `BuildConfig` read because `BuildConfig` is generated into
+ * `:composeApp` and does not exist here. `main.kt` passes the real values to [CrashReporter
+ * .initialize]; the defaults are what an uninitialised reporter reports, which is what the
+ * `try { BuildConfig… } catch { "unknown" }` around every former read already produced.
+ */
+data class BuildIdentity(
+    val versionDisplay: String = UNKNOWN_VERSION,
+    val appVersion: String = UNKNOWN_VERSION,
+    val isRelease: Boolean = false,
+    /**
+     * `release`, `dirty`, `snapshot` or `nogit` — what the tree looked like, not merely whether a
+     * packaging task ran. Already computed for the live-map ping; carried here so a report can say
+     * the same thing.
+     */
+    val buildType: String = UNKNOWN_BUILD,
+    /**
+     * `ci` or `local`: where the build was produced.
+     *
+     * [isRelease] cannot answer that — it means "a packaging task ran", so a build packaged on a
+     * developer's machine is indistinguishable from one CI shipped, and both report
+     * `environment=production`. Over 30 days that left 224 of 234 camera reports labelled
+     * production, a tester's among them, with no way to separate them from an operator's.
+     */
+    val buildChannel: String = UNKNOWN_BUILD,
+)
+
+/**
+ * What kind of fault the last crash was, as far as the handler could tell.
+ *
+ * Only the distinction the crash-loop guard acts on is drawn. The guard disables video backgrounds,
+ * so what it needs to know is whether the crash could plausibly have been video decoding — and a
+ * fault in the rendering stack could not. Everything that is not positively the renderer stays
+ * [OTHER], and a crash that recorded nothing at all is neither (see
+ * `CrashReporter.takeLastCrashKind`).
+ */
+internal enum class CrashKind {
+    /** skiko/skia: the compositor, typically a GPU driver fault surfaced as a Java exception. */
+    RENDERER,
+
+    /** Anything else that reached the uncaught handler with a throwable to look at. */
+    OTHER,
+}
+
+private const val UNKNOWN_VERSION = "unknown"
+
+/** The app's own classes. */
+private const val APP_PACKAGE = "org.churchpresenter."
+
+/** What reads the app's own jars after startup: the class loaders and Compose's resource reader. */
+private val CLASSPATH_READERS =
+    listOf("jdk.internal.loader.", "java.lang.ClassLoader", "org.jetbrains.compose.resources.")
+
+/** What [BuildIdentity] reports for build provenance it was not told. */
+private const val UNKNOWN_BUILD = "unknown"
+
+/**
+ * Global crash reporter that:
+ *  1. Writes crash logs to ~/.churchpresenter/crash-reports/ (always)
+ *  2. Forwards crashes to Sentry when a DSN is configured in sentry.properties
+ *
+ * Install as early as possible in main() via [initialize].
+ */
+// Was in :composeApp's detekt baseline and surfaces here, where there is no baseline. This is the
+// single telemetry facade the whole app calls; splitting it into "the writer" and "the Sentry
+// bridge" would give every call site two objects to choose between for no behavioural gain.
+@Suppress("TooManyFunctions")
+object CrashReporter {
+
+    /**
+     * Resolved on every access, NOT cached in a field.
+     *
+     * These are `get()` rather than `val` on purpose. As plain fields they were built in the
+     * object's initialiser, which runs the first time anything anywhere touches [CrashReporter] —
+     * so whatever `user.home` happened to say at that instant was baked in for the life of the
+     * JVM. In production that is harmless, because `user.home` never changes.
+     *
+     * In the test suite it is not. Dozens of test classes redirect `user.home` to a temporary
+     * directory and delete it in teardown, and several of them reach code that breadcrumbs through
+     * here — `CompanionServer.start` is the usual one. Whichever won the race pinned the reporter
+     * to a directory that no longer exists, and `CrashReporterTest` then read an install id it
+     * never wrote and found no crash files at all, in a class that had done nothing wrong. Which
+     * class won depended on execution order, so it moved every time a test was added anywhere.
+     *
+     * Resolving per access costs a property lookup and removes the whole failure mode.
+     * `LottieRenderCache.cacheDir` is `get()` for the same reason.
+     */
+    private val appDir: File get() = File(System.getProperty("user.home"), ".churchpresenter")
+    private val crashDir: File get() = File(appDir, "crash-reports")
+    private val runningFile: File get() = File(appDir, ".running")
+    private val crashCountFile: File get() = File(appDir, ".crash_count")
+    private val crashKindFile: File get() = File(appDir, ".crash_kind")
+    private val installIdFile: File get() = File(appDir, ".install_id")
+    private val timestampFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd_HHmmss")
+
+    /** Set once by [initialize]; the default is what an uninitialised reporter stamps. */
+    @Volatile
+    private var build: BuildIdentity = BuildIdentity()
+    private const val MAX_AGE_DAYS = 30L
+    private const val CRASH_THRESHOLD = 2 // disable video backgrounds after this many consecutive crashes
+
+    /** True if the previous run crashed (lock file wasn't cleaned up). */
+    @Volatile
+    var didCrashLastRun: Boolean = false
+        private set
+
+    /** Number of consecutive crashes. */
+    @Volatile
+    var consecutiveCrashes: Int = 0
+        private set
+
+    /** True when video backgrounds are disabled due to repeated crashes. */
+    @Volatile
+    var videoBackgroundsDisabled: Boolean = false
+
+    /**
+     * Install the global uncaught exception handler, initialise Sentry
+     * (unless the user has opted out of analytics reporting), and clean
+     * up old crash logs. Call this as the very first line in main().
+     */
+    fun initialize(analyticsReportingEnabled: Boolean, buildIdentity: BuildIdentity) =
+        startUp(
+            analyticsReportingEnabled,
+            buildIdentity,
+            setUncaughtHandler = { Thread.setDefaultUncaughtExceptionHandler(it) },
+            // The JVM refuses a hook once it is already shutting down -- the app quit while it was
+            // still starting (CHURCH-PRESENTER-DESKTOP-H4) -- and there is nothing left to run it for.
+            addShutdownHook = {
+                try {
+                    Runtime.getRuntime().addShutdownHook(Thread(it))
+                } catch (_: IllegalStateException) {
+                }
+            },
+        )
+
+    /**
+     * The startup sequence itself, with the one step a test cannot take handed in.
+     *
+     * [setUncaughtHandler] and [addShutdownHook] are those steps: both outlive the test that
+     * installed them, so a suite calling [initialize] would leave them behind for every later test
+     * in the fork. They are two parameters rather than one so each stays where it always was — the
+     * handler before [cleanOldLogs], the shutdown hook last; a test that reordered them would be
+     * testing a different startup. [exit] is the same shape of seam for the same reason: it really
+     * does end the JVM, which a test cannot let happen to itself. Everything else here — creating
+     * the crash directory, the analytics gate, the crash-escalation arithmetic, the run lock file —
+     * is ordinary logic, and a test drives the real order of it by collecting both and then running
+     * them.
+     */
+    internal fun startUp(
+        analyticsReportingEnabled: Boolean,
+        buildIdentity: BuildIdentity,
+        setUncaughtHandler: (Thread.UncaughtExceptionHandler) -> Unit,
+        addShutdownHook: (Runnable) -> Unit,
+        telemetryOff: Boolean = telemetryDisabled(),
+        initTelemetry: () -> Unit = ::initSentry,
+        exit: (Int) -> Unit = ::exitProcess,
+    ) {
+        build = buildIdentity
+        crashDir.mkdirs()
+
+        // [telemetryOff] is read here rather than inside [initSentry] because this is where
+        // "should telemetry run at all" is already decided, and because a branch inside initSentry
+        // is one no test can reach — that function ends in Sentry.init. Both it and the init step
+        // are defaulted parameters so the suite can drive the decision and see which way it went;
+        // only the real Sentry.init stays uncovered.
+        //
+        // The install id is deliberately outside the switch: it identifies the install for the
+        // local crash log too, and minting it has never depended on Sentry being reachable.
+        if (analyticsReportingEnabled) {
+            if (!telemetryOff) initTelemetry()
+            setUser(getOrCreateInstallId())
+        }
+
+        setUncaughtHandler { thread, throwable ->
+            if (isRecoverableInteraction(throwable)) {
+                // Logged where a crash would be, so it is still there to find, but neither reported
+                // as a crash nor allowed to reach the exit below.
+                writeLocalLog(throwable, context = "Thread: ${thread.name} (recovered)", fatal = false)
+                throwable.printStackTrace()
+                return@setUncaughtHandler
+            }
+            recordFatal(throwable, context = "Thread: ${thread.name}")
+            // The JVM's own default (print to stderr) does not end the process, and every output
+            // this app draws — the presenter windows, DeckLink, and the NDI/Browser Source scenes
+            // pumped through ComposeScenePump — shares the one AWT event-dispatch thread with the
+            // main window, by design (see ComposeScenePump's own doc on the ABBA deadlock that
+            // confining them was for). So a fatal exception on that thread used to leave every
+            // audience-facing output frozen rather than ending: "left it for 3 mins, not projecting
+            // anything" (issue #518, Sentry CHURCH-PRESENTER-DESKTOP-62). Once the crash is on
+            // record, end the process instead of leaving it running with a dead event thread.
+            throwable.printStackTrace()
+            exit(EXIT_CODE_FATAL_CRASH)
+        }
+
+        cleanOldLogs()
+
+        // Check if previous run crashed (lock file still exists); the file's time is when that run began.
+        val previousStartMs = runningFile.takeIf { it.exists() }?.lastModified()
+        didCrashLastRun = previousStartMs != null
+        // Consumed and cleared here, so a kind is judged once and never carried into a later run.
+        val lastKind = takeLastCrashKind()
+        val (count, disable) = evaluateCrashEscalation(didCrashLastRun, readCrashCount(), lastKind)
+        // A Java crash was reported as it happened (it left a kind); anything else ended under the app.
+        if (previousStartMs != null && lastKind == null && analyticsReportingEnabled) {
+            reportUncleanExit(previousStartMs)
+        }
+        consecutiveCrashes = count
+        writeCrashCount(count)
+        if (disable) videoBackgroundsDisabled = true
+
+        // Create lock file for this run
+        try { runningFile.parentFile?.mkdirs(); runningFile.createNewFile() } catch (_: Exception) {}
+
+        // Delete lock file on clean exit
+        addShutdownHook { try { runningFile.delete() } catch (_: Exception) {} }
+    }
+
+    /** Puts a crash the process is about to end on on record, delivered before the caller exits. */
+    fun recordFatal(throwable: Throwable, context: String) {
+        // Record what failed before anything else can go wrong: the next run reads this to
+        // decide whether the crash-loop guard should blame video backgrounds for it.
+        writeCrashKind(classifyCrash(throwable))
+        writeCrashLog(throwable, context, fatal = true)
+        // Flush Sentry synchronously so the event is delivered before the JVM exits
+        try { Sentry.flush(FLUSH_TIMEOUT_MS) } catch (_: Exception) {}
+    }
+
+    /**
+     * Report a caught exception that is important enough to log.
+     * Use this for significant errors that are handled gracefully but should be tracked.
+     */
+    fun reportException(throwable: Throwable, context: String = "") {
+        writeCrashLog(throwable, context, fatal = false)
+    }
+
+    /**
+     * Sends a non-fatal WARNING to Sentry (message + optional throwable + tags + extras). Unlike
+     * [reportException] this writes **no** local crash file — use it to surface genuine
+     * silent failures (VLC/ATEM/SSL/server) that today only print to stderr.
+     *
+     * [context] is the event's title and what Sentry groups on, so it must be a **constant**
+     * sentence: interpolating a file name, a count or a device into it splits one recurring problem
+     * into one issue per value. Everything that varies belongs in [tags] (short, searchable,
+     * low-cardinality) or in [extras] (the detail you want to read once the issue is open).
+     * Both are PII-scrubbed on the way out, like the message itself. A non-empty [fingerprint]
+     * replaces Sentry's own grouping -- for an event whose cause is a value, such as where a stalled
+     * UI thread was stuck.
+     */
+    fun reportWarning(
+        context: String,
+        throwable: Throwable? = null,
+        tags: Map<String, String> = emptyMap(),
+        extras: Map<String, String> = emptyMap(),
+        fingerprint: List<String> = emptyList(),
+    ) {
+        try {
+            if (!Sentry.isEnabled()) return
+            breadcrumb(context, category = "warning", level = SentryLevel.WARNING)
+            val event = (if (throwable != null) SentryEvent(throwable) else SentryEvent()).apply {
+                level = SentryLevel.WARNING
+                message = Message().apply { message = context }
+                tags.forEach { (k, v) -> setTag(k, v) }
+                extras.forEach { (k, v) -> setExtra(k, v) }
+                if (fingerprint.isNotEmpty()) fingerprints = fingerprint
+            }
+            Sentry.captureEvent(event)
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Sends an INFO event to Sentry: a measurement worth seeing in the field rather than a fault, such
+     * as how a feature performed over a session. The same rules as [reportWarning] apply: [context] is
+     * a constant title, the varying values go in [tags] and [extras], and nothing is sent when the
+     * user has turned reporting off.
+     */
+    fun reportInfo(context: String, tags: Map<String, String> = emptyMap(), extras: Map<String, String> = emptyMap()) {
+        try {
+            if (!Sentry.isEnabled()) return
+            val event = SentryEvent().apply {
+                level = SentryLevel.INFO
+                message = Message().apply { message = context }
+                tags.forEach { (k, v) -> setTag(k, v) }
+                extras.forEach { (k, v) -> setExtra(k, v) }
+            }
+            Sentry.captureEvent(event)
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Reports, once, that the run begun at [previousStartMs] ended without closing and without a Java
+     * crash: with what the JVM's crash file says when it left one in [crashFileFolders], which is kept
+     * beside the app's own crash logs.
+     */
+    internal fun reportUncleanExit(
+        previousStartMs: Long,
+        crashFileFolders: List<File> = listOfNotNull(
+            crashDir,
+            System.getProperty("user.dir")?.let(::File),
+            System.getProperty("java.io.tmpdir")?.let(::File),
+        ),
+    ) {
+        val file = UncleanExit.newestCrashFile(crashFileFolders, previousStartMs)
+        val summary = file?.let(UncleanExit::read)?.let(UncleanExit::summary).orEmpty()
+        if (file != null && file.parentFile != crashDir) {
+            try { file.copyTo(File(crashDir, file.name), overwrite = true) } catch (_: Exception) {}
+        }
+        val tags = buildMap {
+            put("exit.kind", if (file != null) UncleanExit.NATIVE_CRASH else UncleanExit.NO_CRASH_FILE)
+            UncleanExit.module(summary["crash.problematic_frame"])?.let { put("exit.module", it) }
+        }
+        reportWarning(UncleanExit.TITLE, tags = tags, extras = summary)
+    }
+
+    /** Re-enable video backgrounds (user override from the warning banner). */
+    fun reEnableVideoBackgrounds() {
+        videoBackgroundsDisabled = false
+        writeCrashCount(0)
+    }
+
+    /**
+     * Given whether the previous run crashed, the persisted consecutive-crash count and what kind
+     * of crash it was, returns the new count and whether video backgrounds should be disabled
+     * (a crash-loop guard that trips at [CRASH_THRESHOLD]). A clean run resets the count to zero.
+     *
+     * [lastCrashKind] is null when the previous run left no record of *what* failed — a hard kill,
+     * a power loss, or a native crash that took the JVM down without unwinding. That is the case
+     * the guard was built for, since a VLC fault does exactly that and leaves no throwable behind,
+     * so an unknown kind still escalates.
+     *
+     * A [CrashKind.RENDERER] crash does not. It counts — it really was a crash, and the count is
+     * what the banner and the diagnostic report show — but disabling video backgrounds for a GPU
+     * driver fault turns off a working feature and hides the real cause. The guard's own subject is
+     * video decoding; a fault in the compositor is somebody else's.
+     */
+    internal fun evaluateCrashEscalation(
+        crashedLastRun: Boolean,
+        previousCount: Int,
+        lastCrashKind: CrashKind?,
+    ): Pair<Int, Boolean> =
+        if (crashedLastRun) {
+            val n = previousCount + 1
+            n to (n >= CRASH_THRESHOLD && lastCrashKind != CrashKind.RENDERER)
+        } else {
+            0 to false
+        }
+
+    /**
+     * What failed, as far as the crash handler could tell — classified by exception **type** and
+     * the frame that threw it, never by message, so a wording change upstream cannot silently
+     * reclassify a crash.
+     *
+     * Only the distinction the escalation guard acts on is drawn: a fault in the rendering stack
+     * versus anything else. skiko surfaces a GPU driver access violation as its own
+     * `org.jetbrains.skiko.RenderException`, thrown from `RenderExceptionsHandler`, so the package
+     * is the test — the stack below it is AWT and coroutines, with no application frame in it. Skia
+     * also throws a bare `RuntimeException` when a native call returns null, so a throwable whose
+     * top frame is in those packages counts too.
+     */
+    internal fun classifyCrash(throwable: Throwable?): CrashKind {
+        val seen = mutableSetOf<Throwable>()
+        var current = throwable
+        while (current != null && seen.add(current)) {
+            val thrownBy = current.stackTrace.firstOrNull()?.className.orEmpty()
+            if (isRendererClass(current.javaClass.name) || isRendererClass(thrownBy)) return CrashKind.RENDERER
+            current = current.cause
+        }
+        return CrashKind.OTHER
+    }
+
+    private fun isRendererClass(name: String): Boolean =
+        name.startsWith("org.jetbrains.skiko.") || name.startsWith("org.jetbrains.skia.")
+
+    /**
+     * Whether [throwable] is a development build's own output changing under it: a class of ours
+     * gone from the classpath, or a jar on it rewritten while it was being read -- what rebuilding
+     * while the app runs does. The developer watches it happen, and no installed copy can, so a
+     * report of it only buries real ones. Classified by type and the frame it came from, never by
+     * message.
+     */
+    internal fun isStaleBuildOutput(throwable: Throwable?): Boolean {
+        val seen = mutableSetOf<Throwable>()
+        var current = throwable
+        while (current != null && seen.add(current)) {
+            val frames = current.stackTrace
+            val ourClassGone = current is NoClassDefFoundError &&
+                frames.firstOrNull()?.className?.startsWith(APP_PACKAGE) == true
+            val classpathJarRewritten = current is ZipException &&
+                frames.any { frame -> CLASSPATH_READERS.any { frame.className.startsWith(it) } }
+            if (ourClassGone || classpathJarRewritten) return true
+            current = current.cause
+        }
+        return false
+    }
+
+    internal fun readCrashCount(): Int = try {
+        if (crashCountFile.exists()) crashCountFile.readText().trim().toIntOrNull() ?: 0 else 0
+    } catch (_: Exception) { 0 }
+
+    internal fun writeCrashCount(count: Int) = try {
+        crashCountFile.parentFile?.mkdirs()
+        crashCountFile.writeText(count.toString())
+    } catch (_: Exception) { }
+
+    /**
+     * Reads the kind the previous run recorded and clears it, so a kind is consumed exactly once
+     * and a later hard kill — which records nothing — is never judged by a stale one. An unreadable
+     * or unrecognised value reads as null, which is the same as no record: today's behaviour.
+     */
+    internal fun takeLastCrashKind(): CrashKind? = try {
+        val stored = if (crashKindFile.exists()) crashKindFile.readText().trim() else ""
+        crashKindFile.delete()
+        CrashKind.entries.find { it.name == stored }
+    } catch (_: Exception) { null }
+
+    internal fun writeCrashKind(kind: CrashKind) = try {
+        crashKindFile.parentFile?.mkdirs()
+        crashKindFile.writeText(kind.name)
+    } catch (_: Exception) { }
+
+    /**
+     * Anonymous, stable per-install ID, creating it on first access. Exposed so
+     * the live-map ping can dedupe by install (see LiveMapReporter). Same id used
+     * for unique-user counting in Sentry.
+     */
+    fun installId(): String = getOrCreateInstallId()
+
+    /** Anonymous, stable per-install ID used for unique-user counting in Sentry. */
+    private fun getOrCreateInstallId(): String = try {
+        if (installIdFile.exists()) {
+            installIdFile.readText().trim()
+        } else {
+            val id = UUID.randomUUID().toString()
+            installIdFile.parentFile?.mkdirs()
+            installIdFile.writeText(id)
+            id
+        }
+    } catch (_: Exception) { "" }
+
+    /** True when Sentry is initialised with a valid DSN. */
+    fun isEnabled(): Boolean = try { Sentry.isEnabled() } catch (_: Exception) { false }
+
+    /** Sets the user identity used for unique-user counting in Sentry. */
+    fun setUser(id: String) {
+        try {
+            if (!Sentry.isEnabled()) return
+            Sentry.setUser(User().apply { this.id = id })
+        } catch (_: Exception) {}
+    }
+
+    /**
+     * Turns Sentry reporting on/off at runtime, reflecting the user's
+     * analytics-opt-out preference without requiring an app restart.
+     * Local crash log files on disk are unaffected by this setting.
+     */
+    fun setReportingEnabled(enabled: Boolean) {
+        try {
+            if (enabled) {
+                if (!Sentry.isEnabled()) initSentry()
+                setUser(getOrCreateInstallId())
+            } else if (Sentry.isEnabled()) {
+                Sentry.close()
+            }
+        } catch (_: Exception) {}
+    }
+
+    /** DSN from sentry.properties with the secret key partially masked. Empty when not configured. */
+    fun maskedDsn(): String = try { maskDsn(readDsn()) } catch (_: Exception) { "" }
+
+    /**
+     * The masking itself, over a DSN that has already been read.
+     *
+     * Separate from [maskedDsn] because this is the part with the rules — how much of the key
+     * survives, what a DSN with no `@` falls back to — and the only thing [maskedDsn] adds is
+     * reading the file it cannot be given.
+     */
+    internal fun maskDsn(dsn: String): String {
+        if (dsn.isBlank()) return ""
+        val atIdx = dsn.indexOf('@')
+        if (atIdx < 0) return dsn.take(DSN_PREFIX_CHARS) + "••••"
+        val beforeAt = dsn.substring(0, atIdx)
+        val afterAt = dsn.substring(atIdx)
+        val schemeEnd = beforeAt.indexOf("//") + 2
+        val key = beforeAt.substring(schemeEnd)
+        val scheme = beforeAt.substring(0, schemeEnd)
+        return "$scheme${key.take(DSN_KEY_VISIBLE_CHARS)}" +
+            "${"•".repeat(maxOf(0, key.length - DSN_KEY_VISIBLE_CHARS))}$afterAt"
+    }
+
+    /** Sends a test exception to Sentry and flushes. Returns true on success. */
+    fun sendTestEvent(): Boolean = try {
+        if (!isEnabled()) return false
+        val version = build.versionDisplay
+        Sentry.captureException(RuntimeException("🧪 ChurchPresenter Sentry test event — v$version"))
+        Sentry.flush(SHUTDOWN_FLUSH_TIMEOUT_MS)
+        true
+    } catch (_: Exception) { false }
+
+    // ── Telemetry: breadcrumbs, tags, context, tracing, feedback ────────────────
+
+    /** Records a breadcrumb — a lightweight trail of user actions shown on later crashes. */
+    fun breadcrumb(message: String, category: String = "app", level: SentryLevel = SentryLevel.INFO) {
+        try {
+            if (!Sentry.isEnabled()) return
+            Sentry.addBreadcrumb(Breadcrumb().apply {
+                this.message = message
+                this.category = category
+                this.level = level
+            })
+        } catch (_: Exception) {}
+    }
+
+    /** Sets a searchable tag on all subsequent events (e.g. active tab, screen count). */
+    fun setTag(key: String, value: String) {
+        try { if (Sentry.isEnabled()) Sentry.setTag(key, value) } catch (_: Exception) {}
+    }
+
+    /**
+     * Applies a batch of startup configuration tags (output/screen count, integration
+     * enablement, VLC/JCEF availability) so errors can be filtered by configuration.
+     * A thin wrapper over [setTag]; re-applying on settings change is safe (overwrites).
+     */
+    fun setConfigTags(tags: Map<String, String>) {
+        tags.forEach { (k, v) -> setTag(k, v) }
+    }
+
+    /** Attaches a structured context block (a named group of key/value data) to events. */
+    fun setContext(name: String, data: Map<String, Any>) {
+        try { if (Sentry.isEnabled()) Sentry.configureScope { it.setContexts(name, data) } } catch (_: Exception) {}
+    }
+
+    /**
+     * Runs [block] inside a Sentry performance transaction so its duration shows up under
+     * Performance. Falls back to running [block] directly when Sentry is disabled.
+     */
+    inline fun <T> trace(operation: String, name: String, block: () -> T): T {
+        val transaction = startTransaction(operation, name)
+        // [block] is inlined here once, whether or not a transaction started: a traced function
+        // compiles to one copy of its own body, not one per path through this function.
+        // runCatching so the failure is recorded and rethrown unchanged without naming a type: the
+        // block is arbitrary caller code, and an Error — an OOM mid-render is the realistic one —
+        // has to mark the transaction failed just as an exception does.
+        val outcome = runCatching { block() }
+        if (transaction != null) finishTransaction(transaction, outcome.exceptionOrNull())
+        return outcome.getOrThrow()
+    }
+
+    /** The transaction [trace] runs its block under; null while Sentry is off, or will not start one. */
+    @PublishedApi
+    internal fun startTransaction(operation: String, name: String): ITransaction? =
+        if (!isEnabled()) null else try { Sentry.startTransaction(name, operation) } catch (_: Exception) { null }
+
+    /** Marks [transaction] failed with [failure], when there is one, and finishes it. */
+    @PublishedApi
+    internal fun finishTransaction(transaction: ITransaction, failure: Throwable?) {
+        if (failure != null) {
+            transaction.throwable = failure
+            transaction.status = SpanStatus.INTERNAL_ERROR
+        }
+        try { transaction.finish() } catch (_: Exception) {}
+    }
+
+    /** Sends user-provided feedback (e.g. after a crash) as a Sentry event + user feedback. */
+    fun sendUserFeedback(comment: String, name: String = "", email: String = "") {
+        try {
+            if (!Sentry.isEnabled() || comment.isBlank()) return
+            val event = SentryEvent().apply {
+                level = SentryLevel.INFO
+                message = Message().apply { message = "User feedback" }
+            }
+            val eventId = Sentry.captureEvent(event)
+            Sentry.feedback().capture(Feedback(comment).apply {
+                setAssociatedEventId(eventId)
+                if (name.isNotBlank()) this.name = name
+                if (email.isNotBlank()) contactEmail = email
+            })
+            Sentry.flush(FLUSH_TIMEOUT_MS)
+        } catch (_: Exception) {}
+    }
+
+    /** Most recently written local crash-report file, if any (used for event attachments). */
+    internal fun latestCrashFile(): File? = try {
+        crashDir.listFiles { f -> f.isFile && f.name.startsWith("crash_") }
+            ?.maxByOrNull { it.lastModified() }
+    } catch (_: Exception) { null }
+
+    // ── PII scrubbing ───────────────────────────────────────────────────────────
+
+    private val userName: String = System.getProperty("user.name", "").trim()
+
+    /**
+     * Redacts `\Users\NAME`, `/Users/NAME`, `/home/NAME` path segments and any literal
+     * occurrence of the current OS username. Case-insensitive; leaves the rest of the
+     * path intact, and masks credentials ([Secrets]). Used by [beforeSend] and the breadcrumb
+     * callback so app-generated paths never leak the username, nor a request its API key.
+     */
+    private fun scrubPii(text: String?): String? {
+        if (text.isNullOrEmpty()) return text
+        var out = Secrets.redact(text)
+            .replace(Regex("(?i)([/\\\\](?:Users|home)[/\\\\])[^/\\\\\\r\\n\"']+"), "$1<user>")
+        if (userName.length >= MIN_SCRUBBED_NAME_LENGTH) out = out.replace(userName, "<user>", ignoreCase = true)
+        return out
+    }
+
+    /**
+     * Walks a Sentry event and scrubs PII in place from the message, exception values, extras,
+     * breadcrumb messages, and context values (e.g. the `jcef` block's `installDir`).
+     * All best-effort — each sub-step is wrapped so telemetry never throws.
+     */
+    internal fun scrubEvent(event: SentryEvent) {
+        try {
+            event.message?.let { msg ->
+                msg.formatted = scrubPii(msg.formatted)
+                msg.message = scrubPii(msg.message)
+            }
+        } catch (_: Exception) {}
+        try { event.exceptions?.forEach { it.value = scrubPii(it.value) } } catch (_: Exception) {}
+        try {
+            event.extras?.keys?.toList()?.forEach { key ->
+                val value = event.getExtra(key)
+                if (value is String) event.setExtra(key, scrubPii(value) ?: "")
+            }
+        } catch (_: Exception) {}
+        try { event.breadcrumbs?.forEach { it.message = scrubPii(it.message) } } catch (_: Exception) {}
+        try {
+            val contexts = event.contexts
+            // Sentry 8's Contexts is no longer a Map: keys() is an Enumeration and put() replaces.
+            for (key in contexts.keys().toList()) {
+                val value = contexts.get(key)
+                if (value is Map<*, *>) {
+                    val scrubbed = value.entries.associate { (k, v) ->
+                        k to (if (v is String) scrubPii(v) else v)
+                    }
+                    contexts.put(key, scrubbed)
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    // ── Sentry ────────────────────────────────────────────────────────────────
+
+    private fun readDsn(): String =
+        dsnFrom(CrashReporter::class.java.classLoader?.getResourceAsStream("sentry.properties"))
+
+    /** The `dsn` property of an already-opened sentry.properties, or "" when there is none. */
+    internal fun dsnFrom(stream: java.io.InputStream?): String {
+        val props = java.util.Properties()
+        stream?.use { props.load(it) }
+        return props.getProperty("dsn", "").trim()
+    }
+
+    /**
+     * The system property that switches telemetry off outright, whatever else is configured.
+     *
+     * The test tasks set `sentry.dsn=""`, which turns out not to be enough: that only disables the
+     * SDK's own external configuration, while [configureOptions] assigns the DSN this reads off the
+     * classpath. `sentry.properties` lives in `jvmMain/resources`, which is on the *test* runtime
+     * classpath, so a suite that initialised the reporter published straight into the production
+     * project — "kaboom", "boom" and "nowhere to write" are all in Sentry, filed under a test class.
+     */
+    internal const val DISABLE_PROPERTY = "churchpresenter.telemetry.disabled"
+
+    /** Whether telemetry is switched off for this JVM regardless of settings. */
+    internal fun telemetryDisabled(value: String? = System.getProperty(DISABLE_PROPERTY)): Boolean =
+        value?.trim()?.lowercase() in setOf("1", "true", "yes")
+
+    private fun initSentry() {
+        try {
+            val dsn = readDsn()
+            if (dsn.isBlank()) return   // no DSN → stay disabled, nothing sent
+            Sentry.init { options -> configureOptions(options, dsn) }
+            staticTags().forEach { (key, value) -> setTag(key, value) }
+        } catch (_: Exception) {
+            // Sentry failing to init must never prevent the app from starting
+        }
+    }
+
+    /**
+     * The context every event carries, whatever it is about.
+     *
+     * A function returning the pairs rather than a run of `setTag` calls inside [initSentry], for
+     * the reason [configureOptions] is split out: `Sentry.init` is the one call a test cannot make,
+     * and these are ordinary decisions about what a report should say. Tags land on the scope and
+     * not on [SentryOptions], so this is the only seam that can check them.
+     *
+     * Arch alone is a trap: Adoptium reports "aarch64" on Apple Silicon and on ARM Linux alike, and
+     * "x86_64" on Intel macOS against "amd64" elsewhere — so a report carrying only arch cannot say
+     * which OS a platform-specific path was taken on. Diagnosing the HEIC decode failures needed
+     * exactly that, which is why the family is sent beside it.
+     *
+     * `build.type` is the tree's own state and not the two-valued `isRelease`, which cannot tell a
+     * CI release from one packaged on a laptop; `build.channel` is what separates those.
+     */
+    internal fun staticTags(
+        osName: String = System.getProperty("os.name", ""),
+        arch: String = System.getProperty("os.arch", "unknown"),
+    ): Map<String, String> = mapOf(
+        "os.family" to osFamily(osName),
+        "os.arch" to arch,
+        "build.type" to build.buildType,
+        "build.channel" to build.buildChannel,
+    )
+
+    /**
+     * Which OS family [osName] names, as one of "macos", "windows", "linux" or "other".
+     *
+     * A tag wants the family rather than the raw `os.name`, which carries a version ("Windows 11",
+     * "Mac OS X 14.4") and would split one platform across a dozen values.
+     */
+    internal fun osFamily(osName: String): String {
+        val name = osName.lowercase()
+        return when {
+            name.contains("mac") || name.contains("darwin") -> "macos"
+            name.contains("win") -> "windows"
+            name.contains("nux") || name.contains("nix") -> "linux"
+            else -> "other"
+        }
+    }
+
+    /**
+     * Everything [initSentry] decides, applied to an options object it is handed.
+     *
+     * Split out because `Sentry.init` is the one call a test cannot make — it installs a live SDK
+     * for the whole JVM — while every choice inside the lambda is an ordinary decision about
+     * release, environment and sampling that a test can check by passing a plain [SentryOptions].
+     */
+    internal fun configureOptions(options: SentryOptions, dsn: String) {
+        options.dsn = dsn
+        options.release = build.appVersion
+        // Keep developer test runs out of production release-health stats.
+        //
+        // Deliberately still `isRelease` and not `buildChannel`: builds packaged by hand and passed
+        // to a church are real installs, and relabelling them `development` would hide operator
+        // data to tidy up a tester's. `environment:production build.channel:ci` is the narrower
+        // question, and it can now be asked without redefining this one.
+        options.environment = if (build.isRelease) "production" else "development"
+        options.isEnableUncaughtExceptionHandler = true
+        options.isAttachThreads = false
+        options.isAttachStacktrace = true
+        // Sample perf/profile volume down in release so it can't crowd out error
+        // events in the quota (errors are captured directly and are unaffected).
+        options.tracesSampleRate = if (build.isRelease) RELEASE_SAMPLE_RATE else 1.0
+        // Capture CPU profiles for sampled transactions (see Performance → Profiling).
+        options.profilesSampleRate = if (build.isRelease) RELEASE_SAMPLE_RATE else 1.0
+        options.isEnableAutoSessionTracking = true
+        // Privacy: don't send end-users' machine hostnames to Sentry.
+        options.isAttachServerName = false
+        // Mark our own packages as in-app so app frames stand out in stack traces.
+        options.addInAppInclude("org.churchpresenter")
+        options.beforeSend = crashAttachingBeforeSend()
+        options.beforeBreadcrumb = scrubbingBeforeBreadcrumb()
+    }
+
+    /**
+     * Whether [throwable] is a platform refusal the event thread carries straight on from, so
+     * ending the process over it would be the more damaging of the two outcomes.
+     *
+     * **Deliberately named cases, not a class of them.** The exit this guards was added for #518,
+     * where a dead event thread left every audience-facing output frozen rather than closing, and
+     * that argument holds for anything that genuinely breaks the thread. What it does not cover is
+     * Windows declining the clipboard: `WClipboard.openClipboard0` throws
+     * `IllegalStateException("cannot open system clipboard")` when another process is holding it
+     * open, which a clipboard manager, a remote-desktop session or Office does routinely and for
+     * milliseconds at a time. The throw arrives here because it comes out of Compose's own
+     * `TextFieldSelectionManager.copy` — there is no frame of ours in it to catch — and the event
+     * thread is entirely healthy afterwards: the copy simply did not happen, and Ctrl+C works on
+     * the next press.
+     *
+     * So the old behaviour was that a failed copy in a text field **quit the app**, in the middle
+     * of a service, on a machine where something else happened to touch the clipboard first
+     * (Sentry CHURCH-PRESENTER-DESKTOP-42, two churches).
+     *
+     * The second case has the same shape: the JDK's Windows shell-folder bridge throws an
+     * `InternalError` ("Unable to bind … to parent") when Explorer will not bind an item it was
+     * asked about -- a stray file in `Network Shortcuts` is the one seen -- out of a Swing file
+     * list's own loading, with no frame of ours in it. The folder simply lists without that item
+     * (Sentry CHURCH-PRESENTER-DESKTOP-C7).
+     *
+     * The third is `FilePane`'s focus listener, which passes `JList.getCellBounds` straight to
+     * `repaint` and throws a `NullPointerException` when a selected index has no cell. It arrives
+     * here from inside the chooser's own modal event loop, which carries on with the dialog still
+     * open; nothing around `showOpenDialog` can catch it, because it never unwinds that far
+     * (Sentry CHURCH-PRESENTER-DESKTOP-9R).
+     *
+     * Widen this only for something with the same two properties: a named platform condition, and
+     * a thread that demonstrably survives it.
+     *
+     * Matched on the **frame it was thrown from**, not on its wording. The type alone cannot do it
+     * — the JDK throws a bare `IllegalStateException`, and recovering from every one of those would
+     * be the opposite of what #518 asked for — and this module's rule against reading messages is
+     * there because an OS phrases its own errors in the user's language. The clipboard peer is the
+     * classification: nothing else in the app throws from `SunClipboard`, and a package name is the
+     * same in all thirty-four locales.
+     */
+    internal fun isRecoverableInteraction(throwable: Throwable): Boolean =
+        (throwable is IllegalStateException && throwable.thrownFrom { it in CLIPBOARD_PEERS }) ||
+            (throwable is InternalError && throwable.thrownFrom { it.startsWith(WINDOWS_SHELL_FOLDER) }) ||
+            (throwable is NullPointerException && throwable.thrownFrom { it.startsWith(FILE_CHOOSER_PANE) })
+
+    private fun Throwable.thrownFrom(matches: (className: String) -> Boolean): Boolean =
+        stackTrace.any { frame -> matches(frame.className) }
+
+    /**
+     * Scrubs PII from every outgoing event, then attaches the most recent local crash-report file
+     * (also scrubbed) to error and fatal events. Neither step may block delivery, which is why
+     * both are wrapped. A development build's crash from its own output changing under it
+     * ([isStaleBuildOutput]) is the one event dropped.
+     */
+    internal fun crashAttachingBeforeSend() = SentryOptions.BeforeSendCallback { event, hint ->
+        if (!build.isRelease && isStaleBuildOutput(event.throwable)) return@BeforeSendCallback null
+        try { scrubEvent(event) } catch (_: Exception) { /* never block delivery */ }
+        try {
+            if (event.level == SentryLevel.ERROR || event.level == SentryLevel.FATAL) {
+                latestCrashFile()?.let { file ->
+                    val scrubbed = scrubPii(file.readText()) ?: ""
+                    hint.addAttachment(Attachment(scrubbed.toByteArray(), file.name))
+                }
+            }
+        } catch (_: Exception) { /* never block delivery */ }
+        event
+    }
+
+    /**
+     * Scrubs every breadcrumb as it is recorded — including the ones `sentry-logback` makes from
+     * WARN lines, which never pass through [breadcrumb] — so the trail holds no credential even
+     * before [scrubEvent] walks it on the way out.
+     */
+    internal fun scrubbingBeforeBreadcrumb() = SentryOptions.BeforeBreadcrumbCallback { crumb, _ ->
+        try { crumb.message = scrubPii(crumb.message) } catch (_: Exception) { /* never drop a crumb */ }
+        crumb
+    }
+
+    private fun sentryMessage(text: String): Message = Message().apply { message = text }
+
+    private fun sendToSentry(throwable: Throwable, context: String, fatal: Boolean) {
+        try {
+            if (!Sentry.isEnabled()) return
+            val event = SentryEvent(throwable)
+            event.level = if (fatal) SentryLevel.FATAL else SentryLevel.ERROR
+            if (context.isNotBlank()) event.message = sentryMessage(context)
+            Sentry.captureEvent(event)
+        } catch (_: Exception) {
+            // Never let Sentry errors surface to the user
+        }
+    }
+
+    // ── Local file logging ────────────────────────────────────────────────────
+
+    internal fun writeCrashLog(throwable: Throwable, context: String, fatal: Boolean) {
+        writeLocalLog(throwable, context, fatal)
+        sendToSentry(throwable, context, fatal)
+    }
+
+    private fun writeLocalLog(throwable: Throwable, context: String, fatal: Boolean) {
+        try {
+            val now = LocalDateTime.now()
+            val tag = if (fatal) "fatal" else "error"
+            val filename = "crash_${now.format(timestampFormat)}_$tag.txt"
+            val file = File(crashDir, filename)
+
+            val stackTrace = StringWriter().also { throwable.printStackTrace(PrintWriter(it)) }.toString()
+
+            val osName = System.getProperty("os.name", "unknown")
+            val osVersion = System.getProperty("os.version", "")
+            val javaVersion = System.getProperty("java.version", "unknown")
+            val appVersion = build.versionDisplay
+
+            val report = buildString {
+                appendLine("=== ChurchPresenter Crash Report ===")
+                appendLine("Timestamp: ${now.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)}")
+                appendLine("Version: $appVersion")
+                appendLine("OS: $osName $osVersion")
+                appendLine("Java: $javaVersion")
+                appendLine("Fatal: $fatal")
+                if (context.isNotBlank()) appendLine("Context: $context")
+                appendLine()
+                append(stackTrace)
+            }
+
+            file.writeText(Secrets.redact(report))
+        } catch (_: Exception) {
+            // Last resort — don't let crash reporting itself crash the app
+        }
+    }
+
+    internal fun cleanOldLogs() {
+        try {
+            val cutoff = System.currentTimeMillis() - (MAX_AGE_DAYS * 24 * 60 * 60 * 1000)
+            crashDir.listFiles()?.forEach { file ->
+                val ours = file.name.startsWith("crash_") || file.name.startsWith("hs_err_pid")
+                if (file.isFile && ours && file.lastModified() < cutoff) {
+                    file.delete()
+                }
+            }
+        } catch (_: Exception) {
+            // Non-critical — skip cleanup silently
+        }
+    }
+}

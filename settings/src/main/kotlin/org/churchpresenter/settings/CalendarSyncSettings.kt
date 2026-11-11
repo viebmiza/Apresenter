@@ -1,0 +1,63 @@
+package org.churchpresenter.settings
+
+import kotlinx.serialization.Serializable
+import java.time.Duration
+import java.time.Instant
+
+/** The connection between this desktop and the calendar relay that phones plan through. */
+@Serializable
+data class CalendarSyncSettings(
+    val enabled: Boolean = false,
+    /** A relay other than the one this build was made for; blank uses the build's own. */
+    val relayUrl: String = "",
+    /** Which church this is, as the relay knows it. Generated here, once. */
+    val instanceId: String = "",
+    /** Minted by the relay at registration. */
+    val desktopToken: String = "",
+    /** The key records are sealed under; made here, handed to phones at enrollment. URL-safe base64 of 32 bytes. */
+    val instanceKey: String = "",
+    /** This installation, so two desktops on one instance can tell each other apart. */
+    val installId: String = "",
+    /** The relay revision this desktop has seen everything up to. */
+    val cursor: Long = 0L,
+    /** ISO instant of the last successful sync, for the settings screen. */
+    val lastSyncAt: String = "",
+    /** The relay's shared client key, fetched from the website and cached;
+     *  refreshed when the relay stops accepting it. */
+    val clientKey: String = "",
+    val rotatedAt: String = "",
+    /** Blank on the main computer; [ROLE_FOLLOWER] or [ROLE_VIEWER] on one that joined another's calendar. */
+    val role: String = "",
+    /** This computer's id on the relay, when it joined another's calendar. */
+    val computerId: String = "",
+    /**
+     * The token a joined computer syncs with. Kept apart from [desktopToken] so a build that knows
+     * nothing of joining reads this computer as unpaired rather than pushing as the main one.
+     */
+    val computerToken: String = "",
+    /** What the main computer is called, as the join file named it, for the status line. */
+    val mainName: String = "",
+) {
+    val isJoined: Boolean get() = role == ROLE_FOLLOWER || role == ROLE_VIEWER
+
+    /** The bearer token this computer syncs with, whichever role it has. */
+    val token: String get() = if (isJoined) computerToken else desktopToken
+
+    val isPaired: Boolean get() = instanceId.isNotBlank() && token.isNotBlank() && instanceKey.isNotBlank()
+
+    /**
+     * When "Start over" may be used again, or null when it may be used now: at most once in
+     * [ROTATION_INTERVAL]. Every rotation is a new instance on the relay and every phone enrolling
+     * again, so a rotation is a deliberate act, not something to repeat on a whim.
+     */
+    fun nextRotationAt(now: Instant): Instant? {
+        val last = runCatching { Instant.parse(rotatedAt) }.getOrNull() ?: return null
+        return last.plus(ROTATION_INTERVAL).takeIf { it.isAfter(now) }
+    }
+
+    companion object {
+        val ROTATION_INTERVAL: Duration = Duration.ofDays(7)
+        const val ROLE_FOLLOWER = "follower"
+        const val ROLE_VIEWER = "viewer"
+    }
+}

@@ -1,0 +1,85 @@
+# Render benchmark baselines
+
+`RenderBenchmark` (`composeApp/src/jvmTest/.../benchmark/`) measures how long each content type
+takes on an off-screen output (NDI, OMT, Browser Source) at 1080p and 4K, split into render and
+pixel readback, and writes `results.md` and `results.json`. Two baselines of that output are kept,
+from two different machines, and they are **never compared with each other**:
+
+| Files | Machine | Recorded with | Used for |
+|---|---|---|---|
+| `results.{md,json}` here | the reference Mac named in `results.md` | `-PrecordRenderBaseline`, on that Mac | the absolute frame budget |
+| `ci/results.{md,json}` | GitHub's hosted `ubuntu-latest` runner (~10x slower) | `render-benchmark.yml`, dispatched with `record_baseline` | the CI regression gate |
+
+```bash
+./gradlew :composeApp:renderBenchmark                           # report to build/reports/render-benchmark/
+./gradlew :composeApp:renderBenchmark -PrecordRenderBaseline    # overwrite the reference baseline here
+./gradlew :composeApp:renderBenchmark -PenforceRenderBudget     # fail past one frame at p99
+./gradlew :composeApp:renderBenchmark -PrecordCiRenderBaseline  # write ci/ (only from the CI runner -- see below)
+./gradlew :composeApp:renderBenchmark -PcheckRenderRegression   # fail on a row slower than ci/results.json
+./gradlew :composeApp:renderBenchmark -PcheckRenderRegression=path/to/results.json  # another baseline
+```
+
+- **Compare like with like.** The header of each `results.md` names its machine. Re-record the
+  reference baseline on the reference Mac before reading a change into it.
+- **The budget** is one frame for render and readback together at p99: 16.7 ms at 1080p (60 fps),
+  33.3 ms above it (30 fps). Over-budget rows are marked. It is not a CI gate: a hosted runner
+  misses it on hardware alone.
+- **Not covered**: the on-screen output windows (GPU, not the CPU raster measured here), video,
+  web pages, cameras and network sources, which need devices or native runtimes a build machine
+  lacks. The windows have benchmarks of their own that need a display and run on the reference Mac
+  only: `gpuBenchmark` (frame intervals per content type, baseline in `gpu/`) and
+  `isolationBenchmark` (frame gaps while the UI thread is stalled on purpose, quoted in
+  `docs/SHOW_CONTROL.md`). Startup time and idle memory are `startupBenchmark`, budgeted in
+  `budgets.md`.
+
+## The CI regression gate
+
+`.github/workflows/render-benchmark.yml` runs on `main` every Monday at 06:00 UTC, or by hand
+(*Run workflow*, on any branch), and holds the run against `ci/results.json`. A scheduled run that
+finds a regression opens a `render-regression` issue with the comparison, or comments on the one
+already open. Each scenario and size that both have is compared on its **typical
+frame** -- render p50 plus readback p50, the median rather than the tail, because a shared runner's
+tail is mostly its neighbours. A row regresses when
+
+    now > baseline x (1 + margin) + slack      margin 0.5, slack 1.0 ms
+
+(`-PrenderRegressionMargin`, `-PrenderRegressionSlackMs`). The slack keeps a sub-millisecond row
+from failing on timer noise. A row only one side has -- a new scenario, or one removed -- is listed
+in the report and never fails; re-record to bring it in. The comparison is appended to the run's
+`results.md`, which the job writes to its summary and uploads as the `render-benchmark` artifact.
+
+A missing or unreadable baseline fails `-PcheckRenderRegression` rather than passing it. In CI the
+job checks first: with no `ci/results.json` committed it records one instead of checking, with a
+notice, so the first run of the workflow produces the baseline.
+
+**Recording it:** dispatch the *Render benchmark* workflow with `record_baseline` ticked (or let a
+run with no baseline committed record one), download its `ci-render-baseline` artifact and commit
+the two files to `composeApp/benchmarks/ci/`.
+Re-record the same way after a change that is meant to make rendering slower, or when GitHub moves
+`ubuntu-latest` to different hardware. Never commit a `ci/` recorded on a developer machine.
+
+## Soak test
+
+`ServiceSoak`, beside the benchmark, runs the same content as a service: every content type in
+turn, a cue every 20 seconds, on one long-lived 1080p output paced at 30 fps in real time. Every
+minute it collects garbage and samples the heap, resident memory and that minute's frame times.
+
+```bash
+./gradlew :composeApp:soakTest                    # four hours
+./gradlew :composeApp:soakTest -PsoakMinutes=10   # a short local run
+```
+
+It writes `soak.md` (verdict, and the worst frame per content type), `soak.csv` and `soak.svg` to
+`build/reports/soak/`, and fails when, after the first pass through every content type:
+
+- any frame takes longer than 250 ms, or
+- the heap grows more than 64 MB, or resident memory more than 256 MB, from the first quarter of
+  the run to the last (judged from eight samples up).
+
+`.github/workflows/soak.yml` runs the four hours on `main` every Sunday at 22:00 UTC, so it is done
+before Monday's render benchmark, or by hand (*Run workflow*, on any branch, with an optional
+`minutes`). A scheduled week in which `main` has not moved since the last successful soak is
+skipped. The report is uploaded as the `soak-report` artifact either way, and a scheduled run that
+fails opens a `soak-failure` issue -- the commit, the run, `soak.md` and the head of `soak-stall.txt`
+(a stall) or `hung-test-dump.txt` (a hang) -- or comments on the one already open. A cancelled run
+files nothing.

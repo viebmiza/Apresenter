@@ -1,0 +1,624 @@
+package org.churchpresenter.theme
+
+import androidx.compose.foundation.LocalScrollbarStyle
+import androidx.compose.foundation.ScrollbarStyle
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
+import androidx.compose.material3.Typography
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+// Typography definition
+val AppTypography = Typography(
+    displayLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 57.sp,
+        lineHeight = 64.sp,
+        letterSpacing = (-0.25).sp
+    ),
+    displayMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 45.sp,
+        lineHeight = 52.sp,
+        letterSpacing = 0.sp
+    ),
+    displaySmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 36.sp,
+        lineHeight = 44.sp,
+        letterSpacing = 0.sp
+    ),
+    headlineLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 32.sp,
+        lineHeight = 40.sp,
+        letterSpacing = 0.sp
+    ),
+    headlineMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 28.sp,
+        lineHeight = 36.sp,
+        letterSpacing = 0.sp
+    ),
+    headlineSmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 24.sp,
+        lineHeight = 32.sp,
+        letterSpacing = 0.sp
+    ),
+    titleLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 22.sp,
+        lineHeight = 28.sp,
+        letterSpacing = 0.sp
+    ),
+    titleMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+        letterSpacing = 0.15.sp
+    ),
+    titleSmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        letterSpacing = 0.1.sp
+    ),
+    labelLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        letterSpacing = 0.1.sp
+    ),
+    labelMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.5.sp
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Medium,
+        fontSize = 11.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.5.sp
+    ),
+    bodyLarge = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 16.sp,
+        lineHeight = 24.sp,
+        letterSpacing = 0.5.sp
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        letterSpacing = 0.25.sp
+    ),
+    bodySmall = TextStyle(
+        fontFamily = FontFamily.Default,
+        fontWeight = FontWeight.Normal,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.4.sp
+    )
+)
+
+/** This typography with every style set in [family] instead — the user's chosen UI font. */
+fun Typography.withFontFamily(family: FontFamily): Typography = copy(
+    displayLarge = displayLarge.copy(fontFamily = family),
+    displayMedium = displayMedium.copy(fontFamily = family),
+    displaySmall = displaySmall.copy(fontFamily = family),
+    headlineLarge = headlineLarge.copy(fontFamily = family),
+    headlineMedium = headlineMedium.copy(fontFamily = family),
+    headlineSmall = headlineSmall.copy(fontFamily = family),
+    titleLarge = titleLarge.copy(fontFamily = family),
+    titleMedium = titleMedium.copy(fontFamily = family),
+    titleSmall = titleSmall.copy(fontFamily = family),
+    bodyLarge = bodyLarge.copy(fontFamily = family),
+    bodyMedium = bodyMedium.copy(fontFamily = family),
+    bodySmall = bodySmall.copy(fontFamily = family),
+    labelLarge = labelLarge.copy(fontFamily = family),
+    labelMedium = labelMedium.copy(fontFamily = family),
+    labelSmall = labelSmall.copy(fontFamily = family),
+)
+
+/*
+ * Every scheme below sets `surfaceContainer` and `surfaceContainerHigh` explicitly, because the
+ * settings screens are built out of exactly three layers and all three have to be told apart:
+ *
+ *   surfaceVariant       the page a settings tab paints edge to edge
+ *   surfaceContainer     the cards on it (`SettingsSection`)
+ *   surfaceContainerHigh the input fields on those cards (`SettingsTextField`)
+ *
+ * None of the nine schemes used to declare the container roles at all, so both came from the M3
+ * baseline palette instead of the theme's own — a lavender-tinted card and field on a navy or green
+ * page, identical in all nine themes. The contrast that resulted was accidental rather than chosen,
+ * and in the Studio theme the card was *exactly* the luminance of its own page (issue #95).
+ *
+ * The values are derived from each scheme's own `surface`, stepped toward white (dark) or white then
+ * black (light) far enough that the card clears its page and the field clears its card by at least
+ * ~1.12:1 in every theme — the invariant `ThemeSurfaceRampTest` holds them to. Keep any new theme in
+ * that shape: adding one without these two roles silently falls back to the baseline lavender again.
+ */
+
+// Light theme colors — neutral grey palette
+private val LightColorScheme = lightColorScheme(
+    primary = Color(0xFF4A5568),           // muted slate-grey
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFDDE1E7),  // light grey-blue container
+    onPrimaryContainer = Color(0xFF1A202C),
+    secondary = Color(0xFF607D8B),         // blue-grey accent
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFCFD8DC),
+    onSecondaryContainer = Color(0xFF263238),
+    tertiary = Color(0xFF78909C),          // lighter blue-grey
+    onTertiary = Color.White,
+    error = Color(0xFFB00020),
+    onError = Color.White,
+    errorContainer = Color(0xFFFDE7E7),
+    onErrorContainer = Color(0xFF790000),
+    background = Color(0xFFF4F4F5),        // very light grey, no blue tint
+    onBackground = Color(0xFF1A1A1A),
+    surface = Color(0xFFEFEFF1),           // neutral light grey surface
+    onSurface = Color(0xFF1A1A1A),
+    surfaceVariant = Color(0xFFE2E2E5),    // slightly darker grey, no purple
+    onSurfaceVariant = Color(0xFF44444A),
+    surfaceContainer = Color(0xFFF9F9FA),
+    surfaceContainerHigh = Color(0xFFEDEDEE),
+    outline = Color(0xFF8A8A94),
+    outlineVariant = Color(0xFFCCCCD0),
+    // Custom colors for buttons
+    inverseSurface = Color(0xFF4CAF50),    // Success button background
+    inverseOnSurface = Color.White,        // Success button text
+)
+
+// Warm light theme — cream/amber tones
+private val WarmColorScheme = lightColorScheme(
+    primary = Color(0xFF7C5C3A),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFEDD9BC),
+    onPrimaryContainer = Color(0xFF2E1A05),
+    secondary = Color(0xFF8D6E4A),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFE8D0B5),
+    onSecondaryContainer = Color(0xFF2E1A05),
+    tertiary = Color(0xFFA07850),
+    onTertiary = Color.White,
+    error = Color(0xFFB00020),
+    onError = Color.White,
+    errorContainer = Color(0xFFFDE7E7),
+    onErrorContainer = Color(0xFF790000),
+    background = Color(0xFFFAF3E8),
+    onBackground = Color(0xFF1E150A),
+    surface = Color(0xFFF5ECD8),
+    onSurface = Color(0xFF1E150A),
+    surfaceVariant = Color(0xFFEBDFC8),
+    onSurfaceVariant = Color(0xFF4A3820),
+    surfaceContainer = Color(0xFFFBF8F0),
+    surfaceContainerHigh = Color(0xFFEEECE4),
+    outline = Color(0xFF9C8060),
+    outlineVariant = Color(0xFFD9C8A8),
+    inverseSurface = Color(0xFF4CAF50),
+    inverseOnSurface = Color.White,
+)
+
+// Ocean light theme — soft blue-tinted surfaces
+private val OceanColorScheme = lightColorScheme(
+    primary = Color(0xFF2A6B8A),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFBFDDED),
+    onPrimaryContainer = Color(0xFF001F2E),
+    secondary = Color(0xFF4A7E96),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFCAE3EF),
+    onSecondaryContainer = Color(0xFF001F2E),
+    tertiary = Color(0xFF3A8FA8),
+    onTertiary = Color.White,
+    error = Color(0xFFB00020),
+    onError = Color.White,
+    errorContainer = Color(0xFFFDE7E7),
+    onErrorContainer = Color(0xFF790000),
+    background = Color(0xFFEDF5FA),
+    onBackground = Color(0xFF0A1A22),
+    surface = Color(0xFFE0EEF6),
+    onSurface = Color(0xFF0A1A22),
+    surfaceVariant = Color(0xFFCCE2EE),
+    onSurfaceVariant = Color(0xFF1E3D50),
+    surfaceContainer = Color(0xFFF3F9FC),
+    surfaceContainerHigh = Color(0xFFE7EDEF),
+    outline = Color(0xFF5A8FAA),
+    outlineVariant = Color(0xFFAAD0E0),
+    inverseSurface = Color(0xFF4CAF50),
+    inverseOnSurface = Color.White,
+)
+
+// Rose light theme — warm pinkish-grey palette
+private val RoseColorScheme = lightColorScheme(
+    primary = Color(0xFF8E4A5A),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFEDD0D6),
+    onPrimaryContainer = Color(0xFF2E0A12),
+    secondary = Color(0xFF9E6070),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFEFD5DA),
+    onSecondaryContainer = Color(0xFF2E0A12),
+    tertiary = Color(0xFFAA7080),
+    onTertiary = Color.White,
+    error = Color(0xFFB00020),
+    onError = Color.White,
+    errorContainer = Color(0xFFFDE7E7),
+    onErrorContainer = Color(0xFF790000),
+    background = Color(0xFFFAF0F2),
+    onBackground = Color(0xFF1E0A10),
+    surface = Color(0xFFF5E6E9),
+    onSurface = Color(0xFF1E0A10),
+    surfaceVariant = Color(0xFFEDD5DA),
+    onSurfaceVariant = Color(0xFF4A2030),
+    surfaceContainer = Color(0xFFFBF6F7),
+    surfaceContainerHigh = Color(0xFFEEEAEB),
+    outline = Color(0xFFA06070),
+    outlineVariant = Color(0xFFDDB8C0),
+    inverseSurface = Color(0xFF4CAF50),
+    inverseOnSurface = Color.White,
+)
+
+// Dark theme colors — classic neutral dark
+private val DarkColorScheme = darkColorScheme(
+    primary = Color(0xFF90CAF9),
+    onPrimary = Color(0xFF003258),
+    primaryContainer = Color(0xFF004881),
+    onPrimaryContainer = Color(0xFFD1E4FF),
+    secondary = Color(0xFF4DB6AC),
+    onSecondary = Color(0xFF003D36),
+    secondaryContainer = Color(0xFF005B4F),
+    onSecondaryContainer = Color(0xFF70F0DD),
+    tertiary = Color(0xFFE1BEE7),
+    onTertiary = Color(0xFF4A148C),
+    error = Color(0xFFF44336),
+    onError = Color.White,
+    errorContainer = Color(0xFFD32F2F),
+    onErrorContainer = Color.White,
+    background = Color(0xFF10131A),
+    onBackground = Color(0xFFE6E1E5),
+    surface = Color(0xFF1E1E1E),
+    onSurface = Color(0xFFE6E1E5),
+    surfaceVariant = Color(0xFF49454F),
+    onSurfaceVariant = Color(0xFFCAC4D0),
+    surfaceContainer = Color(0xFF2E2E2E),
+    surfaceContainerHigh = Color(0xFF363636),
+    outline = Color(0xFF938F99),
+    outlineVariant = Color(0xFF49454F),
+    inverseSurface = Color(0xFF66BB6A),
+    inverseOnSurface = Color.Black,
+)
+
+// Studio dark theme — amber accent, deep navy panels
+private val StudioColorScheme = darkColorScheme(
+    primary = Color(0xFFC4972A),
+    onPrimary = Color(0xFF141820),
+    primaryContainer = Color(0xFF2A1E08),
+    onPrimaryContainer = Color(0xFFE8D49A),
+    secondary = Color(0xFF5ABCA8),
+    onSecondary = Color(0xFF003D36),
+    secondaryContainer = Color(0xFF004D40),
+    onSecondaryContainer = Color(0xFF9ADFD4),
+    tertiary = Color(0xFF4A6FCC),
+    onTertiary = Color(0xFF001A45),
+    tertiaryContainer = Color(0xFF002080),
+    onTertiaryContainer = Color(0xFFD6E3FF),
+    error = Color(0xFFF44336),
+    onError = Color.White,
+    errorContainer = Color(0xFFD32F2F),
+    onErrorContainer = Color.White,
+    background = Color(0xFF111520),
+    onBackground = Color(0xFFE8E4D8),
+    surface = Color(0xFF141820),
+    onSurface = Color(0xFFE8E4D8),
+    surfaceVariant = Color(0xFF182030),
+    onSurfaceVariant = Color(0xFFBFBCB0),
+    surfaceContainer = Color(0xFF272A32),
+    surfaceContainerHigh = Color(0xFF30333A),
+    outline = Color(0xFF555868),
+    outlineVariant = Color(0xFF252830),
+    inverseSurface = Color(0xFF66BB6A),
+    inverseOnSurface = Color.Black,
+)
+
+// Midnight dark theme — deep navy blue
+private val MidnightColorScheme = darkColorScheme(
+    primary = Color(0xFF82AAFF),
+    onPrimary = Color(0xFF001A45),
+    primaryContainer = Color(0xFF003180),
+    onPrimaryContainer = Color(0xFFD6E3FF),
+    secondary = Color(0xFF7EB8D4),
+    onSecondary = Color(0xFF003547),
+    secondaryContainer = Color(0xFF004D66),
+    onSecondaryContainer = Color(0xFFBDE9FF),
+    tertiary = Color(0xFFA8C8E8),
+    onTertiary = Color(0xFF0A2540),
+    error = Color(0xFFF44336),
+    onError = Color.White,
+    errorContainer = Color(0xFFD32F2F),
+    onErrorContainer = Color.White,
+    background = Color(0xFF080E1A),
+    onBackground = Color(0xFFDDE4F0),
+    surface = Color(0xFF0E1520),
+    onSurface = Color(0xFFDDE4F0),
+    surfaceVariant = Color(0xFF1E2A3A),
+    onSurfaceVariant = Color(0xFFB0BDD0),
+    surfaceContainer = Color(0xFF2D333D),
+    surfaceContainerHigh = Color(0xFF353B45),
+    outline = Color(0xFF5A7090),
+    outlineVariant = Color(0xFF1E2A3A),
+    inverseSurface = Color(0xFF66BB6A),
+    inverseOnSurface = Color.Black,
+)
+
+// Forest dark theme — dark green-tinted surfaces
+private val ForestColorScheme = darkColorScheme(
+    primary = Color(0xFF80C8A0),
+    onPrimary = Color(0xFF003820),
+    primaryContainer = Color(0xFF005030),
+    onPrimaryContainer = Color(0xFFB0E8C8),
+    secondary = Color(0xFF60A880),
+    onSecondary = Color(0xFF003018),
+    secondaryContainer = Color(0xFF004020),
+    onSecondaryContainer = Color(0xFF90D8A8),
+    tertiary = Color(0xFF90C8A0),
+    onTertiary = Color(0xFF003818),
+    error = Color(0xFFF44336),
+    onError = Color.White,
+    errorContainer = Color(0xFFD32F2F),
+    onErrorContainer = Color.White,
+    background = Color(0xFF080E0A),
+    onBackground = Color(0xFFD0E8D8),
+    surface = Color(0xFF0E1810),
+    onSurface = Color(0xFFD0E8D8),
+    surfaceVariant = Color(0xFF1A2A1E),
+    onSurfaceVariant = Color(0xFFA8C8B0),
+    surfaceContainer = Color(0xFF29312A),
+    surfaceContainerHigh = Color(0xFF323933),
+    outline = Color(0xFF486858),
+    outlineVariant = Color(0xFF1A2A1E),
+    inverseSurface = Color(0xFF66BB6A),
+    inverseOnSurface = Color.Black,
+)
+
+// Mocha dark theme — warm dark brown (Catppuccin-style)
+private val MochaColorScheme = darkColorScheme(
+    primary = Color(0xFFCBA6F7),
+    onPrimary = Color(0xFF1E0040),
+    primaryContainer = Color(0xFF301050),
+    onPrimaryContainer = Color(0xFFEDD8FF),
+    secondary = Color(0xFFF5C2E7),
+    onSecondary = Color(0xFF3A0030),
+    secondaryContainer = Color(0xFF4A1040),
+    onSecondaryContainer = Color(0xFFFFD6F0),
+    tertiary = Color(0xFF89DCEB),
+    onTertiary = Color(0xFF003040),
+    error = Color(0xFFF38BA8),
+    onError = Color(0xFF300010),
+    errorContainer = Color(0xFF4A0020),
+    onErrorContainer = Color(0xFFFFB3C6),
+    background = Color(0xFF1E1928),
+    onBackground = Color(0xFFCDD6F4),
+    surface = Color(0xFF181622),
+    onSurface = Color(0xFFCDD6F4),
+    surfaceVariant = Color(0xFF302840),
+    onSurfaceVariant = Color(0xFFBAC2E8),
+    surfaceContainer = Color(0xFF36343F),
+    surfaceContainerHigh = Color(0xFF3E3C47),
+    outline = Color(0xFF6C7086),
+    outlineVariant = Color(0xFF302840),
+    inverseSurface = Color(0xFF66BB6A),
+    inverseOnSurface = Color.Black,
+)
+
+// Slate light theme — cool desaturated blue-grey, held apart from Ocean by having far less
+// saturation and from Light by having any hue at all.
+private val SlateColorScheme = lightColorScheme(
+    primary = Color(0xFF44607A),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFD3E0EC),
+    onPrimaryContainer = Color(0xFF10202E),
+    secondary = Color(0xFF5C7789),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFCCDAE3),
+    onSecondaryContainer = Color(0xFF13242E),
+    tertiary = Color(0xFF7A91A4),
+    onTertiary = Color.White,
+    error = Color(0xFFB00020),
+    onError = Color.White,
+    errorContainer = Color(0xFFFDE7E7),
+    onErrorContainer = Color(0xFF790000),
+    background = Color(0xFFEAEEF3),
+    onBackground = Color(0xFF141A20),
+    surface = Color(0xFFDFE5EC),
+    onSurface = Color(0xFF141A20),
+    surfaceVariant = Color(0xFFCFD6DE),
+    onSurfaceVariant = Color(0xFF3D4A56),
+    surfaceContainer = Color(0xFFF4F7FA),
+    surfaceContainerHigh = Color(0xFFE2E8EF),
+    outline = Color(0xFF7C8B9A),
+    outlineVariant = Color(0xFFB6C2CF),
+    inverseSurface = Color(0xFF4CAF50),
+    inverseOnSurface = Color.White,
+)
+
+// Sand light theme — a warm neutral taupe. Warm is a cream with a yellow cast; this is greyer and
+// browner, so the two do not read as the same theme at a glance.
+private val SandColorScheme = lightColorScheme(
+    primary = Color(0xFF6B5D4B),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFE7DECF),
+    onPrimaryContainer = Color(0xFF241C11),
+    secondary = Color(0xFF7D7160),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFE2D8C9),
+    onSecondaryContainer = Color(0xFF241C11),
+    tertiary = Color(0xFF978975),
+    onTertiary = Color.White,
+    error = Color(0xFFB00020),
+    onError = Color.White,
+    errorContainer = Color(0xFFFDE7E7),
+    onErrorContainer = Color(0xFF790000),
+    background = Color(0xFFF7F4EF),
+    onBackground = Color(0xFF1F1A14),
+    surface = Color(0xFFF1ECE4),
+    onSurface = Color(0xFF1F1A14),
+    surfaceVariant = Color(0xFFE0D9CE),
+    onSurfaceVariant = Color(0xFF4C443A),
+    surfaceContainer = Color(0xFFFAF8F5),
+    surfaceContainerHigh = Color(0xFFEEE9E1),
+    outline = Color(0xFF938A7C),
+    outlineVariant = Color(0xFFCFC5B7),
+    inverseSurface = Color(0xFF4CAF50),
+    inverseOnSurface = Color.White,
+)
+
+// Plum dark theme — a deep aubergine with a warm pink accent. The dark set had no red-purple:
+// Mocha is a cool lilac over a blue-grey ground, this is a warm magenta over an aubergine one.
+private val PlumColorScheme = darkColorScheme(
+    primary = Color(0xFFE3A6CE),
+    onPrimary = Color(0xFF2C0A22),
+    primaryContainer = Color(0xFF4A1638),
+    onPrimaryContainer = Color(0xFFFAD8EC),
+    secondary = Color(0xFFD9A8BE),
+    onSecondary = Color(0xFF2E0E1E),
+    secondaryContainer = Color(0xFF482032),
+    onSecondaryContainer = Color(0xFFF8D9E5),
+    tertiary = Color(0xFFE8B98C),
+    onTertiary = Color(0xFF33190A),
+    error = Color(0xFFF38BA8),
+    onError = Color(0xFF300010),
+    errorContainer = Color(0xFF4A0020),
+    onErrorContainer = Color(0xFFFFB3C6),
+    background = Color(0xFF1F1520),
+    onBackground = Color(0xFFEEDCE8),
+    surface = Color(0xFF1A1019),
+    onSurface = Color(0xFFEEDCE8),
+    surfaceVariant = Color(0xFF33222F),
+    onSurfaceVariant = Color(0xFFD3BCCA),
+    surfaceContainer = Color(0xFF3E2C3A),
+    surfaceContainerHigh = Color(0xFF4A3646),
+    outline = Color(0xFF8A7182),
+    outlineVariant = Color(0xFF5E4759),
+    inverseSurface = Color(0xFF66BB6A),
+    inverseOnSurface = Color.Black,
+)
+
+/**
+ * Whether a theme paints a light ground.
+ *
+ * Answered here rather than by a list the settings screens keep, so a theme added above is sorted
+ * correctly by every picker without each one being remembered. [ThemeMode.SYSTEM] is neither — it
+ * is whichever the machine is set to — and is the reason this returns null rather than a boolean.
+ * [ThemeMode.CUSTOM] is neither too: its base is whatever the user picked alongside the accent.
+ */
+fun ThemeMode.isLightTheme(): Boolean? = when (this) {
+    ThemeMode.SYSTEM, ThemeMode.CUSTOM -> null
+    ThemeMode.LIGHT, ThemeMode.WARM, ThemeMode.OCEAN, ThemeMode.ROSE, ThemeMode.SLATE, ThemeMode.SAND -> true
+    ThemeMode.DARK, ThemeMode.MIDNIGHT, ThemeMode.FOREST, ThemeMode.MOCHA, ThemeMode.STUDIO, ThemeMode.PLUM -> false
+}
+
+/**
+ * The palette a [ThemeMode] paints with, without applying it.
+ *
+ * Lets one theme's colours be offered inside another — the schedule-label presets show every
+ * theme's own accent so an operator on Dark can still colour a section Ocean-blue or Forest-green.
+ * [ThemeMode.SYSTEM] is not a palette of its own; it resolves to Light or Dark, so callers listing
+ * palettes skip it. [ThemeMode.CUSTOM] is generated from [custom]; callers listing presets skip it too.
+ */
+fun colorSchemeFor(
+    themeMode: ThemeMode,
+    systemDark: Boolean = true,
+    custom: ThemeCustomization = ThemeCustomization(),
+): ColorScheme = when (themeMode) {
+    ThemeMode.LIGHT -> LightColorScheme
+    ThemeMode.DARK -> DarkColorScheme
+    ThemeMode.SYSTEM -> if (systemDark) DarkColorScheme else LightColorScheme
+    ThemeMode.WARM -> WarmColorScheme
+    ThemeMode.OCEAN -> OceanColorScheme
+    ThemeMode.ROSE -> RoseColorScheme
+    ThemeMode.MIDNIGHT -> MidnightColorScheme
+    ThemeMode.FOREST -> ForestColorScheme
+    ThemeMode.MOCHA -> MochaColorScheme
+    ThemeMode.STUDIO -> StudioColorScheme
+    ThemeMode.SLATE -> SlateColorScheme
+    ThemeMode.SAND -> SandColorScheme
+    ThemeMode.PLUM -> PlumColorScheme
+    ThemeMode.CUSTOM -> customColorScheme(custom)
+}
+
+@Composable
+fun ChurchPresenterTheme(
+    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    customization: ThemeCustomization = LocalThemeCustomization.current,
+    content: @Composable () -> Unit
+) {
+    val systemDark = isSystemInDarkTheme()
+    val colorScheme = remember(themeMode, systemDark, customization) {
+        colorSchemeFor(themeMode, systemDark, customization)
+    }
+    val semanticColors = remember(colorScheme, themeMode, customization) {
+        semanticColorsFor(colorScheme).let {
+            if (themeMode == ThemeMode.CUSTOM) customSemanticColors(it, customization) else it
+        }
+    }
+    val typography = remember(customization.fontFamily) {
+        customization.fontFamily?.let(AppTypography::withFontFamily) ?: AppTypography
+    }
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = typography,
+        shapes = Shapes(
+            extraSmall = AppShape(4.dp),
+            small = AppShape(6.dp),
+            medium = AppShape(8.dp),
+            large = AppShape(10.dp),
+            extraLarge = AppShape(12.dp)
+        )
+    ) {
+        // One per window: a theme nested inside another (a dialog's content) shares its window's.
+        val focusVisibility = LocalFocusVisibility.current ?: remember { FocusVisibility() }
+        CompositionLocalProvider(
+            LocalSemanticColors provides semanticColors,
+            LocalFocusVisibility provides focusVisibility,
+            LocalScrollbarStyle provides ScrollbarStyle(
+                minimalHeight = 16.dp,
+                thickness = 5.dp,
+                shape = AppShape(4.dp),
+                hoverDurationMillis = 150,
+                unhoverColor = colorScheme.onSurface.copy(alpha = 0.25f),
+                hoverColor = colorScheme.onSurface.copy(alpha = 0.45f)
+            )
+        ) {
+            ProvideUiScale(customization.fontScale, customization.uiScale, content)
+        }
+    }
+}

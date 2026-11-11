@@ -1,0 +1,480 @@
+package org.churchpresenter.app.churchpresenter
+
+import org.churchpresenter.media.composables.warmVlcInBackground
+import org.churchpresenter.sharedui.utils.LocalSimulateMissingOutputs
+import org.churchpresenter.app.churchpresenter.utils.appTelemetryIdentity
+import org.churchpresenter.dialogs.showAlreadyRunningDialog
+import androidx.compose.ui.window.ApplicationScope
+import androidx.compose.ui.window.application
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
+import org.churchpresenter.app.churchpresenter.utils.toleratingDisposedOwnerRace
+import androidx.compose.runtime.CompositionLocalProvider
+import org.churchpresenter.profiles.LocalDevelopmentBuild
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import org.churchpresenter.diagnostics.Log
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import org.churchpresenter.app.churchpresenter.utils.AppWindowIcons
+import org.churchpresenter.sharedui.utils.addGuardedShutdownHook
+import org.churchpresenter.updater.StorePackage
+import org.churchpresenter.updater.UpdateChecker
+import org.churchpresenter.updater.UpdaterIdentity
+import org.churchpresenter.updater.deleteLeftoverUpdateInstallers
+import org.churchpresenter.sharedui.utils.DevFlags
+import org.churchpresenter.telemetry.GpuInfo
+import org.churchpresenter.lowerthird.render.LottieFonts
+import org.churchpresenter.sharedui.utils.SystemFonts
+import org.churchpresenter.presentationengine.fonts.SlideFontRegistry
+import churchpresenter.composeapp.generated.resources.Res
+import kotlinx.coroutines.runBlocking
+import org.churchpresenter.settings.AppSettings
+import org.churchpresenter.settings.withBundledBible
+import org.churchpresenter.statistics.asDurationRow
+import org.churchpresenter.settings.SettingsManager
+import org.churchpresenter.web.presenter.CefManager
+import org.churchpresenter.app.churchpresenter.ui.theme.themeCustomizationFrom
+import org.churchpresenter.theme.LocalThemeCustomization
+import org.churchpresenter.theme.ThemeCustomization
+import org.churchpresenter.sharedui.utils.FfmpegBinary
+import org.churchpresenter.media.composables.vlcCustomPath
+import org.churchpresenter.lowerthird.render.LottieRenderCache
+import org.churchpresenter.server.CalendarSyncService
+import org.churchpresenter.settings.calendarFolder
+import org.churchpresenter.settings.signageFolder
+import org.churchpresenter.settings.utils.AppDataDir
+import org.churchpresenter.signage.hub.SignageHub
+import org.churchpresenter.settings.utils.Constants
+import org.churchpresenter.songs.bundledSongCount
+import org.churchpresenter.appsettings.AutoStartManager
+import org.churchpresenter.diagnostics.BuildIdentity
+import org.churchpresenter.diagnostics.CrashReporter
+import org.churchpresenter.diagnostics.EventThreadIoMonitor
+import org.churchpresenter.diagnostics.StartupProbe
+import kotlin.system.exitProcess
+import org.churchpresenter.diagnostics.UiStallInjector
+import org.churchpresenter.diagnostics.UiStallReporter
+import org.churchpresenter.outputguard.OUTPUT_GUARD_ARGUMENT
+import org.churchpresenter.outputguard.RELAUNCHED_ARGUMENT
+import org.churchpresenter.outputguard.runOutputGuard
+import org.churchpresenter.diagnostics.UiStallSpec
+import org.churchpresenter.diagnostics.UiWatchdog
+import org.churchpresenter.telemetry.LiveMapReporter
+import org.churchpresenter.sharedui.utils.RunRecord
+import org.churchpresenter.sharedui.utils.UsageEvents
+import java.io.File
+import java.lang.invoke.MethodHandles
+import java.io.IOException
+import kotlinx.coroutines.CoroutineExceptionHandler
+import org.churchpresenter.liveoutput.AppNetworkInputs
+import org.churchpresenter.canvas.CameraDeviceCatalog
+import org.churchpresenter.canvas.NetworkInputs
+import org.churchpresenter.canvas.ResourceCensus
+import org.jetbrains.compose.resources.MissingResourceException
+
+private const val MILLIS_PER_MINUTE = 60_000L
+internal const val OPTIONS_TAB_BACKGROUND = 2
+internal const val UPDATE_CHECK_DELAY_MS = 5_000L
+internal const val STORY_PROMPT_DELAY_MS = 8_000L
+
+internal const val CURRENT_EULA_VERSION = 1
+
+/** How a startup-benchmark launch that never drew its window ends; see StartupProbe. */
+private const val STARTUP_PROBE_NO_FRAME_EXIT = 3
+
+/** The class `main` is in: what the output guard is started with when the app runs from the build. */
+internal val MAIN_CLASS_NAME: String = MethodHandles.lookup().lookupClass().name
+
+/**
+ * The UI-thread stalls this run counts and reports -- see UiStallReporter. A release build sends
+ * them to Sentry and waits half a second with nothing live; a debug build only logs them, at the
+ * watchdog's own budget, so a breakpoint never reaches Sentry.
+ */
+internal val uiStallReporter = UiStallReporter(
+    idleBudgetMs = if (BuildConfig.IS_RELEASE) UiStallReporter.RELEASE_IDLE_BUDGET_MS else UiWatchdog.DEFAULT_BUDGET_MS,
+    send = { if (BuildConfig.IS_RELEASE) UiStallReporter.sendToSentry(it) },
+)
+
+private var singleInstanceSocket: java.net.ServerSocket? = null
+
+internal fun releaseSingleInstanceLock() {
+    runCatching { singleInstanceSocket?.close() }
+    singleInstanceSocket = null
+}
+
+internal fun acquireSingleInstanceLock(): Boolean {
+    return try {
+        val lockPort = singleInstanceLockPort(
+            System.getProperty("churchpresenter.singleInstancePort"),
+            Constants.SINGLE_INSTANCE_PORT,
+        )
+        singleInstanceSocket = java.net.ServerSocket(lockPort, 1, java.net.InetAddress.getLoopbackAddress())
+        true
+    } catch (_: Exception) {
+        false
+    }
+}
+
+private const val UNIX_DOMAIN_TMPDIR_PROPERTY = "jdk.net.unixdomain.tmpdir"
+
+// "?" is not a legal Windows path character, so every temp socket name is rejected before any I/O.
+private const val UNUSABLE_SOCKET_DIR = "?"
+
+/** The Bible shipped in the app's resources and installed on a first run. */
+private const val BUNDLED_BIBLE_FILE = "kjv1769.spb"
+
+/**
+ * Writes the bundled KJV into the app's Bibles folder and points [settings] at it.
+ *
+ * A folder that cannot be written to is not on its own a reason to skip: the copy may already be
+ * there from an earlier launch, and a read-only Bibles folder is a perfectly usable one — a managed
+ * install, or a folder locked down after the fact, whose settings were then reset. Only when there
+ * is no usable file *and* nowhere to put one is the bundle skipped and settings left pointing at no
+ * Bible at all, so the setup wizard asks for a folder.
+ */
+private fun bundleDefaultBible(settings: AppSettings) {
+    try {
+        val defaultBibleDir = File(AppDataDir.resolve(), Constants.DEFAULT_BIBLES_FOLDER)
+        val problem = bundledBibleSkipReason(defaultBibleDir, BUNDLED_BIBLE_FILE)
+        if (problem != null) {
+            CrashReporter.reportWarning(
+                "Bundled KJV skipped: Bibles folder $problem",
+                tags = mapOf("subsystem" to "bible_bundle", "reason" to problem)
+            )
+            return
+        }
+        val targetFile = File(defaultBibleDir, BUNDLED_BIBLE_FILE)
+        if (!targetFile.exists()) {
+            targetFile.writeBytes(runBlocking { Res.readBytes("files/bible_samples/$BUNDLED_BIBLE_FILE") })
+        }
+        SettingsManager().saveSettings(
+            settings.withBundledBible(defaultBibleDir.absolutePath, BUNDLED_BIBLE_FILE)
+        )
+    } catch (e: IOException) {
+        // Writing the Bible or the settings.
+        CrashReporter.reportException(e, "Bundling default KJV Bible")
+    } catch (e: MissingResourceException) {
+        // A build without the bundled module.
+        CrashReporter.reportException(e, "Bundling default KJV Bible")
+    }
+}
+
+/** System properties the JDK and skiko each read once, on first use, so they are set before anything runs. */
+/**
+ * At shutdown, what this run tells the next launch's ping about itself: how long it lasted, how long
+ * an output was live and how many live stalls passed half a second. Together they say how often a
+ * service stalls, which decides whether outputs move to a process of their own (docs/SHOW_CONTROL.md,
+ * Output isolation).
+ */
+private fun recordRunAtShutdown(startedAt: Long) = addGuardedShutdownHook("session") {
+    UsageEvents.recordRun(
+        RunRecord(
+            sessionMinutes = ((System.currentTimeMillis() - startedAt) / MILLIS_PER_MINUTE).toInt(),
+            liveMinutes = uiStallReporter.liveMinutes(),
+            liveStalls = uiStallReporter.liveStallsPastGate(),
+        )
+    )
+    // Shutdown is when the high-water marks are final. Reports only when they are higher than a
+    // scene can account for — see ResourceCensus, and why counts rather than CPU or heap.
+    ResourceCensus.reportIfLeaky()
+}
+
+/**
+ * Runs this process as the app's own output guard, if [args] ask for it, and says whether it did:
+ * nothing of the app is started in a guard's process -- see OutputGuard.
+ */
+private fun runAsOutputGuard(args: Array<String>): Boolean {
+    val at = args.indexOf(OUTPUT_GUARD_ARGUMENT)
+    if (at < 0 || at + 1 >= args.size) return false
+    runOutputGuard(File(args[at + 1]))
+    return true
+}
+
+/**
+ * With the website rendered off screen, the AWT event thread is also Chromium's browser thread, and
+ * on Linux skiko waits for the screen's refresh inside each buffer swap on that thread, so a playing
+ * video misses refreshes on every window. Skiko latches this on its first SkiaLayer; a value already
+ * set (`-Dskiko.vsync.enabled=true`) wins.
+ */
+private fun turnOffLinuxVsync() {
+    if (System.getProperty("os.name", "").startsWith("Linux") && System.getProperty("skiko.vsync.enabled") == null) {
+        System.setProperty("skiko.vsync.enabled", "false")
+    }
+}
+
+private fun setLatchedSystemProperties() {
+    // Skiko latches this on its first SkiaLayer, so a later set is ignored.
+    val osName = System.getProperty("os.name", "")
+    // Only Windows ever writes one (renderFallbackAfterFirstFrame).
+    val saved = savedRenderFallback(renderFallbackFile(AppDataDir.resolve()), renderFallbackGpu())
+    preferredRenderApi(osName, DevFlags.renderApiOverride, saved = saved)?.let {
+        System.setProperty("skiko.renderApi", it)
+    }
+    // A Store (MSIX) install's %TEMP% cannot hold the AF_UNIX socket the JDK's Windows selector
+    // wake-up pipe uses: the bind succeeds, the connect fails with "Invalid argument", and the first
+    // Ktor selector takes the app down. An unusable socket directory makes the bind fail instead,
+    // and the JDK then falls back to a TCP loopback pipe (sun.nio.ch.PipeImpl.createListener).
+    if (StorePackage.isInstalled) System.setProperty(UNIX_DOMAIN_TMPDIR_PROPERTY, UNUSABLE_SOCKET_DIR)
+}
+
+fun main(args: Array<String>) {
+    // Before anything can touch AWT, the output guard included; see initXlibThreads.
+    initXlibThreads()
+    if (runAsOutputGuard(args)) return
+    // Started by switchRenderApiAndRelaunch: the copy it replaces still holds the lock until it exits.
+    awaitReplacedProcess(args)
+    setLatchedSystemProperties()
+    // Off unless the startup benchmark asked for it; see StartupProbe.
+    StartupProbe.mainStarted(exit = { exitProcess(STARTUP_PROBE_NO_FRAME_EXIT) })
+    if (!acquireSingleInstanceLock()) {
+        Log.info("Startup", "ChurchPresenter is already running.")
+        SettingsManager().loadSettings().let { showAlreadyRunningDialog(it, themeCustomizationFrom(it)) }
+        System.exit(0)
+        return
+    }
+
+    // The Canvas receives NDI and OMT over the app's own libraries; hand it them before any UI.
+    NetworkInputs.install(AppNetworkInputs)
+
+    // ImageIO caches its output stream in a temp file by default, so every slide JPEG the
+    // presentation cache writes depended on java.io.tmpdir being writable — and where it was not,
+    // ImageIO.write failed with the useless "Can't create an ImageOutputStream!" rather than
+    // anything naming a temp directory. That was 75 reports across four churches. The images this
+    // app writes are single slides and thumbnails, small enough to stage in memory, so the temp
+    // file buys nothing and costs a dependency on a directory the app does not control.
+    javax.imageio.ImageIO.setUseCache(false)
+
+    // Before the first window: every window gets the app icon's pixel frames as it opens.
+    AppWindowIcons.install()
+    // Before the first window: a Ctrl shortcut's typed character never reaches a text field.
+    installShortcutResidueFilter()
+
+    // A dev build can stall its own UI on a schedule (-Dchurchpresenter.injectUiStall=<ms>,<everySec>)
+    // to show what a stall costs the outputs -- see docs/SHOW_CONTROL.md, Output isolation.
+    // Asked to, it also logs every blocking call its event thread makes -- DevFlags.watchEventThreadIo.
+    if (!BuildConfig.IS_RELEASE) {
+        UiStallSpec.parse(System.getProperty(UiStallInjector.PROPERTY))?.let { UiStallInjector.start(it) }
+        if (DevFlags.watchEventThreadIo) EventThreadIoMonitor.startLogging()
+    }
+
+    val startupSettings = SettingsManager().loadSettings()
+    val offscreenWeb = startupSettings.projectionSettings.offscreenWebEnabled
+    if (offscreenWeb) turnOffLinuxVsync()
+    CrashReporter.initialize(
+        startupSettings.analyticsReportingEnabled,
+        // BuildConfig is generated into :composeApp, so :diagnostics is told what this build is
+        // rather than reading it.
+        BuildIdentity(
+            versionDisplay = BuildConfig.VERSION_DISPLAY,
+            appVersion = BuildConfig.APP_VERSION,
+            isRelease = BuildConfig.IS_RELEASE,
+            buildType = BuildConfig.BUILD_TYPE,
+            buildChannel = BuildConfig.BUILD_CHANNEL,
+        ),
+    )
+    CrashReporter.breadcrumb("Application started", category = "lifecycle")
+    // Every build says where the UI thread was stuck whenever it stops answering, and a release
+    // build sends the stall to Sentry -- see UiWatchdog and UiStallReporter. After the reporter is
+    // set up, so the first stall it counts can be sent.
+    UiWatchdog.start(uiStallReporter::budgetMs, uiStallReporter::answered, uiStallReporter::stalled)
+    // The same for the updater, which compares releases against this version.
+    UpdateChecker.initialize(UpdaterIdentity(appVersion = BuildConfig.APP_VERSION, isRelease = BuildConfig.IS_RELEASE))
+    // The installer a previous update ran is still in the temp directory: it could not be deleted
+    // while it was running. The single-instance guard above means no download is in flight.
+    deleteLeftoverUpdateInstallers()
+    // Which renderer was live is the first thing a GPU driver crash needs and the one thing the
+    // report never carried. "default" means the platform's own choice, which is not the same fact
+    // as any named API — a report from a machine on Direct3D-by-default and one pinned to it are
+    // different evidence. Set here rather than with the availability tags below: a render fault
+    // can arrive before those run. This is the API asked for; what the main window actually draws
+    // with is render.api.actual, set once it has drawn (MainWindow).
+    CrashReporter.setTag("render.api", System.getProperty("skiko.renderApi") ?: "default")
+    // Which renderer ran is only half the fact: whether a GPU driver fault is an NVIDIA, AMD or
+    // Intel problem is the axis such a group has to be split by, and no report carried it at all.
+    // Empty off Windows and on any machine the call fails, so an absent tag means "not known"
+    // rather than a guess. Beside render.api for the same reason: a render fault can arrive early.
+    CrashReporter.setConfigTags(GpuInfo.crashTags())
+
+    if (shouldBundleDefaultBible(startupSettings.bibleSettings)) bundleDefaultBible(startupSettings)
+
+    val pendingUsageEvents = LiveMapReporter.eventsToReport(startupSettings, UsageEvents.unreported())
+    val previousRun = UsageEvents.lastRun()
+    LiveMapReporter.pingOnOpen(
+        identity = appTelemetryIdentity,
+        installId = analyticsInstallId(startupSettings.analyticsReportingEnabled) { CrashReporter.installId() },
+        updateCheckInterval = startupSettings.updateCheckInterval,
+        setup = {
+            LiveMapReporter.setupFacts(
+                startupSettings,
+                screenCount = LiveMapReporter.detectScreenCount(),
+                songCounts = LiveMapReporter.gatherSongCounts(startupSettings, ::bundledSongCount),
+                sessionMinutes = previousRun.sessionMinutes,
+                liveMinutes = previousRun.liveMinutes,
+                liveStalls = previousRun.liveStalls,
+                signageScreens = SignageHub.pairedScreensByPlatform(startupSettings.signageFolder().toPath()),
+            )
+        },
+        events = pendingUsageEvents,
+        onDelivered = {
+            UsageEvents.markReported(pendingUsageEvents)
+            if (!previousRun.isEmpty) UsageEvents.clearLastRun()
+        }
+    )
+
+    // One camera enumeration at startup, so a capture that fails before any picker has been opened
+    // can still report what the machine had. A fifth of camera reports arrived carrying
+    // `camera.enumerator=not_run` — nothing had looked, because only a picker enumerates and the
+    // presenter restores a scene without one.
+    //
+    // Its own daemon thread, like the font warm-up above: this shells out to ffmpeg, and on Windows
+    // to PowerShell as well, so it must not be on the path that opens the window.
+    Thread {
+        runCatching { runBlocking { CameraDeviceCatalog.refresh() } }
+    }.apply { isDaemon = true }.start()
+
+    recordRunAtShutdown(startedAt = System.currentTimeMillis())
+
+    val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        CrashReporter.reportException(throwable, context = "CoroutineExceptionHandler")
+    }
+
+    CefManager.init(offscreen = offscreenWeb)
+    CrashReporter.setTag("jcef.available", CefManager.initialized.toString())
+    CrashReporter.setTag("web.render", if (CefManager.offscreen) "offscreen" else "windowed")
+    if (CefManager.macOsUnsupported) CrashReporter.setTag("jcef.macos_unsupported", "true")
+    if (CefManager.windowsUnsupported) CrashReporter.setTag("jcef.windows_unsupported", "true")
+
+    io.github.vinceglb.filekit.FileKit.init(appId = "ChurchPresenter")
+
+    Thread { AutoStartManager.syncRegistration() }.apply { isDaemon = true }.start()
+
+    // Warm-up only, and the whole of it is optional: what it saves is the first font picker
+    // enumerating the machine's fonts on the UI thread. It is wrapped because everything in it goes
+    // through AWT's font stack, which raises an Error rather than an Exception when the platform's
+    // native font manager will not load — reported as a fatal crash from this thread even though
+    // the app itself carried on. See LiveMapReporter.detectScreenCount for the same lesson.
+    Thread {
+        runCatching {
+            LottieFonts.bundledFontResources().forEach { resource ->
+                LottieFonts::class.java.getResourceAsStream(resource)?.let {
+                    SlideFontRegistry.registerFontStream(it)
+                }
+            }
+            SlideFontRegistry.initialize()
+            SystemFonts.families()
+        }
+    }.apply { isDaemon = true }.start()
+
+    vlcCustomPath = startupSettings.projectionSettings.vlcPath
+    // Loading VLC takes a second or more on Windows; done here, off the event thread, the first
+    // composition that asks whether it is there and the first video opened find it loaded.
+    warmVlcInBackground()
+    FfmpegBinary.customPath = startupSettings.projectionSettings.ffmpegPath
+
+    LottieRenderCache.ensureForFolder(
+        startupSettings.streamingSettings.lowerThirdFolder,
+        startupSettings.atemSettings
+    )
+
+    exitIfSystemFontsUnavailable(olderThanWindows10 = CefManager.windowsUnsupported)
+    runApplication(startupSettings, coroutineExceptionHandler, relaunchedByGuard = RELAUNCHED_ARGUMENT in args)
+}
+
+/** Opens the windows, once [main] has done everything that comes before them. */
+@OptIn(ExperimentalComposeUiApi::class)
+private fun runApplication(
+    startupSettings: AppSettings,
+    coroutineExceptionHandler: CoroutineExceptionHandler,
+    relaunchedByGuard: Boolean,
+) {
+    // Read here, on this thread, so the manager the app keeps already holds the settings and the
+    // first composition does not read the file on the event thread. Not main's first read:
+    // bundleDefaultBible may have written the file since.
+    val settingsManager = SettingsManager().also { it.loadSettings() }
+
+    application(exitProcessOnExit = true) {
+        // Held above every window so each one -- the main window, Settings, every dialog -- is drawn
+        // with the same accent, font and text size, and a change reaches all of them at once.
+        var themeCustomization by remember {
+            mutableStateOf(themeCustomizationFrom(startupSettings, screenMaxUiScale(null)))
+        }
+        // Every window drops Compose's disposed-owner race (a drag delivered to a layout disposed
+        // under it) and hands anything else to the usual handler, which reports it.
+        val windowExceptions = LocalWindowExceptionHandlerFactory.current
+        CompositionLocalProvider(
+            LocalThemeCustomization provides themeCustomization,
+            LocalDevelopmentBuild provides !BuildConfig.IS_RELEASE,
+            LocalWindowExceptionHandlerFactory provides remember(windowExceptions) {
+                toleratingDisposedOwnerRace(windowExceptions)
+            },
+        ) {
+            ChurchPresenterApp(coroutineExceptionHandler, settingsManager, relaunchedByGuard) {
+                themeCustomization = it
+            }
+        }
+    }
+}
+
+/**
+ * The whole desktop UI: windows, presenter outputs, the server wiring and every dialog.
+ *
+ * Split out of [main] so that function is only the pre-UI startup — settings, crash reporting,
+ * fonts, VLC and the single-instance lock — and this is the Compose tree.
+ */
+@Composable
+private fun ApplicationScope.ChurchPresenterApp(
+    coroutineExceptionHandler: CoroutineExceptionHandler,
+    settingsManager: SettingsManager,
+    relaunchedByGuard: Boolean,
+    onThemeCustomizationChange: (ThemeCustomization) -> Unit,
+) {
+    val coroutineScope = rememberCoroutineScope { coroutineExceptionHandler }
+    val application = this
+    val root = remember { AppRootState(application, coroutineScope, settingsManager = settingsManager) }
+    with(root) {
+        // The desktop's end of calendar sync with phones. Made here, beside the settings it writes
+        // back to, so the startup round and the Settings card talk to the same object.
+        val calendarSync = remember(appSettings.calendarStorageDirectory, appSettings.songSettings.storageDirectory) {
+            CalendarSyncService(
+                folder = appSettings.calendarFolder(),
+                songFolder = appSettings.songSettings.storageDirectory.takeIf { it.isNotBlank() }?.let(::File),
+                settings = { appSettings.calendarSync },
+                saveSettings = { sync ->
+                    appSettings = appSettings.copy(calendarSync = sync)
+                    settingsManager.saveSettings(appSettings)
+                },
+                typicalSeconds = { song -> liveDurationLog.median(song.asDurationRow()) },
+                endpoints = builtInRelayEndpoints,
+            )
+        }
+        DisposableEffect(Unit) {
+            onDispose {
+                instanceLinkViewModel.dispose()
+                companionSatelliteViewModel.dispose()
+            }
+        }
+        SettingsDrivenEffects()
+        InstanceLinkFollowerWiring()
+        MirroredBackgroundsWiring()
+        val effectiveAppSettings = rememberEffectiveAppSettings()
+        val tunnelStatus by companionServer.tunnelManager.status.collectAsState()
+        val tunnelUrl by companionServer.tunnelManager.tunnelUrl.collectAsState()
+        CompanionServerWiring(tunnelStatus)
+        VirtualOutputs(effectiveAppSettings)
+        StartupEffect()
+        SignageEffect()
+        // The saved Simulate Missing Outputs tick counts only while dev mode is on.
+        CompositionLocalProvider(
+            LocalSimulateMissingOutputs provides (devMode && appSettings.projectionSettings.simulateMissingOutputs),
+        ) {
+            OutputGuardWiring(relaunchedByGuard) {
+                AppWindows(effectiveAppSettings, calendarSync, tunnelStatus, tunnelUrl, onThemeCustomizationChange)
+            }
+        }
+    }
+}
