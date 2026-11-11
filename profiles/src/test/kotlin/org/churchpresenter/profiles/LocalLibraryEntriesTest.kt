@@ -130,7 +130,7 @@ class LocalLibraryEntriesTest {
         val file = materializeBundledEntry(REAL_BUNDLED_IMAGE)
 
         assertEquals(
-            File(tempHome, ".churchpresenter/stock-backgrounds/$REAL_BUNDLED_IMAGE").absolutePath,
+            File(tempHome, ".apresenter/stock-backgrounds/$REAL_BUNDLED_IMAGE").absolutePath,
             file.absolutePath,
         )
         assertTrue(file.exists())
@@ -139,7 +139,7 @@ class LocalLibraryEntriesTest {
 
     @Test
     fun `materializeBundledEntry does not overwrite a file that already exists`() = runBlocking {
-        val dir = File(tempHome, ".churchpresenter/stock-backgrounds")
+        val dir = File(tempHome, ".apresenter/stock-backgrounds")
         dir.mkdirs()
         val existing = File(dir, REAL_BUNDLED_IMAGE)
         existing.writeBytes(byteArrayOf(1, 2, 3))

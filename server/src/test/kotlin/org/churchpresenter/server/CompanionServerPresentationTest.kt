@@ -38,7 +38,7 @@ import kotlin.test.assertTrue
  * JPEG bytes as plain [File]s, so the fixture below is just bytes on disk, not a real deck.
  *
  * `user.home` is isolated because the upload endpoint writes into
- * `~/.churchpresenter/device_presentations/`.
+ * `~/.apresenter/device_presentations/`.
  */
 class CompanionServerPresentationTest {
 

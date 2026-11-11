@@ -44,7 +44,7 @@ internal class QAStore(val usage: UsageEventStore) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = false }
-    private val stateFile = File(System.getProperty("user.home"), ".churchpresenter/qa_state.json")
+    private val stateFile = File(System.getProperty("user.home"), ".apresenter/qa_state.json")
 
     val questions = mutableStateListOf<Question>()
 

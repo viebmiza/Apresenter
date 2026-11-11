@@ -82,7 +82,7 @@ class CefManagerTest {
             homeDir = home.absolutePath,
         )
         assertEquals(
-            listOf(File(dir, "ChurchPresenter").absolutePath, File(home, ".churchpresenter").absolutePath),
+            listOf(File(dir, "Apresenter").absolutePath, File(home, ".apresenter").absolutePath),
             roots.map { it.absolutePath },
         )
     }
@@ -95,7 +95,7 @@ class CefManagerTest {
             programData = dir.absolutePath,
             homeDir = home.absolutePath,
         )
-        assertEquals(listOf(File(home, ".churchpresenter").absolutePath), roots.map { it.absolutePath })
+        assertEquals(listOf(File(home, ".apresenter").absolutePath), roots.map { it.absolutePath })
     }
 
     @Test
@@ -105,7 +105,7 @@ class CefManagerTest {
             programData = null,
             homeDir = File(dir, "home").absolutePath,
         )
-        assertEquals("ChurchPresenter", roots.first().name)
+        assertEquals("Apresenter", roots.first().name)
         assertTrue(roots.first().absolutePath.contains("ProgramData"))
     }
 
@@ -229,7 +229,7 @@ class CefManagerTest {
     @Test
     fun `cleanupLegacyJcef does nothing when the active root is the home directory`() {
         val home = dir.absolutePath
-        val churchDir = File(dir, ".churchpresenter")
+        val churchDir = File(dir, ".apresenter")
         val legacyJcef = File(churchDir, "jcef").apply { mkdirs() }
 
         CefManager.cleanupLegacyJcef(activeRoot = churchDir, homeDir = home)
@@ -251,7 +251,7 @@ class CefManagerTest {
     @Test
     fun `cleanupLegacyJcef deletes the legacy jcef and webview-cache directories when relocated`() {
         val home = File(dir, "home").apply { mkdirs() }
-        val churchDir = File(home, ".churchpresenter")
+        val churchDir = File(home, ".apresenter")
         val legacyJcef = File(churchDir, "jcef").apply { mkdirs() }
         val legacyCache = File(churchDir, "webview-cache").apply { mkdirs() }
         val activeRoot = File(dir, "programdata-root").apply { mkdirs() }
@@ -264,7 +264,7 @@ class CefManagerTest {
     @Test
     fun `cleanupLegacyJcef deletes only the legacy directories that actually exist`() {
         val home = File(dir, "home").apply { mkdirs() }
-        val churchDir = File(home, ".churchpresenter")
+        val churchDir = File(home, ".apresenter")
         val legacyJcef = File(churchDir, "jcef").apply { mkdirs() }
         val activeRoot = File(dir, "programdata-root").apply { mkdirs() }
 
@@ -282,16 +282,16 @@ class CefManagerTest {
     }
 
     @Test
-    fun `rootCandidates with no arguments resolves to churchpresenter directories`() {
+    fun `rootCandidates with no arguments resolves to apresenter directories`() {
         val roots = JcefInstall.rootCandidates()
         assertTrue(roots.isNotEmpty())
-        assertTrue(roots.all { it.name == ".churchpresenter" || it.name == "ChurchPresenter" }, "got $roots")
+        assertTrue(roots.all { it.name == ".apresenter" || it.name == "Apresenter" }, "got $roots")
     }
 
     @Test
     fun `cleanupLegacyJcef with no home override reads the real user home`() {
         val home = System.getProperty("user.home")
-        CefManager.cleanupLegacyJcef(activeRoot = File(home, ".churchpresenter"))
+        CefManager.cleanupLegacyJcef(activeRoot = File(home, ".apresenter"))
     }
 
     @Test
@@ -521,7 +521,7 @@ class CefManagerTest {
     @Test
     fun `a library the system lacks is named, and the engine's own files are not`() {
         val missingNspr = UnsatisfiedLinkError(
-            "/home/u/.churchpresenter/jcef/libjcef.so: libnspr4.so: " +
+            "/home/u/.apresenter/jcef/libjcef.so: libnspr4.so: " +
                 "cannot open shared object file: No such file or directory",
         )
         assertEquals("libnspr4.so", missingSystemLibrary(missingNspr))
@@ -535,7 +535,7 @@ class CefManagerTest {
         // A file of the engine's own is a broken extraction, which a fresh one can fix.
         assertNull(
             missingSystemLibrary(
-                UnsatisfiedLinkError("/home/u/.churchpresenter/jcef/libjcef.so: cannot open shared object file"),
+                UnsatisfiedLinkError("/home/u/.apresenter/jcef/libjcef.so: cannot open shared object file"),
             ),
         )
         assertNull(missingSystemLibrary(UnsatisfiedLinkError("The specified procedure could not be found")))

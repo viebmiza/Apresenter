@@ -46,8 +46,9 @@ class LiveMapReporterTest {
     fun `the ping url carries platform, os and version`() {
         val url = LiveMapReporter.buildPingUrl(
             os = "macos", version = "26.1.0", updateCheckInterval = null, isDevBuild = false,
+            baseUrl = "https://example.org/api/ping",
         )
-        assertTrue(url.startsWith("https://www.churchpresenter.org/api/ping?"), url)
+        assertTrue(url.startsWith("https://example.org/api/ping?"), url)
         assertTrue("platform=desktop" in url)
         assertTrue("os=macos" in url)
         assertTrue("version=26.1.0" in url)

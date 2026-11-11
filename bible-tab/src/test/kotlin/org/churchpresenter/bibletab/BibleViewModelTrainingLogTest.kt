@@ -36,7 +36,7 @@ class BibleViewModelTrainingLogTest {
 
     private lateinit var dir: File
     private lateinit var vm: BibleViewModel
-    private val logDir = File(System.getProperty("user.home"), ".churchpresenter/bible-stt-logs")
+    private val logDir = File(System.getProperty("user.home"), ".apresenter/bible-stt-logs")
 
     /** Psalms display 22 = canonical 23 (and one verse shifted too); 1 John sits at display index 1. */
     private fun synodalShapedContent(): String = SpbFixture.buildContent(

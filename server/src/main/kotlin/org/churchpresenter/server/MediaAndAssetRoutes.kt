@@ -455,7 +455,7 @@ private fun Route.pictureSelectAndUploadRoutes(
                  * POST /api/pictures/upload
                  * Body: { "name": "photo.jpg", "data": "data:image/jpeg;base64,…" }
                  *
-                 * Saves the uploaded image to ~/.churchpresenter/device_uploads/,
+                 * Saves the uploaded image to ~/.apresenter/device_uploads/,
                  * registers it as a single-image folder so the other pictures endpoints
                  * serve it, and returns { "ok": true, "folder-id": "…", "image-index": 0 }.
                  */
@@ -481,14 +481,14 @@ private fun Route.pictureSelectAndUploadRoutes(
                             return@post
                         }
                         val imageBytes = Base64.getDecoder().decode(base64Match.groupValues[1])
-                        // Save to ~/.churchpresenter/device_uploads/yyyy-MM-dd/
+                        // Save to ~/.apresenter/device_uploads/yyyy-MM-dd/
                         // Each calendar day gets its own subfolder; the folderId includes the
                         // date so uploads from different days are catalogued separately.
                         val dateStr = java.time.LocalDate.now().toString()   // "yyyy-MM-dd"
                         val dateFolderId = "${PictureLibrary.DEVICE_UPLOADS_FOLDER_ID}_$dateStr"
                         val uploadDir = File(
                             System.getProperty("user.home"),
-                            ".churchpresenter/device_uploads/$dateStr"
+                            ".apresenter/device_uploads/$dateStr"
                         ).also { it.mkdirs() }
                         val file = File(uploadDir, uniqueUploadName(uploadDir, safeName))
                         file.writeBytes(imageBytes)

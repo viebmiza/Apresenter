@@ -133,6 +133,7 @@ fun SongsTab(
     controller.SongsTabPanes(modifier)
     controller.SongEditorDialogs()
     controller.DeleteSongDialog()
+    controller.OnlineSongSearchDialogHost()
 }
 
 @Composable

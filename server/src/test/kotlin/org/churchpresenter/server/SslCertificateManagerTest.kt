@@ -29,7 +29,7 @@ import kotlin.test.assertTrue
  *
  * The manager is a JVM singleton that resolves its keystore directory from user.home once, at first
  * class-load. No other test references it, so redirecting user.home to a temp dir before the first
- * call keeps it off the developer's real ~/.churchpresenter. baseDir latches to that first temp dir
+ * call keeps it off the developer's real ~/.apresenter. baseDir latches to that first temp dir
  * for the rest of the JVM, which is why these tests don't assume an empty starting state — they
  * assert generation and reuse, both order-independent.
  */

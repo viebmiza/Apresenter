@@ -44,7 +44,7 @@ class PresentationViewModelRemoteTest {
         // it would stay pointed at a directory tearDown deletes, breaking CrashReporterTest.
         CrashReporter.installId()
 
-        // Own home per test: the remote slide cache lives under ~/.churchpresenter/slides and is
+        // Own home per test: the remote slide cache lives under ~/.apresenter/slides and is
         // keyed by schedule-item id, so tests would otherwise reuse each other's downloads.
         realHome = System.getProperty("user.home")
         testHome = Files.createTempDirectory("cp-presentation-remote-home").toFile()
@@ -177,7 +177,7 @@ class PresentationViewModelRemoteTest {
         // proves the load had started, so `!isLoading` cannot be the value from before it ran.
         awaitUntil("the failed load to finish cleaning up") { vm.loadError != null && !vm.isLoading }
 
-        val cacheDir = File(File(testHome, ".churchpresenter/slides"), "remote_sched-cleanup")
+        val cacheDir = File(File(testHome, ".apresenter/slides"), "remote_sched-cleanup")
         assertFalse(cacheDir.exists(), "a half-built cache would be served as complete next time")
     }
 

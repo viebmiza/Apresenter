@@ -105,7 +105,7 @@ Line two — "quoted" & 100% of the time"""
     fun `the context names the build so a report can be placed`() {
         val context = ContactReporter.defaultContext("26.1.0-beta")
 
-        assertTrue(context.startsWith("Church Presenter "), context)
+        assertTrue(context.startsWith("Apresenter "), context)
         assertTrue(
             "26.1.0-beta" in context,
             "a bug report without a version cannot be triaged: $context",

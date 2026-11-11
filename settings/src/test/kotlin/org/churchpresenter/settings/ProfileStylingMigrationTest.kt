@@ -210,7 +210,7 @@ class ProfileStylingMigrationTest {
         val settings = manager.migrateAndDecode(v20)
         manager.saveSettings(settings)
 
-        val saved = root(File(home, ".churchpresenter/settings.json").readText())
+        val saved = root(File(home, ".apresenter/settings.json").readText())
         assertEquals(STT_GLOBAL_KEYS, saved.getValue("sttSettings").jsonObject.keys)
         assertEquals(QA_GLOBAL_KEYS, saved.getValue("qaSettings").jsonObject.keys)
         assertFalse("dictionarySettings" in saved)

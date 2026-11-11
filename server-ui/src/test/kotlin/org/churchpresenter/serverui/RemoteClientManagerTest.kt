@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
  * previously blocked has to take it off the block list, and the other way round, or the answer
  * depends on which list happens to be consulted first.
  *
- * The lists persist to `~/.churchpresenter/remote_clients.json`, so `user.home` is swapped per test
+ * The lists persist to `~/.apresenter/remote_clients.json`, so `user.home` is swapped per test
  * and a "restart" is a second manager built against the same file.
  */
 class RemoteClientManagerTest {
@@ -28,7 +28,7 @@ class RemoteClientManagerTest {
     private lateinit var tempHome: File
     private var realHome: String? = null
 
-    private val clientsFile: File get() = File(tempHome, ".churchpresenter/remote_clients.json")
+    private val clientsFile: File get() = File(tempHome, ".apresenter/remote_clients.json")
 
     @BeforeTest
     fun isolateHome() {

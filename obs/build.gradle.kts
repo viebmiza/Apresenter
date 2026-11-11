@@ -1,7 +1,7 @@
 plugins {
     id("cp.jvm-module")
     // CrashReporter resolves its file under `user.home`; the suite gets a home of its own under build/
-    // so a test can never touch the real ~/.churchpresenter.
+    // so a test can never touch the real ~/.apresenter.
     id("cp.test-home")
     id("cp.compose")
     id("cp.screenshots")

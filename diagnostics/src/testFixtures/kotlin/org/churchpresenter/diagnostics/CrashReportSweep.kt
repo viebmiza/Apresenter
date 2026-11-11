@@ -11,7 +11,7 @@ private const val SWEEP_SLACK_MS = 1_000L
  * [org.churchpresenter.diagnostics.CrashReporter] resolves its report directory from
  * `user.home` once per JVM, when the object is first touched, so a test cannot redirect it by
  * swapping the property afterwards — a test that reports an exception really does write into the
- * developer's own `~/.churchpresenter/crash-reports/`. Any test that exercises a path which reports
+ * developer's own `~/.apresenter/crash-reports/`. Any test that exercises a path which reports
  * one has to put that right itself.
  *
  * Deleting by modification time rather than by wiping the directory is the point: a developer's
@@ -26,7 +26,7 @@ private const val SWEEP_SLACK_MS = 1_000L
  */
 class CrashReportSweep {
 
-    private val crashDir = File(System.getProperty("user.home"), ".churchpresenter/crash-reports")
+    private val crashDir = File(System.getProperty("user.home"), ".apresenter/crash-reports")
     private var markedAt = 0L
 
     /** Call at the start of a test, before anything that might report. */

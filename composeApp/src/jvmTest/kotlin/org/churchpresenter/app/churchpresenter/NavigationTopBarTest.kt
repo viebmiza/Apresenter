@@ -625,7 +625,7 @@ class NavigationTopBarTest {
             onOpenWickIntro = { wickIntro++ },
         ) {
             val developer = getMenu(7)
-            assertEquals("Wick Intro Dialog", developer.getItem(4).text)
+            assertEquals("Timóteo Intro Dialog", developer.getItem(4).text)
             developer.getItem(4).doClick(0)
         }
         assertEquals(1, wickIntro)

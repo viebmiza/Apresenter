@@ -199,21 +199,21 @@ class DeckLinkManagerTest {
 
     @Test
     fun `isInputConfigured falls back to a persisted scenes file when the index matches, no-space form`() {
-        val appDir = File(tempHome, ".churchpresenter").apply { mkdirs() }
+        val appDir = File(tempHome, ".apresenter").apply { mkdirs() }
         File(appDir, "scenes.json").writeText("""{"sources":[{"deckLinkIndex":4}]}""")
         assertTrue(DeckLinkManager.isInputConfigured(4))
     }
 
     @Test
     fun `isInputConfigured falls back to a persisted scenes file when the index matches, spaced form`() {
-        val appDir = File(tempHome, ".churchpresenter").apply { mkdirs() }
+        val appDir = File(tempHome, ".apresenter").apply { mkdirs() }
         File(appDir, "scenes.json").writeText("""{"sources":[{"deckLinkIndex": 5}]}""")
         assertTrue(DeckLinkManager.isInputConfigured(5))
     }
 
     @Test
     fun `isInputConfigured returns false when the persisted scenes file exists but does not match`() {
-        val appDir = File(tempHome, ".churchpresenter").apply { mkdirs() }
+        val appDir = File(tempHome, ".apresenter").apply { mkdirs() }
         File(appDir, "scenes.json").writeText("""{"sources":[{"deckLinkIndex":4}]}""")
         assertFalse(DeckLinkManager.isInputConfigured(9))
     }

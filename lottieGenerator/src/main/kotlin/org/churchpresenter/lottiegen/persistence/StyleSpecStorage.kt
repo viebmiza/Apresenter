@@ -7,12 +7,12 @@ import java.io.File
 
 /**
  * Disk storage for Style Editor projects: one spec JSON per file under
- * `~/.churchpresenter/churchpresenter-lottiegen/style-specs/`.
+ * `~/.apresenter/churchpresenter-lottiegen/style-specs/`.
  */
 object StyleSpecStorage {
 
     private fun specsDir(): File {
-        val dir = File(System.getProperty("user.home"), ".churchpresenter/churchpresenter-lottiegen/style-specs")
+        val dir = File(System.getProperty("user.home"), ".apresenter/churchpresenter-lottiegen/style-specs")
         dir.mkdirs()
         return dir
     }

@@ -115,7 +115,7 @@ private const val UNKNOWN_BUILD = "unknown"
 
 /**
  * Global crash reporter that:
- *  1. Writes crash logs to ~/.churchpresenter/crash-reports/ (always)
+ *  1. Writes crash logs to ~/.apresenter/crash-reports/ (always)
  *  2. Forwards crashes to Sentry when a DSN is configured in sentry.properties
  *
  * Install as early as possible in main() via [initialize].
@@ -144,7 +144,7 @@ object CrashReporter {
      * Resolving per access costs a property lookup and removes the whole failure mode.
      * `LottieRenderCache.cacheDir` is `get()` for the same reason.
      */
-    private val appDir: File get() = File(System.getProperty("user.home"), ".churchpresenter")
+    private val appDir: File get() = File(System.getProperty("user.home"), ".apresenter")
     private val crashDir: File get() = File(appDir, "crash-reports")
     private val runningFile: File get() = File(appDir, ".running")
     private val crashCountFile: File get() = File(appDir, ".crash_count")

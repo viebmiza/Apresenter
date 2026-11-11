@@ -27,7 +27,7 @@ import kotlin.test.fail
  */
 class CrashReporterTest {
 
-    private val appDir = File(System.getProperty("user.home"), ".churchpresenter")
+    private val appDir = File(System.getProperty("user.home"), ".apresenter")
     private val crashDir = File(appDir, "crash-reports")
     private val installIdFile = File(appDir, ".install_id")
     private val crashCountFile = File(appDir, ".crash_count")
@@ -177,7 +177,7 @@ class CrashReporterTest {
 
     @Test
     fun `reporting never throws even when the crash directory is missing`() {
-        // Simulates a user deleting ~/.churchpresenter while the app runs.
+        // Simulates a user deleting ~/.apresenter while the app runs.
         crashDir.deleteRecursively()
         CrashReporter.reportException(RuntimeException("nowhere to write"))
         assertTrue(crashFiles().isEmpty())
@@ -392,7 +392,7 @@ class CrashReporterTest {
 
             CrashReporter.writeCrashCount(7)
 
-            val landed = File(otherHome, ".churchpresenter/.crash_count")
+            val landed = File(otherHome, ".apresenter/.crash_count")
             assertTrue(landed.isFile, "the count must be written under the home in force at the time")
             assertEquals("7", landed.readText().trim())
             assertEquals(7, CrashReporter.readCrashCount(), "and read back from the same place")

@@ -1,7 +1,7 @@
 plugins {
     id("cp.jvm-module")
     // The render cache keeps its frames under `user.home`; the suite gets a home of its own under
-    // build/ so a test can never touch the real ~/.churchpresenter.
+    // build/ so a test can never touch the real ~/.apresenter.
     id("cp.test-home")
     // The bundled lottie fonts are plain classpath resources under src/main/resources/fonts, loaded by
     // LottieFonts (and by LottieGen's FontRegistry) -- not Compose resources.

@@ -1,7 +1,7 @@
 plugins {
     id("cp.jvm-module")
     // StatisticsManager keeps statistics.json and play_log.json under `user.home`; the suite gets a
-    // home of its own under build/ so a test can never touch the real ~/.churchpresenter.
+    // home of its own under build/ so a test can never touch the real ~/.apresenter.
     id("cp.test-home")
     id("cp.compose")
     alias(libs.plugins.kotlinx.serialization)

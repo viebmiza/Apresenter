@@ -2,7 +2,7 @@ plugins {
     id("cp.jvm-module")
     // CrashReportSweep is published from here because it exists for CrashReporter's own design:
     // the report directory is resolved once per JVM, so a test that reports an exception really
-    // writes into the developer's own ~/.churchpresenter/crash-reports and has to put it back.
+    // writes into the developer's own ~/.apresenter/crash-reports and has to put it back.
     // HungTestReporter is too: the root build puts these fixtures on every module's test runtime,
     // and their service file registers it, so a hung fork anywhere leaves a thread dump.
     `java-test-fixtures`
@@ -22,7 +22,7 @@ dependencies {
 }
 
 tasks.withType<Test>().configureEach {
-    // CrashReporterTest DELETES ~/.churchpresenter/crash-reports, .install_id and .crash_count in
+    // CrashReporterTest DELETES ~/.apresenter/crash-reports, .install_id and .crash_count in
     // its @BeforeTest. In :composeApp that was safe because the jvmTest task redirects user.home;
     // without the same redirect here the suite deletes the developer's own crash reports and
     // install id on the first run. This is the whole of that protection — do not remove it.

@@ -62,7 +62,7 @@ object StockMediaClient {
         }
     }
 
-    private val defaultDownloadDir = File(System.getProperty("user.home"), ".churchpresenter/stock-backgrounds")
+    private val defaultDownloadDir = File(System.getProperty("user.home"), ".apresenter/stock-backgrounds")
 
     // --- Pexels DTOs ---
 

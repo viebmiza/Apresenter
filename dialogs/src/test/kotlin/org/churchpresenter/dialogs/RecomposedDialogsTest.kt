@@ -147,7 +147,7 @@ class RecomposedDialogsTest {
     }
 
     @Test
-    fun `the about dialog`() = recomposes("About Church Presenter") { changed, _ ->
+    fun `the about dialog`() = recomposes("About Apresenter") { changed, _ ->
         AboutDialog(true, {}, AppSettings(), TEST_IDENTITY, if (changed) ThemeMode.DARK else ThemeMode.LIGHT, inPlace)
     }
 

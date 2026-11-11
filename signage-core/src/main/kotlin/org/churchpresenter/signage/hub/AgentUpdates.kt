@@ -124,7 +124,7 @@ class AgentUpdates(
     }
 
     companion object {
-        const val RELEASE_URL = "https://github.com/ChurchPresenter/ChurchPresenter-Signage/releases/latest/download"
+        const val RELEASE_URL = "https://github.com/viebmiza/Apresenter-Signage/releases/latest/download"
 
         /**
          * Reads releases from another place instead (`-Dchurchpresenter.signageReleaseUrl=…`), a

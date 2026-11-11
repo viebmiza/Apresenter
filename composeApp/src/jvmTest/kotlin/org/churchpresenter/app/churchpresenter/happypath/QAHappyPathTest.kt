@@ -27,7 +27,7 @@ private const val ROW_SLACK = 40f
 class QAHappyPathTest : HappyPathHarness() {
 
     /** Where `QAManager` keeps its session: this fork's home, shared with every other suite. */
-    private val stateFile get() = File(System.getProperty("user.home"), ".churchpresenter/qa_state.json")
+    private val stateFile get() = File(System.getProperty("user.home"), ".apresenter/qa_state.json")
 
     @BeforeTest
     fun clearSession() {

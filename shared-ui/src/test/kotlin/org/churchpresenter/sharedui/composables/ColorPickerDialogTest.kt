@@ -39,7 +39,7 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalTestApi::class)
 class ColorPickerDialogTest {
 
-    private val recentColorsFile = File(System.getProperty("user.home"), ".churchpresenter/recent_colors.json")
+    private val recentColorsFile = File(System.getProperty("user.home"), ".apresenter/recent_colors.json")
 
     @BeforeTest
     fun freshRecentColors() {

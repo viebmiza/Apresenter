@@ -17,7 +17,7 @@ import kotlin.test.assertTrue
  */
 class SongCacheTest {
 
-    private val cacheFile = File(System.getProperty("user.home"), ".churchpresenter/song_cache.json")
+    private val cacheFile = File(System.getProperty("user.home"), ".apresenter/song_cache.json")
 
     @AfterTest
     fun clearCache() {

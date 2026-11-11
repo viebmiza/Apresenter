@@ -347,7 +347,7 @@ private fun seedRecentPictureFolders() {
                 files.forEach { it.copyTo(File(this, it.name), overwrite = true) }
             }
         }
-    val recent = File(System.getProperty("user.home"), ".churchpresenter/recent_picture_folders.json")
+    val recent = File(System.getProperty("user.home"), ".apresenter/recent_picture_folders.json")
     recent.parentFile.mkdirs()
     recent.writeText((listOf(gallery) + folders).joinToString(",", "[", "]") { "\"${it.absolutePath}\"" })
 }
@@ -365,7 +365,7 @@ private fun DemoTour.swap(heading: String, sub: String, leading: String) {
 /** A second translation for the two-language part, from this machine's own library; null skips it. */
 private fun secondBible(): File? {
     val source = File(
-        System.getenv("CP_DEMO_SECOND_BIBLE") ?: "${System.getenv("HOME")}/.churchpresenter/Bibles/RUS_SYN.spb",
+        System.getenv("CP_DEMO_SECOND_BIBLE") ?: "${System.getenv("HOME")}/.apresenter/Bibles/RUS_SYN.spb",
     )
     if (!source.isFile) return null
     return File(LIBRARY, "Bibles/${source.name}").also { source.copyTo(it, overwrite = true) }

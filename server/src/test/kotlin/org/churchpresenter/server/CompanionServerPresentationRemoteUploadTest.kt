@@ -40,7 +40,7 @@ import kotlin.test.assertTrue
  *
  * It is a second, separate implementation of the same idea as `/api/presentations/upload`
  * (covered by [CompanionServerPresentationTest]): same base64 data-URI body, same
- * `~/.churchpresenter/device_presentations/` destination, but a different gate in front of it —
+ * `~/.apresenter/device_presentations/` destination, but a different gate in front of it —
  * the presentation-remote enable flag and password rather than the API key and the
  * file-upload-enabled switch. The two having drifted apart is exactly what would go unnoticed,
  * so this drives the remote one end to end rather than assuming the other suite speaks for it.
@@ -61,7 +61,7 @@ class CompanionServerPresentationRemoteUploadTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     private val uploadDir: File
-        get() = File(tempHome, ".churchpresenter/device_presentations")
+        get() = File(tempHome, ".apresenter/device_presentations")
 
     companion object {
         private lateinit var server: CompanionServer

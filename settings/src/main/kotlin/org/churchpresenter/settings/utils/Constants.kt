@@ -4,7 +4,7 @@ import org.churchpresenter.core.models.schedule.TimerModes
 
 object Constants {
     /** Localhost port used to enforce single-instance via ServerSocket lock. */
-    const val SINGLE_INSTANCE_PORT = 47632
+    const val SINGLE_INSTANCE_PORT = BrandConfig.SINGLE_INSTANCE_PORT
 
     /**
      * Fixed loopback port for the Planning Center OAuth redirect catcher. Fixed (not
@@ -283,7 +283,7 @@ object Constants {
 
     // Companion Server (Ktor)
     const val SERVER_DEFAULT_PORT = 8765
-    const val SERVER_APP_NAME = "ChurchPresenter"
+    const val SERVER_APP_NAME = BrandConfig.APP_NAME
     const val SERVER_VERSION = "1.0"
 
     // REST endpoints
@@ -416,8 +416,8 @@ object Constants {
     // SSL / TLS (self-signed cert for companion server)
     const val SSL_KEYSTORE_TYPE     = "JKS"
     const val SSL_KEY_ALGORITHM     = "RSA"
-    const val SSL_KEY_ALIAS         = "churchpresenter"
-    const val SSL_KEYSTORE_PASSWORD = "churchpresenter_ssl"
+    const val SSL_KEY_ALIAS         = BrandConfig.SSL_KEY_ALIAS
+    const val SSL_KEYSTORE_PASSWORD = BrandConfig.SSL_KEYSTORE_PASSWORD
 
     object DBus {
         const val DESKTOP_OBJECT_NAME = "org.freedesktop.portal.Desktop"

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Church Presenter</string>
+    <string name="app_name">Apresenter</string>
     <string name="mode">Mode</string>
     <string name="scope">Scope</string>
     <string name="title">Title</string>
@@ -122,7 +122,7 @@
     <string name="menu_close_schedule">Close Schedule</string>
     <string name="menu_exit">Exit</string>
     <string name="file_chooser_save_schedule">Save Schedule As</string>
-    <string name="file_filter_schedule">Church Presenter Schedule (*.cps)</string>
+    <string name="file_filter_schedule">Apresenter Schedule (*.cps)</string>
 
     <string name="menu_remove_from_schedule">Remove from Schedule</string>
     <string name="menu_clear_schedule">Clear Schedule</string>
@@ -145,7 +145,7 @@
     <string name="menu_disconnect">Disconnect</string>
 
     <string name="instance_link_title">Instance Link</string>
-    <string name="instance_link_description">Follow another ChurchPresenter instance on your network — mirror its live content here, and optionally add items to its schedule.</string>
+    <string name="instance_link_description">Follow another Apresenter instance on your network — mirror its live content here, and optionally add items to its schedule.</string>
     <string name="instance_link_host">Host</string>
     <string name="instance_link_host_hint">e.g. 192.168.1.10</string>
     <string name="instance_link_autoconnect">Connect automatically on launch</string>
@@ -199,9 +199,9 @@
     <string name="memory_monitor_native_note">JVM heap/non-heap only — native memory not shown</string>
     <string name="menu_getting_started">Getting Started…</string>
     <string name="menu_about">About</string>
-    <string name="about_title">About Church Presenter</string>
-    <string name="about_copyright">© %1$s Church Presenter</string>
-    <string name="converter_window_title">ChurchPresenter Song and Bible Converter</string>
+    <string name="about_title">About Apresenter</string>
+    <string name="about_copyright">© %1$s Apresenter</string>
+    <string name="converter_window_title">Apresenter Song and Bible Converter</string>
     <string name="lottie_gen_window_title">Lottie Lower Third Generator</string>
     <string name="open_crash_logs">Open Crash Logs</string>
     <string name="save_diagnostic_info">Save Diagnostic Info…</string>
@@ -1099,14 +1099,14 @@
     <string name="ndi_runtime_path_help">Leave empty to detect automatically. NDI_RUNTIME_DIR_V6 and NDI_RUNTIME_DIR_V5 are honoured.</string>
     <string name="ffmpeg_section_title">Camera Capture</string>
     <string name="ffmpeg_ready">Using ffmpeg at %1$s</string>
-    <string name="ffmpeg_bundled_ready">Using the ffmpeg included with ChurchPresenter</string>
+    <string name="ffmpeg_bundled_ready">Using the ffmpeg included with Apresenter</string>
     <string name="ffmpeg_missing_title">ffmpeg was not found</string>
     <string name="ffmpeg_missing_help">Cameras and capture cards are opened with ffmpeg. This build should include one — choose an ffmpeg below, or install ffmpeg and check again.</string>
     <string name="ffmpeg_path_hint">Choose an ffmpeg program</string>
     <string name="ffmpeg_browse">Choose ffmpeg</string>
     <string name="ffmpeg_clear">Use bundled</string>
     <string name="ffmpeg_download_link">Get ffmpeg</string>
-    <string name="ffmpeg_path_help">Leave empty to use the ffmpeg included with ChurchPresenter.</string>
+    <string name="ffmpeg_path_help">Leave empty to use the ffmpeg included with Apresenter.</string>
     <string name="ndi_trademark">NDI® is a registered trademark of Vizrt NDI AB.</string>
     <string name="omt_outputs">OMT Outputs</string>
     <string name="omt_outputs_help">Virtual outputs sent over the network as Open Media Transport (OMT) sources — the open-source alternative to NDI, received by vMix, OBS with the OMT plugin and other OMT software. Alpha mode carries real transparency, so a lower third arrives already keyed.</string>
@@ -1122,17 +1122,17 @@
     <string name="omt_quality_high">High</string>
     <string name="omt_quality_default_help">Each receiver asks for the quality it needs, and the highest request is used.</string>
     <string name="omt_quality_fixed_help">A fixed encoding quality for every receiver. Higher looks better and uses more of the network.</string>
-    <string name="omt_library_bundled">OMT library included with ChurchPresenter</string>
+    <string name="omt_library_bundled">OMT library included with Apresenter</string>
     <string name="omt_library_custom">OMT library: %1$s</string>
     <string name="omt_library_load_failed">An OMT library was found at %1$s but could not be loaded. It may be for a different processor architecture, or libvmx may be missing beside it.</string>
     <string name="omt_discovery_service_missing">OMT on Linux needs the Avahi service to find and announce sources, and it is not running. Install and start avahi-daemon (for example: sudo apt install avahi-daemon), then check again.</string>
     <string name="omt_library_missing_title">OMT library not found</string>
-    <string name="omt_library_missing_help">This copy of ChurchPresenter does not include the OMT library for this computer. Choose a folder that holds libomt and libvmx, then check again.</string>
+    <string name="omt_library_missing_help">This copy of Apresenter does not include the OMT library for this computer. Choose a folder that holds libomt and libvmx, then check again.</string>
     <string name="omt_library_path">OMT library folder</string>
-    <string name="omt_library_path_help">Leave empty to use the OMT library included with ChurchPresenter. Once a library has loaded, a change takes effect the next time ChurchPresenter starts.</string>
+    <string name="omt_library_path_help">Leave empty to use the OMT library included with Apresenter. Once a library has loaded, a change takes effect the next time Apresenter starts.</string>
     <string name="omt_discovery_server">Discovery server</string>
     <string name="omt_discovery_server_placeholder">omt://host:port</string>
-    <string name="omt_discovery_server_help">Leave empty to find OMT sources automatically. Set one when your network blocks automatic discovery, and point every OMT device at the same server. Takes effect the next time ChurchPresenter starts.</string>
+    <string name="omt_discovery_server_help">Leave empty to find OMT sources automatically. Set one when your network blocks automatic discovery, and point every OMT device at the same server. Takes effect the next time Apresenter starts.</string>
 
     <!-- Background Settings Tab -->
     <!-- Background Settings Tab: the surface rail and the editor beside it -->
@@ -1287,7 +1287,7 @@
     <string name="license_title">End User License Agreement (EULA)</string>
     <string name="license_accept_button">I Accept</string>
     <string name="license_decline_button">Decline &amp; Exit</string>
-    <string name="license_prompt">Please read and accept the End User License Agreement to use Church Presenter.</string>
+    <string name="license_prompt">Please read and accept the End User License Agreement to use Apresenter.</string>
 
     <!-- Announcements timer -->
     <string name="timer_title">Timer</string>
@@ -1355,13 +1355,13 @@
     <string name="web_engine_unavailable_title">Web browser unavailable</string>
     <string name="web_engine_unavailable_body">The browser engine could not start. Install the Microsoft Visual C++ Redistributable (x64) and restart the app.</string>
     <string name="web_engine_unavailable_policy_title">Web browser blocked by a policy on this computer</string>
-    <string name="web_engine_unavailable_policy_body">A software policy on this computer is blocking the browser engine ChurchPresenter downloads. Ask whoever manages the computer to allow ChurchPresenter, or use a computer without that restriction — the Web tab and browser sources need it.</string>
+    <string name="web_engine_unavailable_policy_body">A software policy on this computer is blocking the browser engine Apresenter downloads. Ask whoever manages the computer to allow Apresenter, or use a computer without that restriction — the Web tab and browser sources need it.</string>
     <string name="web_engine_unavailable_library_title">Web browser needs a system library</string>
-    <string name="web_engine_unavailable_library_body">This computer is missing %1$s, which the browser engine needs. Install the package that provides it with your Linux distribution's package manager, then restart ChurchPresenter.</string>
+    <string name="web_engine_unavailable_library_body">This computer is missing %1$s, which the browser engine needs. Install the package that provides it with your Linux distribution's package manager, then restart Apresenter.</string>
     <string name="web_engine_unavailable_macos_title">Web browser requires a newer macOS</string>
-    <string name="web_engine_unavailable_macos_body">ChurchPresenter's browser engine no longer supports this version of macOS. Update to macOS 12 (Monterey) or later to use the Web tab and browser sources.</string>
+    <string name="web_engine_unavailable_macos_body">Apresenter's browser engine no longer supports this version of macOS. Update to macOS 12 (Monterey) or later to use the Web tab and browser sources.</string>
     <string name="web_engine_unavailable_windows_title">Web browser requires Windows 10 or later</string>
-    <string name="web_engine_unavailable_windows_body">ChurchPresenter's browser engine no longer supports this version of Windows. Update to Windows 10 or later to use the Web tab and browser sources.</string>
+    <string name="web_engine_unavailable_windows_body">Apresenter's browser engine no longer supports this version of Windows. Update to Windows 10 or later to use the Web tab and browser sources.</string>
     <string name="web_live_badge">LIVE</string>
     <string name="web_type_to_page_placeholder">Click an input on the live page first</string>
     <string name="web_focus_first_input">Focus first input on page</string>
@@ -1538,19 +1538,19 @@
          virtual cameras. Kept defined because fourteen locales translate it: removing it here would
          orphan every one of those, which LocaleStringsTest gates against. -->
     <string name="canvas_camera_unopenable_listing">ffmpeg could not list any camera on this machine. The cameras below were found by the system instead, and none of them will show a picture.</string>
-    <string name="canvas_camera_ffmpeg_required">ChurchPresenter opens cameras with ffmpeg, and this build could not find its copy. Open Settings → Projection to point at an ffmpeg, then check again.</string>
+    <string name="canvas_camera_ffmpeg_required">Apresenter opens cameras with ffmpeg, and this build could not find its copy. Open Settings → Projection to point at an ffmpeg, then check again.</string>
     <string name="canvas_camera_v4l2_hint">Install v4l2loopback for virtual cameras: sudo apt install v4l2loopback-dkms</string>
     <string name="canvas_camera_refresh">Refresh Cameras</string>
     <string name="canvas_camera_is_screen_capture">This is a display, not a camera — it records your screen, which is why macOS asks for Screen Recording permission. To put a screen on the canvas, use a Screen Capture source instead.</string>
-    <string name="canvas_camera_error_ffmpeg_missing">This camera cannot be opened because ChurchPresenter could not find its copy of ffmpeg. Open Settings → Projection to point at an ffmpeg, then select the camera again.</string>
-    <string name="canvas_camera_error_permission_denied_windows">Windows is blocking camera access for ChurchPresenter. Open Settings → Privacy &amp; security → Camera, turn on camera access and "Let desktop apps access your camera", then select the camera again.</string>
+    <string name="canvas_camera_error_ffmpeg_missing">This camera cannot be opened because Apresenter could not find its copy of ffmpeg. Open Settings → Projection to point at an ffmpeg, then select the camera again.</string>
+    <string name="canvas_camera_error_permission_denied_windows">Windows is blocking camera access for Apresenter. Open Settings → Privacy &amp; security → Camera, turn on camera access and "Let desktop apps access your camera", then select the camera again.</string>
     <string name="canvas_camera_error_device_not_found_windows">Windows could not open a camera with this name. It may have been unplugged, or its driver may name it differently than Windows does — press Refresh Cameras and pick it again.</string>
-    <string name="canvas_camera_error_permission_denied">macOS is blocking camera access for ChurchPresenter. Open System Settings → Privacy &amp; Security → Camera, switch ChurchPresenter on, then select the camera again.</string>
+    <string name="canvas_camera_error_permission_denied">macOS is blocking camera access for Apresenter. Open System Settings → Privacy &amp; Security → Camera, switch Apresenter on, then select the camera again.</string>
     <string name="canvas_camera_error_unsupported_format">This device does not accept the video format that was requested. Choose a specific one under Video Format.</string>
     <string name="canvas_camera_error_unsupported_framerate">This device does not accept the frame rate that was requested. Choose a specific format under Video Format.</string>
     <string name="canvas_camera_error_device_busy">This camera is already in use by another application.</string>
     <string name="canvas_camera_error_config_refused">This camera would not accept the video format that was requested and sent nothing. Set Video Format to Auto, or choose one of the formats it lists.</string>
-    <string name="canvas_camera_error_permission_or_unavailable">macOS would not send video from this camera. Check System Settings → Privacy &amp; Security → Camera that ChurchPresenter is switched on, and that no other app is using the camera.</string>
+    <string name="canvas_camera_error_permission_or_unavailable">macOS would not send video from this camera. Check System Settings → Privacy &amp; Security → Camera that Apresenter is switched on, and that no other app is using the camera.</string>
     <string name="canvas_camera_error_device_not_found">This camera is no longer connected.</string>
     <string name="canvas_camera_error_no_frames">The camera opened but sent no video.</string>
     <string name="canvas_camera_error_unknown">The camera could not be opened.</string>
@@ -1695,7 +1695,7 @@
     <string name="remote_api_calendar_enroll_code">Code %1$s — allow only if the phone shows the same code</string>
     <string name="calendar_enroll_qr_title">Scan with the phone</string>
     <string name="calendar_enroll_invite_failed">Could not create an invite — this computer could not reach the relay.</string>
-    <string name="calendar_enroll_qr_body">Scan this code with the ChurchPresenter app to enroll the phone. It works for 15 minutes, from anywhere.</string>
+    <string name="calendar_enroll_qr_body">Scan this code with the Apresenter app to enroll the phone. It works for 15 minutes, from anywhere.</string>
     <string name="remote_api_calendar_enroll_detail">A phone or tablet wants to plan services in the calendar from anywhere.</string>
     <string name="remote_api_qa_add">Q&amp;A: Add Question</string>
     <string name="remote_api_qa_edit">Q&amp;A: Edit Question</string>
@@ -1925,11 +1925,11 @@
     <string name="test_event_sent">Test event sent to Sentry. Check your dashboard to confirm it arrived.</string>
     <string name="test_event_failed">Could not send test event. Crash reporting is disabled or no DSN is configured.</string>
     <string name="test_event_dev_only">Visible to developers only — hidden in released installer builds.</string>
-    <string name="already_running_title">ChurchPresenter is already running</string>
-    <string name="already_running_message">Switch to the ChurchPresenter window that is already open to keep working.</string>
+    <string name="already_running_title">Apresenter is already running</string>
+    <string name="already_running_message">Switch to the Apresenter window that is already open to keep working.</string>
     <string name="already_running_ok">OK</string>
     <string name="crash_feedback_title">Report what happened</string>
-    <string name="crash_feedback_message">ChurchPresenter closed unexpectedly last time. Telling us what you were doing helps us fix it. This is optional.</string>
+    <string name="crash_feedback_message">Apresenter closed unexpectedly last time. Telling us what you were doing helps us fix it. This is optional.</string>
     <string name="crash_feedback_comment_label">What were you doing?</string>
     <string name="crash_feedback_email_label">Email (optional)</string>
     <string name="crash_feedback_send">Send report</string>
@@ -1938,7 +1938,7 @@
 
     <!-- System Settings - storage list -->
     <string name="system_storage">Storage</string>
-    <string name="system_storage_subtitle">Where Church Presenter looks for your content</string>
+    <string name="system_storage_subtitle">Where Apresenter looks for your content</string>
     <string name="system_storage_linked_count">%1$d linked</string>
     <string name="system_storage_needs_attention_count">%1$d need attention</string>
     <string name="system_storage_status_not_found">Folder not found</string>
@@ -2225,7 +2225,7 @@
 
     <!-- Update checker -->
     <string name="update_dialog_title">Update Available</string>
-    <string name="update_dialog_message">A new version of Church Presenter is available: %1$s</string>
+    <string name="update_dialog_message">A new version of Apresenter is available: %1$s</string>
     <string name="update_dialog_channel_stable">Stable release</string>
     <string name="update_dialog_channel_prerelease">Pre-release</string>
     <string name="update_dialog_dismiss">Later</string>
@@ -2335,7 +2335,7 @@
     <string name="setup_step0_subtitle">Choose the language for the app interface</string>
     <string name="setup_step1_theme_title">Choose a Theme</string>
     <string name="setup_step1_theme_subtitle">Pick the look that works best for your environment</string>
-    <string name="setup_step1_title">Welcome to ChurchPresenter</string>
+    <string name="setup_step1_title">Welcome to Apresenter</string>
     <string name="setup_step1_body">This quick guide will help you set up Bible translations and song books so you can start presenting right away.</string>
     <string name="setup_step2_title">Add Bible Translations</string>
     <string name="setup_step2_subtitle">Set up your Bible files for verse display</string>
@@ -2374,7 +2374,7 @@
     <string name="setup_step4_body">You can always add more content or adjust settings later by clicking the ⚙ Settings button in the toolbar.</string>
     <string name="setup_step4_hint">This guide is available anytime from Help → Getting Started.</string>
     <string name="schedule_open_failed_title">Couldn't open the schedule</string>
-    <string name="schedule_open_not_a_schedule">%1$s isn't a ChurchPresenter schedule, so nothing was opened and your schedule is unchanged. If it came from a download or an email, check that you saved the .cps file itself and not the page it was linked from.</string>
+    <string name="schedule_open_not_a_schedule">%1$s isn't a Apresenter schedule, so nothing was opened and your schedule is unchanged. If it came from a download or an email, check that you saved the .cps file itself and not the page it was linked from.</string>
     <string name="schedule_open_unreadable">%1$s could not be read, so nothing was opened and your schedule is unchanged. Check that the file is still there and that you have permission to open it.</string>
     <string name="autosave_restore_title">Restore unsaved schedule?</string>
     <string name="autosave_restore_message">An unsaved schedule from %1$s was found. Would you like to restore it?</string>
@@ -2457,7 +2457,7 @@
     <!-- Companion Satellite surface (ChurchPresenter as a Bitfocus Companion Satellite client) -->
     <string name="tab_companion_surface">Companion</string>
     <string name="companion_satellite_settings">Companion Satellite</string>
-    <string name="companion_satellite_description">Connect to a Bitfocus Companion instance on your network as a Satellite surface, and press its buttons from inside ChurchPresenter.</string>
+    <string name="companion_satellite_description">Connect to a Bitfocus Companion instance on your network as a Satellite surface, and press its buttons from inside Apresenter.</string>
     <string name="companion_satellite_host">Host</string>
     <string name="companion_satellite_host_hint">e.g. 192.168.1.50</string>
     <string name="companion_satellite_device_id">Tab device ID</string>
@@ -2611,8 +2611,8 @@
 
     <string name="story_prompt_window_title">Share Your Story</string>
     <string name="story_prompt_badge">We'd love to hear from you</string>
-    <string name="story_prompt_heading">Has Church Presenter helped your church?</string>
-    <string name="story_prompt_body_1">Church Presenter is built for Sunday mornings like yours, and the best way we know whether it's working is to hear from the people running it.</string>
+    <string name="story_prompt_heading">Has Apresenter helped your church?</string>
+    <string name="story_prompt_body_1">Apresenter is built for Sunday mornings like yours, and the best way we know whether it's working is to hear from the people running it.</string>
     <string name="story_prompt_body_2">If the app has helped your church, we'd love to hear about it — whether that's:</string>
     <string name="story_prompt_example_1">A smoother service order</string>
     <string name="story_prompt_example_2">Scripture on the screen without a scramble</string>
@@ -2620,12 +2620,12 @@
     <string name="story_prompt_body_3">Send us a few lines and let us know if we can share them on the home page, along with your name and church.</string>
     <string name="story_prompt_body_4">Your story helps other churches decide whether this is the right fit for them.</string>
     <string name="story_prompt_quote">Every church runs it a little differently.</string>
-    <string name="story_prompt_screenshot">Church Presenter running on a booth computer</string>
+    <string name="story_prompt_screenshot">Apresenter running on a booth computer</string>
     <string name="story_prompt_share">Share your story</string>
     <string name="story_prompt_later">Maybe later</string>
     <string name="story_prompt_reassurance">Nothing is published without your OK.</string>
     <string name="menu_developer_story_prompt">Share Your Story Dialog</string>
-    <string name="menu_developer_wick_intro">Wick Intro Dialog</string>
+    <string name="menu_developer_wick_intro">Timóteo Intro Dialog</string>
     <!-- Font picker -->
     <string name="font_picker_search">Search fonts…</string>
     <string name="font_picker_clear_search">Clear search</string>
@@ -3185,21 +3185,21 @@
     <string name="profile_merge_snap">Snap side by side</string>
     <string name="preview_merged_label">(merged)</string>
     <string name="projection_merged_by_profile">Overridden by %1$s profile</string>
-    <string name="helper_name">Wick</string>
-    <string name="helper_open">Open Wick, the helper</string>
+    <string name="helper_name">Timóteo</string>
+    <string name="helper_open">Open Timóteo, the helper</string>
     <string name="helper_close">Close the helper</string>
-    <string name="helper_hide">Hide Wick</string>
+    <string name="helper_hide">Hide Timóteo</string>
     <string name="helper_close_bubble">Close this bubble (the lamp stays)</string>
-    <string name="helper_confirm_hide">Hide Wick?</string>
+    <string name="helper_confirm_hide">Hide Timóteo?</string>
     <string name="helper_hide_where">You can bring it back any time from</string>
     <string name="helper_hide_menu_path">Help → Show Helper</string>
-    <string name="helper_hide_confirm_button">Hide Wick</string>
+    <string name="helper_hide_confirm_button">Hide Timóteo</string>
     <string name="helper_send">Send</string>
-    <string name="helper_input_placeholder">Ask Wick or tell it what to do…</string>
+    <string name="helper_input_placeholder">Ask Timóteo or tell it what to do…</string>
     <string name="helper_status">Here to help</string>
     <string name="helper_more">More</string>
     <string name="helper_clear">Clear conversation</string>
-    <string name="helper_greeting">Hi, I'm Wick. Tell me what you'd like to do, or ask where something is.</string>
+    <string name="helper_greeting">Hi, I'm Timóteo. Tell me what you'd like to do, or ask where something is.</string>
     <string name="helper_youre_welcome">You're welcome! Ask me any time.</string>
     <string name="helper_not_sure">I'm not sure what you mean. Try saying it another way, or type help to see what I know.</string>
     <string name="helper_did_you_mean">Did you mean %1$s?</string>
@@ -3241,13 +3241,13 @@
     <string name="helper_hint_output_picker_new">Pick the profile it shows: a full screen, a lower third or a stage monitor.</string>
     <string name="helper_hint_browser_source_add">Click %1$s here to add a Browser Source. In OBS, add a Browser source and paste in its address.</string>
     <string name="helper_hint_browser_source_name">Give it a name, like Livestream, so you can tell it apart later.</string>
-    <string name="helper_hint_obs_enable">Turn this on to let ChurchPresenter talk to OBS. In OBS, turn on its WebSocket server under Tools first.</string>
+    <string name="helper_hint_obs_enable">Turn this on to let Apresenter talk to OBS. In OBS, turn on its WebSocket server under Tools first.</string>
     <string name="helper_hint_obs_host">Type the address of the computer running OBS, or leave localhost if it is this one, and the port OBS shows.</string>
     <string name="helper_hint_obs_password">Type the password from OBS's WebSocket settings, if it has one.</string>
     <string name="helper_hint_obs_connect">Click %1$s. Once it connects, OBS's scenes appear below.</string>
     <string name="helper_hint_obs_scene">Pick which OBS scene to switch to, here and for each kind of content below.</string>
     <string name="helper_hint_atem_host">Type the ATEM's IP address. It is on the ATEM's front panel, or in ATEM Setup.</string>
-    <string name="helper_hint_atem_test">Click %1$s to check that ChurchPresenter can reach it.</string>
+    <string name="helper_hint_atem_test">Click %1$s to check that Apresenter can reach it.</string>
     <string name="helper_hint_atem_dsk">Turn this on to put lower thirds on a downstream key, or leave it off to pick an M/E and key instead.</string>
     <string name="helper_hint_pco_connect">Click %1$s and sign in. You only do this once.</string>
     <string name="helper_hint_pco_service_type">Pick the service type, like Sunday Morning.</string>
@@ -3292,8 +3292,8 @@
     <string name="helper_example_stage_layout">Choose what shows on the stage monitor</string>
     <string name="helper_do_it">Do it</string>
     <string name="helper_cancel">Cancel</string>
-    <string name="helper_send_chat">Send this chat to help improve Wick</string>
-    <string name="helper_send_chat_title">Send this chat to the ChurchPresenter team?</string>
+    <string name="helper_send_chat">Send this chat to help improve Timóteo</string>
+    <string name="helper_send_chat_title">Send this chat to the Apresenter team?</string>
     <string name="helper_send_chat_preview">This is exactly what will be sent. Names, numbers and announcement text are hidden.</string>
     <string name="helper_send_chat_note">What went wrong, or what were you trying to do? (optional)</string>
     <string name="helper_send_chat_email">Your email, if you'd like a reply</string>
@@ -3490,7 +3490,7 @@
     <string name="helper_tip_calendar_cues">The Calendar Manager can start your pre-service cues on their own. Set when each item starts, and it goes on screen at that time.</string>
     <string name="helper_tip_calendar_sync">Your planned services can sync with phones and tablets, so you can plan from the mobile app all week, even while this computer is off.</string>
     <!-- %1$s is the Sync the calendar with phones switch (calendar_sync_enable). -->
-    <string name="helper_hint_calendar_sync">Turn on %1$s, then scan the code with the ChurchPresenter app on the phone or tablet.</string>
+    <string name="helper_hint_calendar_sync">Turn on %1$s, then scan the code with the Apresenter app on the phone or tablet.</string>
     <string name="helper_tip_qa_tunnel">People can send questions to a Q&amp;A session from their phones without joining the church Wi-Fi. Turn on public access and they use their mobile data.</string>
     <!-- %1$s is the Q&amp;A tab's Sharing &amp; Remote Access button (tooltip_qa_remote). -->
     <string name="helper_hint_qa_remote">Click %1$s to open the join code and sharing options.</string>
@@ -3503,11 +3503,11 @@
     <!-- %1$s is the song editor's Tempo field (song_tempo). -->
     <string name="helper_hint_song_tempo">Type the beats per minute under %1$s. It only shows once a stage monitor is set up.</string>
     <string name="helper_tip_song_features">A song can show chords, open with a title slide, and carry up to four languages. Add chords and languages in the song editor; each output's profile turns the title slide on.</string>
-    <string name="helper_tip_stt">A speech-to-text service can connect to ChurchPresenter and put live captions, or a live translation of what is said, on a screen. Connect it on the STT tab.</string>
+    <string name="helper_tip_stt">A speech-to-text service can connect to Apresenter and put live captions, or a live translation of what is said, on a screen. Connect it on the STT tab.</string>
     <string name="helper_tip_song_library">The Song Library Manager edits many songs at once: select them, choose Batch Edit…, and set the songbook, author or anything else for all of them together.</string>
     <string name="helper_tip_compare_translations">The Song Library Manager can check a song's languages against each other: Compare translations finds sections that are missing a title, are only partly translated, or don't line up.</string>
     <string name="helper_tip_presets">Save any picture set, presentation, video, announcement or scene as a preset with Save preset, beside Add to Schedule. Then add it to a planned service from Presets in the Calendar Manager.</string>
-    <string name="helper_tip_remote">A phone or tablet can control ChurchPresenter: put up songs, verses and slides from anywhere in the room. Turn on the server, then scan its code with the ChurchPresenter app.</string>
+    <string name="helper_tip_remote">A phone or tablet can control Apresenter: put up songs, verses and slides from anywhere in the room. Turn on the server, then scan its code with the Apresenter app.</string>
     <string name="helper_display_title">Display setup</string>
     <string name="helper_display_one_screen">I can only find one display. Connect the projector or TV, and I'll find it here. For a stream, set up NDI or a Browser Source in Projection settings instead.</string>
     <string name="helper_display_pick">Which one does the congregation see?</string>
@@ -3557,8 +3557,8 @@
     <string name="helper_intro_back">Back</string>
     <string name="helper_intro_next">Next</string>
     <string name="helper_intro_finish">Let's go</string>
-    <string name="helper_intro_title_1">Hi, I'm Wick</string>
-    <string name="helper_intro_body_1">I'm a small helper bot that lives in the corner of Church Presenter, **not** an AI (artificial intelligence) chatbot. I know a set list of tasks, work without the internet, and point you to the right buttons while you get ready for Sunday.</string>
+    <string name="helper_intro_title_1">Hi, I'm Timóteo</string>
+    <string name="helper_intro_body_1">I'm a small helper bot that lives in the corner of Apresenter, **not** an AI (artificial intelligence) chatbot. I know a set list of tasks, work without the internet, and point you to the right buttons while you get ready for Sunday.</string>
     <string name="helper_intro_title_2">Just ask</string>
     <string name="helper_intro_body_2">Type a short request in plain words. If it isn't one I know, I'll suggest ones I do. Try one:</string>
     <string name="helper_intro_ask_song">How do I add a song?</string>
@@ -3618,7 +3618,7 @@
     <string name="helper_command_look_13_does">Shows the reference's text settings</string>
     <string name="helper_commands_intro">Here's everything I understand. Click one to try it.</string>
     <string name="helper_commands_you_type">You type</string>
-    <string name="helper_commands_wick_does">Wick does</string>
+    <string name="helper_commands_wick_does">Timóteo does</string>
     <string name="helper_commands_look">Look</string>
     <string name="helper_command_look_1">make the song background blue</string>
     <string name="helper_command_look_1_does">Changes the background color</string>
@@ -3627,7 +3627,7 @@
     <string name="helper_command_look_3">make the text bigger</string>
     <string name="helper_command_look_3_does">Steps the text size up or down</string>
     <string name="helper_command_look_4">undo</string>
-    <string name="helper_command_look_4_does">Takes back Wick's last change</string>
+    <string name="helper_command_look_4_does">Takes back Timóteo's last change</string>
     <string name="helper_commands_bible">Bible</string>
     <string name="helper_command_bible_1">show John 3:16</string>
     <string name="helper_command_bible_1_does">Puts the verse on screen</string>
@@ -3762,7 +3762,7 @@
     <string name="helper_version">You're on version %1$s. I'm checking for a newer one; if there is, a window will say so.</string>
     <string name="menu_show_helper">Show Helper</string>
     <string name="settings_helper_title">Helper</string>
-    <string name="settings_helper_show">Show Wick, the helper, in the corner of the main window</string>
+    <string name="settings_helper_show">Show Timóteo, the helper, in the corner of the main window</string>
     <string name="settings_helper_tips">Offer a tip of the day</string>
     <string name="settings_helper_reset">Show dismissed suggestions again</string>
     <string name="tooltip_message">Message</string>
@@ -3963,12 +3963,12 @@
     <string name="calendar_computer_copy_code">Copy code</string>
     <string name="calendar_computer_copied">Copied</string>
     <string name="calendar_computer_email">Email…</string>
-    <string name="calendar_computer_email_subject">Join the Church Presenter calendar</string>
-    <string name="calendar_computer_email_body">On the other computer, open Church Presenter → Settings → Server → Calendar sync → Join another…, and paste this code:\n\n%1$s\n\nIt works once, for 24 hours. Please don't forward this email.</string>
+    <string name="calendar_computer_email_subject">Join the Apresenter calendar</string>
+    <string name="calendar_computer_email_body">On the other computer, open Apresenter → Settings → Server → Calendar sync → Join another…, and paste this code:\n\n%1$s\n\nIt works once, for 24 hours. Please don't forward this email.</string>
     <string name="calendar_join_title">Join another calendar</string>
     <string name="calendar_join_body">Paste the code from the main computer, or open the file it saved.</string>
     <string name="calendar_join_code">Join code</string>
-    <string name="calendar_join_file_type">Church Presenter join file</string>
+    <string name="calendar_join_file_type">Apresenter join file</string>
     <string name="calendar_join_open_file">Open file…</string>
     <string name="calendar_join_join">Join</string>
     <string name="calendar_join_invalid">That isn't a join code.</string>
@@ -4096,7 +4096,7 @@
     <string name="signage_message_edit">Change</string>
     <string name="signage_message_clear">Clear</string>
     <string name="signage_playlists">Playlists</string>
-    <string name="signage_server_off">Screens can't reach ChurchPresenter until it's on. They keep playing what they already have.</string>
+    <string name="signage_server_off">Screens can't reach Apresenter until it's on. They keep playing what they already have.</string>
     <string name="signage_server_off_title">The companion server is off</string>
     <string name="signage_turn_on_server">Turn on server</string>
     <string name="signage_new_screen">A new screen wants to join</string>
@@ -4155,7 +4155,7 @@
     <string name="signage_orientation_landscape_flipped">Landscape, upside down</string>
     <string name="signage_orientation_portrait_flipped">Portrait, the other way</string>
     <string name="signage_factory_reset_title">Factory reset %1$s?</string>
-    <string name="signage_factory_reset_text">The screen deletes its pictures, videos and playlists, forgets this ChurchPresenter and shows a new pairing code. It leaves this list.</string>
+    <string name="signage_factory_reset_text">The screen deletes its pictures, videos and playlists, forgets this Apresenter and shows a new pairing code. It leaves this list.</string>
     <string name="signage_device">Device</string>
     <string name="signage_device_address">Address: %1$s</string>
     <string name="signage_device_offline">Not connected</string>
@@ -4219,7 +4219,7 @@
     <string name="signage_help_shared_title">Running the screens from more than one computer</string>
     <string name="signage_help_shared">On every computer, set Settings → System → Storage → Signage to the same shared folder: a network share, or a synced folder such as OneDrive or Dropbox. They then share the screens, playlists, schedules and files.</string>
     <string name="signage_help_updates_title">When the screens update</string>
-    <string name="signage_help_updates">While ChurchPresenter is running with the Signage tab shown in the tab bar; it does not have to be the tab you are on. With the computer off, the screens keep playing what they last received.</string>
+    <string name="signage_help_updates">While Apresenter is running with the Signage tab shown in the tab bar; it does not have to be the tab you are on. With the computer off, the screens keep playing what they last received.</string>
     <string name="signage_copying">Copying %1$s into the signage folder…</string>
     <string name="signage_copy_failed">Could not copy %1$s into the signage folder.</string>
     <string name="signage_remove_copy_trash">Screens playing it go back to the first playlist. Its copy in the signage folder goes to the Trash; the original is not touched.</string>
@@ -4345,7 +4345,7 @@
     <string name="signage_update_restarting">restarting</string>
     <string name="signage_update_failed">Update to %1$s failed: %2$s</string>
     <string name="signage_update_rolled_back">Update to %1$s didn't start, so the screen went back: %2$s</string>
-    <string name="system_fonts_failed_title">Church Presenter can't start on this computer</string>
+    <string name="system_fonts_failed_title">Apresenter can't start on this computer</string>
     <string name="system_fonts_failed_body">It couldn't load this computer's system fonts.</string>
     <string name="system_fonts_failed_old_windows_reason">This version of Windows is older than Windows 10, which is the most likely reason.</string>
     <string name="system_fonts_failed_old_windows_fix">Updating to Windows 10 or later should fix it.</string>
@@ -4363,4 +4363,19 @@
     <string name="action_hold_mode_black">Black</string>
     <string name="shortcut_description_hold_all_screens">Hold every screen on its last frame</string>
     <string name="shortcut_description_release_all_screens">Release every held screen</string>
+    <string name="online_song_search">Search Online Lyrics</string>
+    <string name="online_song_search_title">Search Online Songs</string>
+    <string name="online_song_search_hint">Song title, artist, or a lyric phrase…</string>
+    <string name="online_song_search_action">Search</string>
+    <string name="online_song_searching">Searching online…</string>
+    <string name="online_song_empty_prompt">Type a song name, artist, or phrase from the lyrics to search and import it ready to present.</string>
+    <string name="online_song_no_results">No matching lyrics found. Try including the artist name or another line from the song.</string>
+    <string name="online_song_error">Could not search online right now. Check your internet connection and try again.</string>
+    <string name="online_song_songbook_label">Folder / Songbook (optional)</string>
+    <string name="online_song_sections_count">%1$d sections</string>
+    <string name="online_song_preview_empty">Select a song on the left to preview the formatted slides before importing.</string>
+    <string name="online_song_import">Import Song</string>
+    <string name="online_song_import_and_present">Import &amp; Go Live</string>
+    <string name="online_song_import_failed">Configure a songs folder in Settings before importing.</string>
+    <string name="online_song_select_prompt">Select a result</string>
 </resources>

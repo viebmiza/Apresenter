@@ -83,7 +83,7 @@ class ScheduleAutoSaveTest {
         assertEquals("Be Thou My Vision", (reader.scheduleItems.single() as ScheduleItem.SongItem).title)
     }
 
-    private val autoSaveFile: File get() = File(home, ".churchpresenter/autosave_schedule.tmp")
+    private val autoSaveFile: File get() = File(home, ".apresenter/autosave_schedule.tmp")
 
     /**
      * Writes an autosave in the real on-disk format by saving a throwaway schedule through

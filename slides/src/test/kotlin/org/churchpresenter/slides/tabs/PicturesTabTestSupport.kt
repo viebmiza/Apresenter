@@ -86,7 +86,7 @@ internal class PictureReports {
  * out of most tests; each is exercised on its own where it matters.
  *
  * Deliberately never touches `RecentPictureFolders` — that object is a JVM-wide singleton private to
- * `PicturesTab.kt` that persists to real JSON files under the real `~/.churchpresenter` directory on
+ * `PicturesTab.kt` that persists to real JSON files under the real `~/.apresenter` directory on
  * first touch, with no test seam to redirect it. Every existing test already reads it (composing the
  * tab evaluates the recent-folders row unconditionally), which is harmless; nothing here calls
  * `add`/`togglePin`/`clear`, which

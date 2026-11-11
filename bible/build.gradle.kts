@@ -13,7 +13,7 @@ dependencies {
     testImplementation(kotlin("test"))
     // CrashReportSweep: these tests exercise paths that really do write a crash report, and the
     // reporter resolves its directory once per JVM, so each has to put the developer's own
-    // ~/.churchpresenter/crash-reports back afterwards.
+    // ~/.apresenter/crash-reports back afterwards.
     testImplementation(testFixtures(projects.diagnostics))
 }
 

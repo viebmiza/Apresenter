@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import org.churchpresenter.core.models.io.writeTextAtomically
 import org.churchpresenter.diagnostics.Log
+import org.churchpresenter.settings.utils.BrandConfig
 import java.io.File
 import java.net.URI
 import java.net.http.HttpClient
@@ -14,8 +15,8 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
 
-/** Where `main`'s pack is read from: the project's own repository, the host the update check already calls. */
-const val WICK_PACK_URL = "https://raw.githubusercontent.com/ChurchPresenter/ChurchPresenter/main/wick-pack/pack.json"
+/** Where `main`'s pack is read from: the Apresenter repository, the host the update check calls. */
+const val WICK_PACK_URL = BrandConfig.WICK_PACK_URL
 
 /** A dev build reads its pack from here instead when set — a URL, or a path to a local file. */
 const val WICK_PACK_URL_PROPERTY = "churchpresenter.wickPackUrl"
@@ -70,8 +71,8 @@ class WickPackStore(
     }
 }
 
-/** The app-wide pack, cached in `~/.churchpresenter/` beside the app's other state. */
-val WickPacks = WickPackStore({ File(System.getProperty("user.home"), ".churchpresenter/wick-pack.json") })
+/** The app-wide pack, cached in `~/.apresenter/` beside the app's other state. */
+val WickPacks = WickPackStore({ File(System.getProperty("user.home"), ".apresenter/wick-pack.json") })
 
 /** [url]'s body over HTTPS, or a local file's text for a dev URL; null on any failure or past the size cap. */
 internal fun httpGet(url: String): String? {

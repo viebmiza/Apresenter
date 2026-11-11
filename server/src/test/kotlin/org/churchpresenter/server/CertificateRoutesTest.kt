@@ -59,7 +59,7 @@ class CertificateRoutesTest {
         val response = client.get("http://127.0.0.1:$port/ca.crt")
         assertEquals(HttpStatusCode.OK, response.status)
         assertTrue(
-            response.headers["Content-Disposition"]?.contains("ChurchPresenter-CA.crt") == true,
+            response.headers["Content-Disposition"]?.contains("Apresenter-CA.crt") == true,
             "the browser must be offered a file to install, not shown bytes"
         )
     }

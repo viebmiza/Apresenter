@@ -54,7 +54,7 @@ import org.churchpresenter.sharedui.screenshot.PinnedFonts
  * Nothing here clicks the enable switch or Restart — they would stop the shared server out from
  * under the other states, and `ServerSettingsTabLifecycleTest` already drives them for real.
  *
- * `RemoteClientManager` reads and writes `~/.churchpresenter/remote_clients.json` in its field
+ * `RemoteClientManager` reads and writes `~/.apresenter/remote_clients.json` in its field
  * initialiser, so every render gets a `user.home` of its own through `withIsolatedHome` — otherwise
  * these images would show whichever phones and tablets the recording machine had paired with.
  *

@@ -20,8 +20,8 @@ class AlreadyRunningDialogTest {
         setContent { MaterialTheme { AlreadyRunningContent(onDismiss = { dismissed++ }) } }
         waitUntilAtLeastOneExists(hasText("OK"), timeoutMillis = 5_000L)
 
-        onNodeWithText("ChurchPresenter is already running").assertExists()
-        onNodeWithText("Switch to the ChurchPresenter window", substring = true).assertExists()
+        onNodeWithText("Apresenter is already running").assertExists()
+        onNodeWithText("Switch to the Apresenter window", substring = true).assertExists()
         onNodeWithText("OK").performClick()
         waitForIdle()
 

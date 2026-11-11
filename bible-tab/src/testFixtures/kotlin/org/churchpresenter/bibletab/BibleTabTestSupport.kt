@@ -164,7 +164,7 @@ fun bibleTab(
     /**
      * Passed as the tab's [BibleVerseStatistics] when non-null.
      *
-     * It resolves `~/.churchpresenter` at construction, so a test that passes one must isolate
+     * It resolves `~/.apresenter` at construction, so a test that passes one must isolate
      * `user.home` first — see [bibleTabWithStatistics].
      */
     statistics: BibleVerseStatistics? = null,
@@ -173,7 +173,7 @@ fun bibleTab(
     /**
      * Passed as the tab's [VerseSequenceLog] when non-null.
      *
-     * Its default store is under `~/.churchpresenter`, so build one over a temp file rather than
+     * Its default store is under `~/.apresenter`, so build one over a temp file rather than
      * calling `VerseSequenceLog()`.
      */
     sequenceLog: VerseSequenceLog? = null,

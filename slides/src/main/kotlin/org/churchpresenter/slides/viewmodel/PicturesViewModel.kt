@@ -199,7 +199,7 @@ class PicturesViewModel private constructor(
         parts.hiding.loadFor(displayFolder)
         val cacheDir = File(
             System.getProperty("user.home"),
-            ".churchpresenter/instance-link/cache/picture-folders/$folderId"
+            ".apresenter/instance-link/cache/picture-folders/$folderId"
         )
         cacheDir.mkdirs()
         remoteLoadJob = scope.launch {

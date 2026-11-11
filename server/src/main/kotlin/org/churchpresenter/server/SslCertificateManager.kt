@@ -41,11 +41,11 @@ import java.util.Date
 /**
  * Manages a two-level Private PKI for the companion server:
  *
- *   1. **CA certificate** (`~/.churchpresenter/ca.jks`) — a self-signed root CA that
+ *   1. **CA certificate** (`~/.apresenter/ca.jks`) — a self-signed root CA that
  *      lives for 10 years.  Mobile devices install this once via GET /ca.crt and from
  *      that point all server certificates are automatically trusted.
  *
- *   2. **Server certificate** (`~/.churchpresenter/server.jks`) — signed by the CA,
+ *   2. **Server certificate** (`~/.apresenter/server.jks`) — signed by the CA,
  *      valid for ~2 years, includes an IP SAN matching the current server address.
  *      Regenerated automatically when the host/IP changes or the cert nears expiry.
  *
@@ -66,7 +66,7 @@ private val PASSWORD = Constants.SSL_KEYSTORE_PASSWORD.toCharArray()
 
 object SslCertificateManager {
 
-    private val baseDir = File(System.getProperty("user.home"), ".churchpresenter").also { it.mkdirs() }
+    private val baseDir = File(System.getProperty("user.home"), ".apresenter").also { it.mkdirs() }
     private val caKeystoreFile     = File(baseDir, "ca.jks")
     private val serverKeystoreFile = File(baseDir, "server.jks")
 
@@ -176,7 +176,7 @@ object SslCertificateManager {
 
         val caKeyPair = generateEcKeyPair()
         val now       = Instant.now()
-        val subject   = X500Name("CN=ChurchPresenter CA, O=ChurchPresenter, C=US")
+        val subject   = X500Name("CN=Apresenter CA, O=Apresenter, C=BR")
 
         val caCert = sign(
             JcaX509v3CertificateBuilder(
@@ -231,11 +231,11 @@ object SslCertificateManager {
 
         val serverCert = sign(
             JcaX509v3CertificateBuilder(
-                X500Name("CN=ChurchPresenter CA, O=ChurchPresenter, C=US"),
+                X500Name("CN=Apresenter CA, O=Apresenter, C=BR"),
                 BigInteger.valueOf(now.toEpochMilli()),
                 Date.from(now),
                 Date.from(now.plus(825, ChronoUnit.DAYS)),   // ~2 years (Apple max)
-                X500Name("CN=ChurchPresenter, O=ChurchPresenter, C=US"),
+                X500Name("CN=Apresenter, O=Apresenter, C=BR"),
                 serverKeyPair.public
             ).apply {
                 addExtension(Extension.basicConstraints,       false, BasicConstraints(false))

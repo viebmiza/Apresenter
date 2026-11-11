@@ -86,7 +86,7 @@ class ScheduleSongGoLiveTest {
 
     private fun historyLines(): List<JsonObject> {
         LiveHistoryLogger.flush()
-        return File(home, ".churchpresenter/bible-stt-logs/live-content-schedule-go-live.jsonl")
+        return File(home, ".apresenter/bible-stt-logs/live-content-schedule-go-live.jsonl")
             .readLines().map { Json.parseToJsonElement(it).jsonObject }
     }
 

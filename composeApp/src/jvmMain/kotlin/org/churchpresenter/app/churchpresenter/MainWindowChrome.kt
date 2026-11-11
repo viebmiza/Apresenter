@@ -32,6 +32,7 @@ import org.churchpresenter.app.churchpresenter.remote.shouldUseRemoteContent
 import org.churchpresenter.sharedui.utils.UrlOpener
 import org.churchpresenter.calendar.model.UpcomingLoad
 import org.churchpresenter.settings.InstanceLinkSettings
+import org.churchpresenter.settings.utils.BrandConfig
 import org.churchpresenter.calendar.ScheduleServiceLink
 
 /** The menu bar. */
@@ -62,9 +63,9 @@ internal fun MainWindowScope.AppMenuBar() {
             },
             onSongLibrary = { showSongLibraryWindow = true },
             onCalendar = { showCalendarWindow = true },
-            onHelp = { UrlOpener.open("https://churchpresenter.org/wiki") },
-            onHowToBlog = { UrlOpener.open("https://churchpresenter.org/blog") },
-            onTutorialVideos = { UrlOpener.open("https://www.churchpresenter.org/tutorials/") },
+            onHelp = { UrlOpener.open(BrandConfig.websitePageUrl("wiki", BrandConfig.DOCS_URL)) },
+            onHowToBlog = { UrlOpener.open(BrandConfig.websitePageUrl("blog", BrandConfig.BLOG_URL)) },
+            onTutorialVideos = { UrlOpener.open(BrandConfig.websitePageUrl("tutorials", BrandConfig.TUTORIALS_URL)) },
             onCheckForUpdates = {
                 coroutineScope.launch {
                     pendingUpdateResult = UpdateChecker.checkForUpdate(

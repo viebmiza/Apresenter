@@ -207,7 +207,7 @@ class PresentationViewModel private constructor(
                 state.isLoading.value = true
             }
             val cacheDir = File(
-                File(System.getProperty("user.home"), ".churchpresenter/slides"),
+                File(System.getProperty("user.home"), ".apresenter/slides"),
                 "remote_$scheduleItemId"
             )
                 .also { it.mkdirs() }

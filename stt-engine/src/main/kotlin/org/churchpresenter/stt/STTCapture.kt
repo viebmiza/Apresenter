@@ -75,7 +75,7 @@ internal class STTCapture(private val scope: CoroutineScope) {
 
     /**
      * Periodically pulls a fresh copy of the live STT session's .db into
-     * ~/.churchpresenter/bible-stt-logs/ (same folder TrainingDataLogger writes to), so the whole
+     * ~/.apresenter/bible-stt-logs/ (same folder TrainingDataLogger writes to), so the whole
      * session can be submitted as one folder without a manual, end-of-service pull from the STT
      * server — which may not be running by then. Read-only against the STT server (GET only,
      * never triggers its file_mover, which defaults to deleting the source file). Gated by
@@ -137,7 +137,7 @@ internal class STTCapture(private val scope: CoroutineScope) {
         val downloadResponse = client.send(downloadRequest, HttpResponse.BodyHandlers.ofByteArray())
         if (downloadResponse.statusCode() != HTTP_OK) return
 
-        val logDir = File(System.getProperty("user.home"), ".churchpresenter/bible-stt-logs").also { it.mkdirs() }
+        val logDir = File(System.getProperty("user.home"), ".apresenter/bible-stt-logs").also { it.mkdirs() }
         val target = File(logDir, File(dbName).name)
         val tmp = File(logDir, "${target.name}.tmp")
         tmp.writeBytes(downloadResponse.body())

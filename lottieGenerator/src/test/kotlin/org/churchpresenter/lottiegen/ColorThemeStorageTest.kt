@@ -31,7 +31,7 @@ class ColorThemeStorageTest {
     }
 
     private fun themesFile() =
-        File(temp, ".churchpresenter/churchpresenter-lottiegen/color-themes.json")
+        File(temp, ".apresenter/churchpresenter-lottiegen/color-themes.json")
 
     private fun theme(name: String) =
         ColorTheme(name, ColorThemeColors("#111111", "#222222", "#333333", "#444444", "#555555"))

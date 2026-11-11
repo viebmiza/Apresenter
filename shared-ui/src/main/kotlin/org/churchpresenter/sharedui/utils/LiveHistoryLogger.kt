@@ -28,7 +28,7 @@ data class LiveHistoryEntry(
 
 /**
  * Best-effort JSONL log of what was on screen and when, one line per on-screen change, written to
- * `~/.churchpresenter/bible-stt-logs/live-content-<suffix>.jsonl` beside [TrainingDataLogger]'s
+ * `~/.apresenter/bible-stt-logs/live-content-<suffix>.jsonl` beside [TrainingDataLogger]'s
  * files and under the same rules: the suffix is the STT session id ([TrainingDataLogger.sessionId],
  * shared so the two never disagree) or else the process-start timestamp, each file opens with one
  * session header line, and [TrainingDataLogger.cleanupOldLogsOnce] sweeps it after 30 days.
@@ -79,7 +79,7 @@ object LiveHistoryLogger {
      * resolved from `user.home` on every write rather than once per JVM, as `CrashReporter` does.
      */
     private fun path(session: String?): String {
-        val dir = File(System.getProperty("user.home"), ".churchpresenter/bible-stt-logs").also { it.mkdirs() }
+        val dir = File(System.getProperty("user.home"), ".apresenter/bible-stt-logs").also { it.mkdirs() }
         val suffix = session?.let { sanitize(it) } ?: runStamp
         return File(dir, "$PREFIX$suffix.jsonl").absolutePath
     }

@@ -18,7 +18,7 @@ import java.nio.file.Files
  *
  * **This is about isolation, not safety.** The Gradle test config already points `user.home` at
  * `build/test-home` for the whole JVM (`composeApp/build.gradle.kts`), so no test can reach the
- * developer's real `~/.churchpresenter` either way. What this buys is a *fresh* file per test
+ * developer's real `~/.apresenter` either way. What this buys is a *fresh* file per test
  * instead of one shared across a class, so tests cannot see each other's writes.
  *
  * Usage — two lines of lifecycle per test class:

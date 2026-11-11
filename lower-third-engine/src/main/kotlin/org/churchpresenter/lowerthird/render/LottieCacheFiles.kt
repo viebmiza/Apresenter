@@ -28,7 +28,7 @@ internal object LottieCacheFiles {
      * test class ran first would decide it. Same reasoning as `RecentLabelColors`.
      */
     val cacheDir: File
-        get() = File(System.getProperty("user.home"), ".churchpresenter/lottie_render_cache")
+        get() = File(System.getProperty("user.home"), ".apresenter/lottie_render_cache")
 
     fun keyFor(lottieJson: String, v: LottieRenderCache.Variant): String {
         val md5 = MessageDigest.getInstance("MD5").digest(lottieJson.toByteArray(Charsets.UTF_8))

@@ -311,4 +311,4 @@ private suspend fun browseForMedia(isVideo: Boolean, filterLabel: String): Strin
 }
 
 private val TILE_MIN_WIDTH = 82.dp
-private const val STOCK_BACKGROUNDS_DIR = ".churchpresenter/stock-backgrounds"
+private const val STOCK_BACKGROUNDS_DIR = ".apresenter/stock-backgrounds"

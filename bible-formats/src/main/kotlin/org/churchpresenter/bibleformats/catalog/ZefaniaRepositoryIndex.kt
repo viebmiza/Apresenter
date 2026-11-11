@@ -102,7 +102,7 @@ object ZefaniaRepositoryIndex {
         }
     }
 
-    private val defaultCacheFile = File(System.getProperty("user.home"), ".churchpresenter/cache/zefania-index.json")
+    private val defaultCacheFile = File(System.getProperty("user.home"), ".apresenter/cache/zefania-index.json")
 
     /**
      * The archive is a preservation project, not a feed — it changes a few times a year. A long TTL

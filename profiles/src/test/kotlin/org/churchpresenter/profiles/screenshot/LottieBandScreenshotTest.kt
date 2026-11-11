@@ -467,7 +467,7 @@ class LottieBandScreenshotTest {
 
     private companion object {
         const val SECTION = "lottieBand"
-        const val LAST_CONFIG = ".churchpresenter/churchpresenter-lottiegen/bible-band-last.json"
+        const val LAST_CONFIG = ".apresenter/churchpresenter-lottiegen/bible-band-last.json"
         const val KJV = "kjv.spb"
         const val TAMIL_FILE = "tam.spb"
         const val TAMIL_FACE = "Noto Sans Tamil"

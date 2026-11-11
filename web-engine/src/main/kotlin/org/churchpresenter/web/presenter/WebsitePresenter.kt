@@ -64,7 +64,7 @@ internal object JcefInstall {
      * On Windows, prefer an ASCII-safe, username-free path under %ProgramData%
      * (e.g. C:\ProgramData\ChurchPresenter) — a home directory containing non-ASCII characters is
      * a suspected trigger for native-load failures, and a fresh extraction here also clears any
-     * partially-corrupted install. ~/.churchpresenter follows it, because ProgramData is shared
+     * partially-corrupted install. ~/.apresenter follows it, because ProgramData is shared
      * between accounts: a directory this user can create is not necessarily one this user can
      * extract into when another account got there first, and that is only knowable by trying.
      *
@@ -80,9 +80,9 @@ internal object JcefInstall {
         programData: String? = System.getenv("ProgramData"),
         homeDir: String = System.getProperty("user.home")
     ): List<File> {
-        val home = File(homeDir, ".churchpresenter")
+        val home = File(homeDir, ".apresenter")
         if (!osName.lowercase().contains("win")) return listOf(home)
-        return listOf(File(programData ?: "C:\\ProgramData", "ChurchPresenter"), home)
+        return listOf(File(programData ?: "C:\\ProgramData", "Apresenter"), home)
             .distinctBy { it.absolutePath }
     }
 
@@ -295,7 +295,7 @@ object CefManager {
      * The root the browser engine actually installed into, once it has.
      *
      * Anything that wants to reach the engine's own directories has to ask, rather than assume
-     * `~/.churchpresenter`: on Windows [JcefInstall.rootCandidates] prefers `%ProgramData%`, so a
+     * `~/.apresenter`: on Windows [JcefInstall.rootCandidates] prefers `%ProgramData%`, so a
      * hardcoded home path names a directory the engine never used — deleting nothing while the
      * live cache stays where it is.
      */
@@ -398,7 +398,7 @@ object CefManager {
     }
 
     /**
-     * One-time cleanup of the legacy JCEF footprint left under ~/.churchpresenter after a
+     * One-time cleanup of the legacy JCEF footprint left under ~/.apresenter after a
      * Windows user is relocated to %ProgramData%. Only runs when [activeRoot] is NOT the home
      * directory — i.e. we actually moved. If ProgramData was unwritable and we fell back to the
      * home dir, that location is live and must be left untouched. Deletes only the jcef and
@@ -407,7 +407,7 @@ object CefManager {
      * locked files are simply skipped and retried on a future launch.
      */
     internal fun cleanupLegacyJcef(activeRoot: File, homeDir: String = System.getProperty("user.home")) {
-        val homeRoot = File(homeDir, ".churchpresenter")
+        val homeRoot = File(homeDir, ".apresenter")
         if (activeRoot.absolutePath == homeRoot.absolutePath) return
         val legacyDirs = listOf(File(homeRoot, "jcef"), File(homeRoot, "webview-cache"))
         if (legacyDirs.none { it.isDirectory }) return

@@ -39,8 +39,8 @@ class AutoStartManagerTest {
         homeBackup = System.getProperty("user.home")
         tempHome = Files.createTempDirectory("cp-autostart-test").toFile()
         System.setProperty("user.home", tempHome.absolutePath)
-        macPlist = File(tempHome, "Library/LaunchAgents/org.churchpresenter.app.plist")
-        linuxDesktop = File(tempHome, ".config/autostart/churchpresenter.desktop")
+        macPlist = File(tempHome, "Library/LaunchAgents/org.apresenter.app.plist")
+        linuxDesktop = File(tempHome, ".config/autostart/apresenter.desktop")
     }
 
     @AfterTest fun after() {
@@ -323,7 +323,7 @@ class AutoStartManagerTest {
      * The crash-report folder under the test's own home, made as the app's start makes it: without
      * it a report is dropped, and "nothing was reported" would hold whatever the code did.
      */
-    private fun crashReportDir(): File = File(tempHome, ".churchpresenter/crash-reports").apply { mkdirs() }
+    private fun crashReportDir(): File = File(tempHome, ".apresenter/crash-reports").apply { mkdirs() }
 
     /** Every crash report in [dir], as text. */
     private fun reportsIn(dir: File): List<String> = dir.listFiles()?.map { it.readText() }.orEmpty()

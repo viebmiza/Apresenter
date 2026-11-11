@@ -129,7 +129,7 @@ internal suspend fun loadBundledFileNames(mediaType: StockMediaClient.StockMedia
 
 /** Copies a bundled background out of app resources into the stock library folder the first time it's picked. */
 internal suspend fun materializeBundledEntry(fileName: String): File = withContext(Dispatchers.IO) {
-    val dir = File(System.getProperty("user.home"), ".churchpresenter/stock-backgrounds")
+    val dir = File(System.getProperty("user.home"), ".apresenter/stock-backgrounds")
     dir.mkdirs()
     val target = File(dir, fileName)
     if (!target.exists()) {
@@ -140,7 +140,7 @@ internal suspend fun materializeBundledEntry(fileName: String): File = withConte
 
 /**
  * Lets the user pick a previously downloaded stock photo/video from the app's local
- * library (~/.churchpresenter/stock-backgrounds/) without hitting the network again.
+ * library (~/.apresenter/stock-backgrounds/) without hitting the network again.
  */
 @Composable
 fun LocalLibraryDialog(
@@ -155,7 +155,7 @@ fun LocalLibraryDialog(
     }
 
     val allFiles = remember(mediaType) {
-        val dir = File(System.getProperty("user.home"), ".churchpresenter/stock-backgrounds")
+        val dir = File(System.getProperty("user.home"), ".apresenter/stock-backgrounds")
         scanDownloadedFiles(dir, mediaType)
     }
 

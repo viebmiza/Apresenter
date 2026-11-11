@@ -141,7 +141,7 @@ class VideoFirstFrameTest {
     fun `frames are kept in the app's own cache, run through the bundled ffmpeg`() {
         val clip = video()
         val home = File(System.getProperty("user.home"))
-        assertEquals(File(home, ".churchpresenter/cache/preview-frames"), VideoFirstFrame.cacheDir())
+        assertEquals(File(home, ".apresenter/cache/preview-frames"), VideoFirstFrame.cacheDir())
         assertEquals(VideoFirstFrame.cacheDir(), VideoFirstFrame.cacheFileFor(clip).parentFile)
         val command = VideoFirstFrame.ffmpegFirstFrameCommand(clip, File(dir, "out.jpg"))
         assertEquals(org.churchpresenter.sharedui.utils.FfmpegBinary.path, command.first())

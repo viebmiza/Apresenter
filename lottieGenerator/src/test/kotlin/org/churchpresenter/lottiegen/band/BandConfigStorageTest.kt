@@ -87,7 +87,7 @@ class BandConfigStorageTest {
 
     @Test
     fun `a corrupt file is ignored`() {
-        val dir = File(temp, ".churchpresenter/churchpresenter-lottiegen").apply { mkdirs() }
+        val dir = File(temp, ".apresenter/churchpresenter-lottiegen").apply { mkdirs() }
         File(dir, "bible-band-last.json").writeText("{ not json")
         assertNull(BandConfigStorage.load())
     }

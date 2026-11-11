@@ -20,11 +20,11 @@ import kotlin.test.assertTrue
  *
  * The logger resolves its directory from `user.home` on every write, and the test task points each
  * fork at its own `build/test-home` (build-logic's `cp.test-home`), so this never touches a real
- * `~/.churchpresenter`. Each test uses a distinct sessionId, which gives it its own file.
+ * `~/.apresenter`. Each test uses a distinct sessionId, which gives it its own file.
  */
 class TrainingDataLoggerTest {
 
-    private val logDir = File(System.getProperty("user.home"), ".churchpresenter/bible-stt-logs")
+    private val logDir = File(System.getProperty("user.home"), ".apresenter/bible-stt-logs")
 
     /**
      * `build/test-home` survives between Gradle runs, so without this the logger would append to

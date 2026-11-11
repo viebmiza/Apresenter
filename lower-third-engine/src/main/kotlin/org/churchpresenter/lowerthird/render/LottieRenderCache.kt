@@ -83,7 +83,7 @@ object LottieRenderCache : LottieRenderPolicy by LottieRenderSizes {
         // One-time migration: the pre-unification ATEM-only cache (YUVA .acpc files) is
         // superseded by this shared ARGB cache — delete it so it doesn't linger on disk.
         scope.launch(Dispatchers.IO) {
-            File(System.getProperty("user.home"), ".churchpresenter/atem_render_cache")
+            File(System.getProperty("user.home"), ".apresenter/atem_render_cache")
                 .takeIf { it.isDirectory }
                 ?.deleteRecursively()
         }

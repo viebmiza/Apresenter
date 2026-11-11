@@ -28,7 +28,7 @@ import kotlin.test.assertTrue
  */
 class TextStyleButtonsBackdropTest {
 
-    private val savedFile = File(System.getProperty("user.home"), ".churchpresenter/saved_backdrops.json")
+    private val savedFile = File(System.getProperty("user.home"), ".apresenter/saved_backdrops.json")
 
     private val chip = "Text backing"
     private val caret = "Text backing options"

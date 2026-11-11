@@ -18,7 +18,7 @@ import java.io.File
  * @param file where it is kept -- a parameter so a test can keep it in a temp directory.
  */
 class HiddenItemsStore(
-    private val file: File = File(System.getProperty("user.home"), ".churchpresenter/hidden_items.json"),
+    private val file: File = File(System.getProperty("user.home"), ".apresenter/hidden_items.json"),
 ) {
     @Serializable
     private data class Stored(

@@ -59,7 +59,7 @@ class DownloadBeaconTest {
         val hit = hits.single()
         assertEquals("POST", hit.method)
         assertEquals("platform=${currentPlatformId()}&source=app&version=26.9.2", hit.query)
-        assertEquals("ChurchPresenter/26.9.1", hit.userAgent)
+        assertEquals("Apresenter/26.9.1", hit.userAgent)
         assertEquals("application/json", hit.contentType, "the site's CSRF check refuses form posts")
     }
 

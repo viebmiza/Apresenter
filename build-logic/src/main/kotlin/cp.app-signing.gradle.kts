@@ -86,7 +86,7 @@ val winCertPath = if (signingRepoPath != null && winCertFileRel.isConfigured())
     "$signingRepoPath/windows/$winCertFileRel" else null
 val winCertPassword = winSigningProps.getProperty("certPassword", "")
 val winTimestampUrl = winSigningProps.getProperty("timestampUrl", "http://timestamp.digicert.com")
-val winSubjectName = winSigningProps.getProperty("subjectName", "Church Presenter")
+val winSubjectName = winSigningProps.getProperty("subjectName", "Mizael G Nascimento")
 
 fun registerWindowsSignTask(taskName: String, packagingTask: String, extension: String) =
     tasks.register(taskName) {
@@ -132,9 +132,9 @@ registerWindowsSignTask("signWindowsExe", "packageExe", "exe")
 // itself, so the output is left unsigned. The identity must match the app's reservation in
 // Partner Center: pass -Pmsix.identityName, -Pmsix.publisher and -Pmsix.publisherDisplayName.
 // The defaults produce a package that builds, not one the Store accepts.
-val msixIdentityName = providers.gradleProperty("msix.identityName").filter { it.isNotBlank() }.getOrElse("ChurchPresenter.ChurchPresenter")
-val msixPublisher = providers.gradleProperty("msix.publisher").filter { it.isNotBlank() }.getOrElse("CN=Church Presenter")
-val msixPublisherDisplayName = providers.gradleProperty("msix.publisherDisplayName").filter { it.isNotBlank() }.getOrElse("Church Presenter")
+val msixIdentityName = providers.gradleProperty("msix.identityName").filter { it.isNotBlank() }.getOrElse("Apresenter.Apresenter")
+val msixPublisher = providers.gradleProperty("msix.publisher").filter { it.isNotBlank() }.getOrElse("CN=Mizael G Nascimento")
+val msixPublisherDisplayName = providers.gradleProperty("msix.publisherDisplayName").filter { it.isNotBlank() }.getOrElse("Apresenter")
 
 // How long makeappx may run before packageMsix gives up on it; the app image packs in a few.
 val msixTimeoutMinutes = 15L
@@ -155,7 +155,7 @@ tasks.register("packageMsix") {
     // MSIX takes four segments and the Store requires the last to be 0; the first three are the
     // MSI's, so both installers of one build carry the same version.
     val msixVersion = "$versionYear.${commits / 256}.${commits % 256}.0"
-    val appImage = layout.buildDirectory.dir("compose/binaries/main/app/ChurchPresenter")
+    val appImage = layout.buildDirectory.dir("compose/binaries/main/app/Apresenter")
     val stagingDir = layout.buildDirectory.dir("msix/layout")
     val outDir = layout.buildDirectory.dir("compose/binaries/main/msix")
     val templateDir = layout.projectDirectory.dir("src/msix")
@@ -172,7 +172,7 @@ tasks.register("packageMsix") {
         File(staging, "AppxManifest.xml").writeText(manifest)
 
         val out = outDir.get().asFile.apply { deleteRecursively(); mkdirs() }
-        val msix = File(out, "ChurchPresenter-$msixVersion-WINDOWS-x64.msix")
+        val msix = File(out, "Apresenter-$msixVersion-WINDOWS-x64.msix")
         // Verbose, with its output read into the build log: inherited output goes to the Gradle
         // daemon's own console, which the CI log never shows. Stdin is closed at once, so a prompt
         // reads end-of-input instead of waiting, and the wait is bounded, so a stall fails the task.

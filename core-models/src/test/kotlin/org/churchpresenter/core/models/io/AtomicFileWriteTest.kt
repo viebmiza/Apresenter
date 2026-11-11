@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 /**
  * The write that a reader — or a sync client — can never catch half-finished.
  *
- * Every file this protects lives in `~/.churchpresenter`, which people sync between machines, so
+ * Every file this protects lives in `~/.apresenter`, which people sync between machines, so
  * the two things that matter are that the previous content survives a failed write and that no
  * scratch file is ever left in the folder for a sync daemon to pick up.
  */

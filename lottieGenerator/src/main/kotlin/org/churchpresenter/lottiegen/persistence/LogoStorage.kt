@@ -8,7 +8,7 @@ import javax.imageio.ImageIO
 object LogoStorage {
 
     private fun logosDir(): File {
-        val dir = File(System.getProperty("user.home"), ".churchpresenter/churchpresenter-lottiegen/logos")
+        val dir = File(System.getProperty("user.home"), ".apresenter/churchpresenter-lottiegen/logos")
         dir.mkdirs()
         return dir
     }

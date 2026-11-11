@@ -302,10 +302,10 @@ class StatisticsManager {
     }
 }
 
-/** Where the counters and the event log are kept: `~/.churchpresenter/statistics.json` and `play_log.json`. */
+/** Where the counters and the event log are kept: `~/.apresenter/statistics.json` and `play_log.json`. */
 private class StatisticsFiles {
     private val userHome = System.getProperty("user.home")
-    private val appDataDir = File(userHome, ".churchpresenter")
+    private val appDataDir = File(userHome, ".apresenter")
     private val statsFile = File(appDataDir, "statistics.json")
     private val logFile = File(appDataDir, "play_log.json")
 

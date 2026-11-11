@@ -80,6 +80,6 @@ class GuardFiles(val dir: File) {
         private const val MAX_PIXELS = 7680L * 4320L
 
         /** The folder for the app running as this user: beside its settings and crash reports. */
-        fun forUser(): GuardFiles = GuardFiles(File(System.getProperty("user.home"), ".churchpresenter/output-guard"))
+        fun forUser(): GuardFiles = GuardFiles(File(System.getProperty("user.home"), ".apresenter/output-guard"))
     }
 }

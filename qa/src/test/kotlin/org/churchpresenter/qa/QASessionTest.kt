@@ -25,7 +25,7 @@ class QASessionTest {
     private var realHome: String? = null
     private val managers = mutableListOf<QAManager>()
 
-    private val stateFile: File get() = File(tempHome, ".churchpresenter/qa_state.json")
+    private val stateFile: File get() = File(tempHome, ".apresenter/qa_state.json")
 
     @BeforeTest
     fun isolateHome() {

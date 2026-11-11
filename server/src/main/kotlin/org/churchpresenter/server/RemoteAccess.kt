@@ -29,7 +29,7 @@ enum class RemoteAccess {
  *    Either way the operator is asked.
  *
  * Takes plain collections rather than `RemoteClientManager` on purpose: that class reads and writes
- * `~/.churchpresenter/remote_clients.json` in its constructor, so a test that built one would touch
+ * `~/.apresenter/remote_clients.json` in its constructor, so a test that built one would touch
  * the developer's real home directory.
  */
 fun remoteAccessDecision(

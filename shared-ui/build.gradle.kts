@@ -1,7 +1,7 @@
 plugins {
     id("cp.jvm-module")
     // Several of these classes read and write under `user.home`; the suite gets a home of its own under
-    // build/ so a test can never touch the real ~/.churchpresenter.
+    // build/ so a test can never touch the real ~/.apresenter.
     id("cp.test-home")
     // The strings and icons come from :strings and :icons; this module ships no resources of its own,
     // so it has no Res class to generate.

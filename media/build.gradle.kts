@@ -1,7 +1,7 @@
 plugins {
     id("cp.jvm-module")
     // Several of these classes read and write under `user.home` (recent media files); the suite
-    // gets a home of its own under build/ so a test can never touch the real ~/.churchpresenter.
+    // gets a home of its own under build/ so a test can never touch the real ~/.apresenter.
     id("cp.test-home")
     id("cp.compose")
     // Committed, beside the module, as :composeApp's, :shared-ui's and :slides' are.

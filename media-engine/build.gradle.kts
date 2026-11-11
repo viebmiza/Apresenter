@@ -1,7 +1,7 @@
 plugins {
     id("cp.jvm-module")
     // VideoFirstFrame and the player's caches read and write under `user.home`; the suite gets a home
-    // of its own under build/ so a test can never touch the real ~/.churchpresenter.
+    // of its own under build/ so a test can never touch the real ~/.apresenter.
     id("cp.test-home")
     id("cp.compose")
 }

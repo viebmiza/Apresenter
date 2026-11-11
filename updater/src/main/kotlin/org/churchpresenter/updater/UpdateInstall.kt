@@ -14,6 +14,8 @@ import kotlin.system.exitProcess
  * installer paths containing spaces need no shell quoting.
  */
 internal fun installerLaunchCommand(osName: String, path: String): List<String> = when {
+    // Direct .exe installers launch natively without msiexec.
+    osName.lowercase().contains("win") && path.endsWith(".exe", ignoreCase = true) -> listOf(path)
     // msiexec is the supported way to run an .msi; /i = install.
     osName.lowercase().contains("win") -> listOf("msiexec", "/i", path)
     // mounts the .dmg in Finder; same as what Desktop.open() does on mac.

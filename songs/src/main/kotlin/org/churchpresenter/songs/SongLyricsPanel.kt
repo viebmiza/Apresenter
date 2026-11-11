@@ -78,7 +78,9 @@ import org.churchpresenter.strings.generated.resources.go_live
 import org.churchpresenter.icons.generated.resources.ic_add
 import org.churchpresenter.icons.generated.resources.ic_note
 import org.churchpresenter.icons.generated.resources.ic_edit
+import org.churchpresenter.icons.generated.resources.ic_web
 import org.churchpresenter.strings.generated.resources.no_lyrics_available
+import org.churchpresenter.strings.generated.resources.online_song_search
 import org.churchpresenter.strings.generated.resources.songs_browse_paused_hint
 import org.churchpresenter.strings.generated.resources.tab_focus_lost
 import org.churchpresenter.strings.generated.resources.song_title_slide
@@ -307,6 +309,15 @@ private fun LyricsActionBar(
                 modifier = Modifier.guideTarget(GuideTargets.EDIT_SONG),
             )
         }
+
+        // Search online lyrics button
+        ActionIconButton(
+            onClick = { dialogs.searchOnline() },
+            tooltipText = stringResource(Res.string.online_song_search),
+            painter = painterResource(IconRes.drawable.ic_web),
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        )
 
         // New Song button
         ActionIconButton(

@@ -22,11 +22,11 @@ import kotlin.test.assertNull
  * a layer in it, and keeping it in step when layers or scenes are copied or removed.
  *
  * The same stub and state reset as `SceneViewModelTest`: `addScene()` reads `presenterScreenBounds()`,
- * which throws headless, and scenes persist to `~/.churchpresenter/scenes.json`.
+ * which throws headless, and scenes persist to `~/.apresenter/scenes.json`.
  */
 class SceneViewModelDualLayoutTest {
 
-    private val scenesFile = File(System.getProperty("user.home"), ".churchpresenter/scenes.json")
+    private val scenesFile = File(System.getProperty("user.home"), ".apresenter/scenes.json")
 
     @BeforeTest
     fun stubScreenBoundsAndClearState() {

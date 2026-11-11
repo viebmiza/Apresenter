@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
  * `user.home` at a throwaway `build/test-home` directory before any test runs (see
  * `composeApp/build.gradle.kts`), which is what [RecentColors] has therefore always resolved
  * against here — the same safeguard [CrashReporterTest][org.churchpresenter.diagnostics.CrashReporterTest]
- * relies on for its own `~/.churchpresenter` file, and the same reason this test manages its one
+ * relies on for its own `~/.apresenter` file, and the same reason this test manages its one
  * file/state directly rather than swapping `user.home` itself.
  *
  * `RecentColors` was widened from `private` to `internal` (and `load()` from `private` to
@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
  */
 class RecentColorsTest {
 
-    private val file = File(System.getProperty("user.home"), ".churchpresenter/recent_colors.json")
+    private val file = File(System.getProperty("user.home"), ".apresenter/recent_colors.json")
 
     @BeforeTest
     fun freshState() {

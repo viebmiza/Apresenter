@@ -413,7 +413,7 @@ private fun serviceSchedule(actions: ScheduleActions) {
 }
 
 /**
- * Writes the Q&A questions into `~/.churchpresenter/qa_state.json`, the same file `QAManager`
+ * Writes the Q&A questions into `~/.apresenter/qa_state.json`, the same file `QAManager`
  * reads at construction and writes back on every change — so they survive a settings dump rather
  * than living only in the preview run.
  *
@@ -495,7 +495,7 @@ internal fun writeQuestions() {
     )
     val list = ListSerializer(QuestionDto.serializer())
     val json = Json { encodeDefaults = true }
-    val file = File(System.getProperty("user.home"), ".churchpresenter/qa_state.json")
+    val file = File(System.getProperty("user.home"), ".apresenter/qa_state.json")
     file.parentFile?.mkdirs()
     // Both as finished sessions: a session never comes back running after a restart, so the live
     // one is resumed by [previewQAManager] once the manager has read the file.
@@ -520,7 +520,7 @@ internal fun previewQAManager(): QAManager = QAManager().also { it.resumeSession
  * `user.home` and MainDesktop builds it internally, so there is no instance to seed directly.
  */
 internal fun writeScenes() {
-    val file = File(System.getProperty("user.home"), ".churchpresenter/scenes.json")
+    val file = File(System.getProperty("user.home"), ".apresenter/scenes.json")
     file.parentFile?.mkdirs()
     file.writeText(Json { prettyPrint = false }.encodeToString(previewScenes()))
 }

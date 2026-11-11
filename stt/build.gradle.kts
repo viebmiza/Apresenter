@@ -1,7 +1,7 @@
 plugins {
     id("cp.jvm-module")
     // STTManager's capture and the training-data logs write under `user.home`; the suite gets a home of
-    // its own under build/ so a test can never touch the real ~/.churchpresenter.
+    // its own under build/ so a test can never touch the real ~/.apresenter.
     id("cp.test-home")
     id("cp.compose")
     id("cp.screenshots")

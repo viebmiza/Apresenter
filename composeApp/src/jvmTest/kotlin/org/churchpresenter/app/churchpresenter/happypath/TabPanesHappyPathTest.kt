@@ -42,7 +42,7 @@ class TabPanesHappyPathTest : HappyPathHarness() {
 
     private var savedRecent = emptyList<String>()
 
-    private val scenesFile get() = File(System.getProperty("user.home"), ".churchpresenter/scenes.json")
+    private val scenesFile get() = File(System.getProperty("user.home"), ".apresenter/scenes.json")
 
     @BeforeTest
     fun saveRecentDecks() {

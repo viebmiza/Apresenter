@@ -297,7 +297,7 @@ class WickPanelTest {
     fun `a Settings page with nothing to offer shows only the greeting`() = runComposeUiTest {
         settings = HelperSettings(tipsEnabled = true)
         wick(HelperState().apply { isOpen = true }, place = WickPlace.Settings(SettingsPage.ATEM))
-        onNodeWithText("Hi, I'm Wick", substring = true).assertExists()
+        onNodeWithText("Hi, I'm Timóteo", substring = true).assertExists()
         onNodeWithText("Suggestions").assertDoesNotExist()
         onNodeWithText("Tip of the day").assertDoesNotExist()
     }
@@ -344,7 +344,7 @@ class WickPanelTest {
         assertFalse(state.confirmingHide)
         onNodeWithTag("helper.hide").performClick()
         waitForIdle()
-        press("Hide Wick")
+        press("Hide Timóteo")
         assertFalse(settings.enabled)
     }
 

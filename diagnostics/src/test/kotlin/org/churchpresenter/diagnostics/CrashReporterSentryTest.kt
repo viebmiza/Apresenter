@@ -180,7 +180,7 @@ class CrashReporterSentryTest {
     @Test
     fun `an event's message is scrubbed of the user's home path`() {
         val event = SentryEvent().apply {
-            message = Message().apply { message = "could not read /Users/someone/.churchpresenter/songs" }
+            message = Message().apply { message = "could not read /Users/someone/.apresenter/songs" }
         }
 
         CrashReporter.scrubEvent(event)
@@ -222,7 +222,7 @@ class CrashReporterSentryTest {
     @Test
     fun `a linux home path is scrubbed too`() {
         val event = SentryEvent().apply {
-            message = Message().apply { message = "/home/someone/.churchpresenter" }
+            message = Message().apply { message = "/home/someone/.apresenter" }
         }
 
         CrashReporter.scrubEvent(event)
@@ -286,7 +286,7 @@ class CrashReporterSentryTest {
 
     @Test
     fun `a reported exception carries its context as the event message`() {
-        val crashDir = java.io.File(System.getProperty("user.home"), ".churchpresenter/crash-reports")
+        val crashDir = java.io.File(System.getProperty("user.home"), ".apresenter/crash-reports")
         crashDir.mkdirs()
         try {
             // Goes through the same writeCrashLog path a real caught error takes.
@@ -302,7 +302,7 @@ class CrashReporterSentryTest {
 
     @Test
     fun `an exception with no context is still reported`() {
-        val crashDir = java.io.File(System.getProperty("user.home"), ".churchpresenter/crash-reports")
+        val crashDir = java.io.File(System.getProperty("user.home"), ".apresenter/crash-reports")
         crashDir.mkdirs()
         try {
             // The blank-context path: nothing to put in the message, so none is set.
@@ -318,7 +318,7 @@ class CrashReporterSentryTest {
 
     @Test
     fun `a fatal crash is recorded at fatal level`() {
-        val crashDir = java.io.File(System.getProperty("user.home"), ".churchpresenter/crash-reports")
+        val crashDir = java.io.File(System.getProperty("user.home"), ".apresenter/crash-reports")
         crashDir.mkdirs()
         try {
             CrashReporter.writeCrashLog(OutOfMemoryError("heap"), "Thread: main", fatal = true)

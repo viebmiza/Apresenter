@@ -14,6 +14,7 @@ import org.churchpresenter.settings.AppSettings
 import org.churchpresenter.settings.profileFor
 import org.churchpresenter.settings.drivesNothing
 import org.churchpresenter.profiles.FileManager
+import org.churchpresenter.settings.utils.BrandConfig
 import org.churchpresenter.settings.utils.Constants
 import org.churchpresenter.settings.utils.UpdateCheckInterval
 import java.awt.GraphicsEnvironment
@@ -24,11 +25,8 @@ import org.churchpresenter.sharedui.utils.UsageEvent
 import org.churchpresenter.sharedui.utils.UsageEventStore
 
 /**
- * Sends an anonymous, city-level ping to the ChurchPresenter live world map
- * (churchpresenter.org/map) when the app is opened.
- *
- * No personal data is transmitted — Cloudflare derives a city-level coordinate
- * server-side from the network layer. No IP address is stored.
+ * Sends an anonymous, city-level ping to the configured Apresenter live map endpoint
+ * when the app is opened. Empty [BrandConfig.PING_URL] disables the remote ping cleanly.
  */
 object LiveMapReporter {
 
@@ -42,7 +40,7 @@ object LiveMapReporter {
         }
     }
 
-    private const val PING_URL = "https://www.churchpresenter.org/api/ping"
+    private const val PING_URL = BrandConfig.PING_URL
 
     // If the first ping fails (e.g. network isn't up yet at launch), retry a
     // few times in quick succession, then fall back to a slow, long-running
@@ -217,8 +215,9 @@ object LiveMapReporter {
         buildType: String = "",
         setup: SetupFacts = SetupFacts(),
         events: Map<UsageEvent, Int> = emptyMap(),
+        baseUrl: String = PING_URL,
     ): String = buildString {
-        append(PING_URL)
+        append(baseUrl)
         append("?platform=desktop")
         append("&os=$os")
         append("&version=$version")
@@ -256,7 +255,9 @@ object LiveMapReporter {
         events: Map<UsageEvent, Int> = emptyMap(),
         onDelivered: () -> Unit = {},
         send: suspend (url: String, installId: String?) -> Boolean = ::ping,
+        baseUrl: String = PING_URL,
     ) {
+        if (baseUrl.isBlank()) return
         scope.launch {
             // Gathered here rather than at the call site: it enumerates displays and scans the song
             // folder, neither of which belongs on the path between launching and showing a window.
@@ -268,7 +269,7 @@ object LiveMapReporter {
                 repoSlug = identity.repoSlug,
                 commit = identity.commitHash,
                 buildType = identity.buildType,
-                setup = setup(), events = events,
+                setup = setup(), events = events, baseUrl = baseUrl,
             )
             if (send(url, installId)) onDelivered()
         }
@@ -276,6 +277,7 @@ object LiveMapReporter {
 
     /** @return true once the server has taken the ping, false if every attempt failed. */
     internal suspend fun ping(url: String, installId: String?): Boolean {
+        if (url.isBlank() || url.startsWith("?")) return false
         suspend fun tryPing(): Boolean = try {
             http.get(url) {
                 if (!installId.isNullOrBlank()) header("X-Install-Id", installId)

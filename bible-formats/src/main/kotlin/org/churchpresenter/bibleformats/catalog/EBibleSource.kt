@@ -58,7 +58,7 @@ object EBibleSource : BibleSource {
     /** The archive is revised in batches, not continuously; a week keeps traffic negligible. */
     private const val CACHE_TTL_MILLIS = 7L * 24 * 60 * 60 * 1000
 
-    private val defaultCacheFile = File(System.getProperty("user.home"), ".churchpresenter/cache/ebible-catalog.csv")
+    private val defaultCacheFile = File(System.getProperty("user.home"), ".apresenter/cache/ebible-catalog.csv")
 
     @Volatile
     private var memoryCache: Pair<Long, List<BibleModule>>? = null

@@ -175,8 +175,8 @@ class SettingsCompanionMigrationTest {
     @Test
     fun `the range fields do not survive into the saved file`() {
         val manager = SettingsManager()
-        File(home, ".churchpresenter").mkdirs()
-        File(home, ".churchpresenter/settings.json").writeText(
+        File(home, ".apresenter").mkdirs()
+        File(home, ".apresenter/settings.json").writeText(
             """{"companionSatelliteConnections":[
                 {"tabStartRow":0,"tabEndRow":1,"tabStartColumn":0,"tabEndColumn":2}
             ]}""",
@@ -184,7 +184,7 @@ class SettingsCompanionMigrationTest {
 
         manager.saveSettings(manager.loadSettings())
 
-        val saved = File(home, ".churchpresenter/settings.json").readText()
+        val saved = File(home, ".apresenter/settings.json").readText()
         assertTrue("tabStartRow" !in saved, "a dead field left in the file would be migrated again on every load")
         assertTrue("tabEndColumn" !in saved)
         assertTrue("\"tabRows\":2" in saved, "and the size it stood for has to be there instead")
@@ -216,7 +216,7 @@ class SettingsCompanionMigrationTest {
 
         val json = SettingsManager().let { it.saveSettings(once); File(
             home,
-            ".churchpresenter/settings.json",
+            ".apresenter/settings.json",
         ).readText() }
         val twice = manager.migrateAndDecode(json.replace(Regex(""""settingsVersion":\d+,?"""), ""))
 
@@ -232,7 +232,7 @@ class SettingsCompanionMigrationTest {
         // The migrations are triggered by a substring match before the document is parsed, so a
         // file cut short mid-write still enters them. Each hands the text back untouched, and the
         // failure is then handled where every other unreadable settings file is.
-        val appDir = File(home, ".churchpresenter").also { it.mkdirs() }
+        val appDir = File(home, ".apresenter").also { it.mkdirs() }
         File(appDir, "settings.json").writeText(
             """{"theme":"dark","companionSatelliteConnections":[{"rows":2,"tabStartRow":0,"showBible":fal""",
         )

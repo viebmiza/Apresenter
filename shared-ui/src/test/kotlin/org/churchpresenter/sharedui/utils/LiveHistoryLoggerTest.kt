@@ -25,7 +25,7 @@ import kotlin.test.assertTrue
  */
 class LiveHistoryLoggerTest {
 
-    private val logDir get() = File(System.getProperty("user.home"), ".churchpresenter/bible-stt-logs")
+    private val logDir get() = File(System.getProperty("user.home"), ".apresenter/bible-stt-logs")
 
     @BeforeTest
     fun clearLogDir() {

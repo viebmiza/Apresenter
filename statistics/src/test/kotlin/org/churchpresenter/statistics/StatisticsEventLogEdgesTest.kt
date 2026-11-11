@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
 class StatisticsEventLogEdgesTest {
 
     private fun managerWith(home: File, log: PlayEventLog): StatisticsManager {
-        File(home, ".churchpresenter").apply { mkdirs() }
+        File(home, ".apresenter").apply { mkdirs() }
             .resolve("play_log.json")
             .writeText(Json.encodeToString(log))
         return StatisticsManager()

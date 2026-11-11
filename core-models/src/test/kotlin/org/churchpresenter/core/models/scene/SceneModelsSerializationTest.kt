@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 /**
  * The on-disk shape of a canvas scene.
  *
- * `SceneViewModel` writes every scene the user has built to `~/.churchpresenter/scenes.json` and
+ * `SceneViewModel` writes every scene the user has built to `~/.apresenter/scenes.json` and
  * reads it back on the next launch, so these classes are a file format, not just in-memory state.
  * A renamed field, a changed default or a changed polymorphic discriminator all compile perfectly
  * and lose the user's scenes silently — the sources come back missing, or the whole file fails to

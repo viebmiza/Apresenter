@@ -13,7 +13,7 @@ import org.churchpresenter.server.InstanceLinkViewModel
 /** Where fetched background image/video bytes are cached, keyed by slot — BackgroundConfig's
  *  image/video fields need a local path, not bytes, same reasoning as [instanceLinkPictureCacheDir]. */
 internal val instanceLinkBackgroundCacheDir: File by lazy {
-    File(System.getProperty("user.home"), ".churchpresenter/instance-link/cache/backgrounds").apply { mkdirs() }
+    File(System.getProperty("user.home"), ".apresenter/instance-link/cache/backgrounds").apply { mkdirs() }
 }
 
 /**

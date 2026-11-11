@@ -21,7 +21,7 @@ import org.churchpresenter.core.models.schedule.RowTiming
  * IMPORTANT: [ScheduleViewModel] resolves its autosave path from `user.home` **at construction**,
  * and `newSchedule()` deletes that file. Every test therefore builds its ViewModel while
  * `user.home` points at a throwaway directory, so a test run can never delete the developer's
- * real `~/.churchpresenter/autosave_schedule.tmp`.
+ * real `~/.apresenter/autosave_schedule.tmp`.
  */
 class ScheduleViewModelTest {
 

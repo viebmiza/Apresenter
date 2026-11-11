@@ -79,7 +79,7 @@ internal class PictureLibrary {
      * in-memory entry whose folder-id belongs to it (any date, plus legacy flat entries).
      */
     fun clearDeviceUploads() {
-        File(System.getProperty("user.home"), ".churchpresenter/device_uploads").deleteRecursively()
+        File(System.getProperty("user.home"), ".apresenter/device_uploads").deleteRecursively()
         files.keys
             .filter { it == DEVICE_UPLOADS_FOLDER_ID || it.startsWith("${DEVICE_UPLOADS_FOLDER_ID}_") }
             .forEach { id -> files.remove(id); catalogs.remove(id) }

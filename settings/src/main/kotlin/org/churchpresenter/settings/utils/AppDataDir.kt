@@ -5,7 +5,7 @@ import java.io.File
 /**
  * Where the app keeps everything it persists — settings, the bundled Bible, presets.
  *
- * This is `~/.churchpresenter` on every machine where the home directory is usable, which is very
+ * This is `~/.apresenter` on every machine where the home directory is usable, which is very
  * nearly all of them. It is not universally usable: a Windows profile that is redirected, roaming
  * or simply absent leaves `user.home` pointing at a path that cannot be created, and the first
  * thing to notice was the startup step that writes the bundled KJV out — it failed with a bare
@@ -32,10 +32,10 @@ import java.io.File
 object AppDataDir {
 
     /** The home-relative name, kept for the overwhelmingly common case. */
-    private const val HOME_FOLDER = ".churchpresenter"
+    private const val HOME_FOLDER = BrandConfig.HOME_FOLDER
 
     /** The name used under a platform application-data folder, where a dotfile would be odd. */
-    private const val APP_FOLDER = "ChurchPresenter"
+    private const val APP_FOLDER = BrandConfig.APP_FOLDER
 
     /** What the last [resolve] for the process's own `user.home` came to, and for which home. */
     private class Resolution(val homeDir: String?, val folder: File)

@@ -190,7 +190,7 @@ class SongsTabGoLiveTelemetryTest {
                 )
                 LiveHistoryLogger.flush()
 
-                val line = File(tempHome, ".churchpresenter/bible-stt-logs/live-content-songs-tab-history.jsonl")
+                val line = File(tempHome, ".apresenter/bible-stt-logs/live-content-songs-tab-history.jsonl")
                     .readLines().last().let { Json.parseToJsonElement(it).jsonObject }
                 assertEquals("Hymnal::2", line["songId"]?.jsonPrimitive?.content)
                 assertEquals("manual", line["source"]?.jsonPrimitive?.content)

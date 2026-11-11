@@ -137,12 +137,9 @@ BEEN ADVISED.
 
 11. TRADEMARKS AND BRANDING
 
-The Church Presenter name, logos, graphics, website design elements, and
-related branding may be protected by trademarks or other intellectual property
-laws. GPLv3 does not grant rights to use Church Presenter trademarks or
-branding in a manner that implies endorsement, sponsorship, or official
-affiliation. Modified versions of the Software should not be represented as
-official Church Presenter releases without permission.
+Apresenter is distributed by Mizael G Nascimento as a branded derivative built on
+open-source GPLv3 software. All third-party trademarks and upstream project names
+belong to their respective owners, and GPLv3 terms apply to all distributed source.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -165,8 +162,8 @@ governing the distribution and use of software.
 14. GOVERNING LAW
 
 To the extent permitted by applicable law, this Agreement shall be governed by
-the laws applicable to the Church Presenter Project's principal place of
-operation, without regard to conflict-of-law principles.
+the laws applicable to the distributor's principal place of operation, without
+regard to conflict-of-law principles.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -179,8 +176,8 @@ licenses, constitutes the entire agreement governing your use of the Software.
 
 16. CONTACT INFORMATION
 
-Church Presenter Project
-Website: https://churchpresenter.org
-GitHub:  https://github.com/ChurchPresenter/ChurchPresenter
+Apresenter — Mizael G Nascimento
+Email:   raquelanascimento@gmail.com
+GitHub:  https://github.com/viebmiza/Apresenter
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

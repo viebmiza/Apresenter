@@ -15,7 +15,7 @@ internal object BandConfigStorage {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     private fun file(): File {
-        val dir = File(System.getProperty("user.home"), ".churchpresenter/churchpresenter-lottiegen")
+        val dir = File(System.getProperty("user.home"), ".apresenter/churchpresenter-lottiegen")
         dir.mkdirs()
         return File(dir, "bible-band-last.json")
     }

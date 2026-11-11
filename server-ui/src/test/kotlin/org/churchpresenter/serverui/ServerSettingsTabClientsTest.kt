@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
  * Drives the Remote Clients card: the allow and block lists, the friendly-name editor and Remove.
  *
  * These rows are the one part of the tab whose state lives outside the settings object —
- * `RemoteClientManager` owns it and persists it to `~/.churchpresenter/remote_clients.json`. Every
+ * `RemoteClientManager` owns it and persists it to `~/.apresenter/remote_clients.json`. Every
  * test therefore asserts against the *manager* rather than against `AppSettings`, and runs inside its
  * own temporary home so nothing it writes escapes or leaks into the next test.
  *

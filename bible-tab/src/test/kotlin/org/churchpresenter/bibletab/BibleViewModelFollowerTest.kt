@@ -36,7 +36,7 @@ class BibleViewModelFollowerTest {
 
     /** Must match BibleViewModel's own path — note the plural "bibles". */
     private val cacheDir: File
-        get() = File(System.getProperty("user.home"), ".churchpresenter/instance-link/cache/bibles")
+        get() = File(System.getProperty("user.home"), ".apresenter/instance-link/cache/bibles")
 
     @BeforeTest
     fun setUp() {

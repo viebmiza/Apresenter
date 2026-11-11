@@ -43,7 +43,7 @@ class ContactReporterSubmitTest {
             val outcome = runBlocking { ContactReporter.submit(request, "26.1.0", endpoint) }
 
             assertEquals(ContactReporter.Outcome.Success, outcome)
-            assertEquals("ChurchPresenter/26.1.0", received.userAgent)
+            assertEquals("Apresenter/26.1.0", received.userAgent)
             assertTrue("\"message\":\"hello\"" in received.body, received.body)
         }
 

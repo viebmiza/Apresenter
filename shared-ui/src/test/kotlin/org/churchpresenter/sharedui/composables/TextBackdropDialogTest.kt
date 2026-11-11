@@ -35,7 +35,7 @@ import kotlin.test.assertTrue
  */
 class TextBackdropDialogTest {
 
-    private val savedFile = File(System.getProperty("user.home"), ".churchpresenter/saved_backdrops.json")
+    private val savedFile = File(System.getProperty("user.home"), ".apresenter/saved_backdrops.json")
 
     @BeforeTest
     fun freshPresets() {

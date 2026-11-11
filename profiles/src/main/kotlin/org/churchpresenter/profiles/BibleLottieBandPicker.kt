@@ -282,7 +282,7 @@ private fun stockBackgroundsDir(): java.nio.file.Path {
     return (if (dir.isDirectory) dir else File(System.getProperty("user.home"))).toPath()
 }
 
-private const val STOCK_BACKGROUNDS_DIR = ".churchpresenter/stock-backgrounds"
+private const val STOCK_BACKGROUNDS_DIR = ".apresenter/stock-backgrounds"
 
 /** The template files in [dir] by name, after the no-template entry; [current] is kept even from outside it. */
 internal fun templateOptions(dir: File?, current: String, noneLabel: String): List<Pair<String, String>> {

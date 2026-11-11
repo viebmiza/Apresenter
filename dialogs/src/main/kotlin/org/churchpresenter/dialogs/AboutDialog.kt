@@ -100,11 +100,11 @@ fun AboutDialog(
 
 /** The GitHub issue template the "Report a Bug" button opens, and its copy button copies. */
 internal const val BUG_REPORT_URL =
-    "https://github.com/ChurchPresenter/ChurchPresenter/issues/new?template=bug_report.md"
+    org.churchpresenter.settings.utils.BrandConfig.BUG_REPORT_URL
 
 /** The GitHub issue template behind "Feature Request". */
 internal const val FEATURE_REQUEST_URL =
-    "https://github.com/ChurchPresenter/ChurchPresenter/issues/new?template=feature_request.md"
+    org.churchpresenter.settings.utils.BrandConfig.FEATURE_REQUEST_URL
 
 /** One GitHub issue template: a full-width button that opens it, and a button that copies it. */
 @Composable
@@ -211,7 +211,7 @@ fun AboutDialogContent(
                     shape = AppShape(6.dp),
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
-                        val crashDir = File(System.getProperty("user.home"), ".churchpresenter/crash-reports")
+                        val crashDir = File(System.getProperty("user.home"), ".apresenter/crash-reports")
                         // Making the folder and asking the OS to open it both wait on the disk.
                         scope.launch(Dispatchers.IO) {
                             crashDir.mkdirs()
@@ -275,7 +275,7 @@ private fun SaveDiagnosticInfoButton(appSettings: AppSettings, identity: Telemet
             saveCoroutineScope.launch {
                 var path = FileChooser.platformInstance.save(
                     location = null,
-                    suggestedName = "churchpresenter-diagnostic-info.txt",
+                    suggestedName = "apresenter-diagnostic-info.txt",
                     filters = listOf(FileNameExtensionFilter("Text (*.txt)", "txt")),
                     title = saveTitle
                 )

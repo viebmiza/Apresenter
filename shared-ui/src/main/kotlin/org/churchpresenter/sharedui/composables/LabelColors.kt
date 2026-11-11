@@ -86,7 +86,7 @@ fun themeLabelPresets(): List<LabelColors> {
  */
 object RecentLabelColors {
     private const val MAX = 8
-    private fun file() = File(System.getProperty("user.home"), ".churchpresenter/recent_label_colors.json")
+    private fun file() = File(System.getProperty("user.home"), ".apresenter/recent_label_colors.json")
 
     val combos = mutableStateListOf<LabelColors>()
 

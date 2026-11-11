@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
  * What the tunnel does with a running `cloudflared`: scraping the public URL out of its output, and
  * what each way the process can end means to the operator.
  *
- * No download and no real tunnel. `TunnelManager` resolves `~/.churchpresenter/cloudflared` at
+ * No download and no real tunnel. `TunnelManager` resolves `~/.apresenter/cloudflared` at
  * construction and skips the download when that file already exists and `cloudflared.version` beside
  * it names the pinned release, so a shell script written there with that marker before the manager is
  * built *is* the binary as far as production code is concerned — the real
@@ -61,7 +61,7 @@ class TunnelManagerProcessTest {
         tempHome.deleteRecursively()
     }
 
-    private val dataDir: File get() = File(tempHome, ".churchpresenter")
+    private val dataDir: File get() = File(tempHome, ".apresenter")
     private val binary: File get() = File(dataDir, "cloudflared")
 
     /** Writes the stand-in `cloudflared`. Must be called before the manager is constructed. */

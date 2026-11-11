@@ -24,7 +24,7 @@ const val MASK_NUMBER = "[number]"
 const val MAX_TRANSCRIPT_CHARS = 20_000
 
 private const val OPERATOR_LABEL = "You"
-private const val WICK_LABEL = "Wick"
+private const val WICK_LABEL = "Timóteo"
 
 private val QUOTED = Regex("""["“”«„]([^"“”«»„]+)["“”»]""")
 

@@ -36,7 +36,7 @@ import org.churchpresenter.app.churchpresenter.viewmodel.rawHeader
 /** Where fetched picture bytes are cached so PresenterManager.setSelectedImagePath (which needs a
  *  local path, not bytes) can display them like any other local file. */
 internal val instanceLinkPictureCacheDir: File by lazy {
-    File(System.getProperty("user.home"), ".churchpresenter/instance-link/cache/pictures").apply { mkdirs() }
+    File(System.getProperty("user.home"), ".apresenter/instance-link/cache/pictures").apply { mkdirs() }
 }
 
 /**

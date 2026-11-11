@@ -79,7 +79,7 @@ class CompanionServerQaTest {
 
         /** The state file `QAManager` restores itself from, under the test JVM's own home. */
         private val qaStateFile
-            get() = File(System.getProperty("user.home"), ".churchpresenter/qa_state.json")
+            get() = File(System.getProperty("user.home"), ".apresenter/qa_state.json")
 
         @JvmStatic
         @BeforeClass

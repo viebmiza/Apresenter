@@ -72,7 +72,7 @@ configurations.configureEach {
     }
 }
 
-// The suite gets a home of its own under build/ so a test can never touch the real ~/.churchpresenter.
+// The suite gets a home of its own under build/ so a test can never touch the real ~/.apresenter.
 // One fork: the suites bind real loopback ports, and in a single JVM no two of them run at once.
 tasks.withType<Test>().configureEach {
     val testHome = layout.buildDirectory.dir("test-home").get().asFile

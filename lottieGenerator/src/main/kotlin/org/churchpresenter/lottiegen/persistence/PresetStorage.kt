@@ -11,7 +11,7 @@ object PresetStorage {
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
     private fun presetsFile(): File {
-        val dir = File(System.getProperty("user.home"), ".churchpresenter/churchpresenter-lottiegen")
+        val dir = File(System.getProperty("user.home"), ".apresenter/churchpresenter-lottiegen")
         dir.mkdirs()
         return File(dir, "presets.json")
     }

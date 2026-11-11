@@ -29,7 +29,7 @@ import kotlin.test.assertTrue
  * good doesn't leave megabytes of rendered JPEGs behind). Getting the flag backwards is invisible
  * until a disk fills up or an operator wonders why a re-added deck re-renders every time.
  *
- * Slides render for real from real PDFs, into `~/.churchpresenter/slides/` under the test home.
+ * Slides render for real from real PDFs, into `~/.apresenter/slides/` under the test home.
  * Each test builds its own document so cache entries never collide with another test's.
  */
 class PresentationViewModelDeckSwitchingTest {

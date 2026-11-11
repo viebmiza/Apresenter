@@ -204,7 +204,7 @@ class PicturesTabOptionsTest {
     fun `a scheduled folder from another machine is fetched over Instance Link`() {
         val cache = File(
             System.getProperty("user.home"),
-            ".churchpresenter/instance-link/cache/picture-folders/" +
+            ".apresenter/instance-link/cache/picture-folders/" +
                 "/elsewhere/Remote".hashCode().toUInt().toString(16),
         )
         cache.deleteRecursively()

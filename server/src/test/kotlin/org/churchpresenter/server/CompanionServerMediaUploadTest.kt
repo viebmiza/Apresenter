@@ -41,7 +41,7 @@ import kotlin.test.assertTrue
  * The media path also has to survive two phones sending the same file name: the second is renamed
  * rather than replacing the first, and a name carrying a path cannot escape the upload folder.
  *
- * `user.home` is redirected for the class, since both endpoints write under `~/.churchpresenter`.
+ * `user.home` is redirected for the class, since both endpoints write under `~/.apresenter`.
  *
  * Not covered here: what happens to a *deck* after it is saved — parsing and rasterising it needs a
  * real PowerPoint or Keynote file through `DeckRasterizer`. Only the validation in front of that is
@@ -87,10 +87,10 @@ class CompanionServerMediaUploadTest {
         }
 
         private val mediaDir: File
-            get() = File(System.getProperty("user.home"), ".churchpresenter/device_media")
+            get() = File(System.getProperty("user.home"), ".apresenter/device_media")
 
         private val deckDir: File
-            get() = File(System.getProperty("user.home"), ".churchpresenter/device_presentations")
+            get() = File(System.getProperty("user.home"), ".apresenter/device_presentations")
     }
 
     @BeforeTest

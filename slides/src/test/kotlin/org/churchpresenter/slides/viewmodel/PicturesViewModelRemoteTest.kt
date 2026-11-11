@@ -85,7 +85,7 @@ class PicturesViewModelRemoteTest {
     private val PicturesViewModel.names: List<String> get() = images.map { it.name }
 
     private fun cacheDir(folderId: String) =
-        File(tempHome, ".churchpresenter/instance-link/cache/picture-folders/$folderId")
+        File(tempHome, ".apresenter/instance-link/cache/picture-folders/$folderId")
 
     // ── Downloading a mirrored folder ───────────────────────────────────────────
 

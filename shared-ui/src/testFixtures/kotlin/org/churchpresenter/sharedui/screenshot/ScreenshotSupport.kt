@@ -383,7 +383,7 @@ private fun BufferedImage.trimmed(margin: Int = 8): BufferedImage {
 /**
  * Empties the color picker's "Recent" row for one test class, and puts it back.
  *
- * [RecentColors] is a JVM-wide singleton loaded from `~/.churchpresenter/recent_colors.json` at class
+ * [RecentColors] is a JVM-wide singleton loaded from `~/.apresenter/recent_colors.json` at class
  * init and appended to by every picker anyone confirms — so the row a picker draws is whatever the
  * machine and the tests that ran before happened to leave there. That is not a hypothetical: it is
  * why `bibleSettingsTab/colour_picker.png` and `songSettingsTab/colour_picker.png` were two of the

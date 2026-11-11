@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 /** What the next start makes of a run that ended under the app: the JVM's crash file and its summary. */
 class UncleanExitTest {
     private val root: File = Files.createTempDirectory("unclean-exit").toFile()
-    private val crashDir = File(File(System.getProperty("user.home"), ".churchpresenter"), "crash-reports")
+    private val crashDir = File(File(System.getProperty("user.home"), ".apresenter"), "crash-reports")
 
     @AfterTest
     fun cleanUp() {

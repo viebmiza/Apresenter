@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
  * turn them back on or hide the strip.
  *
  * Every parameter is pinned here rather than left to default. The defaults read the JVM-wide
- * `CrashReporter` singleton and the crash-count file under `~/.churchpresenter`, so a test that let
+ * `CrashReporter` singleton and the crash-count file under `~/.apresenter`, so a test that let
  * them stand would be asserting on process state another fork can change — and forcing that state
  * would mean the ad-hoc singleton seam `AGENT.md` rules out. **The defaults themselves are
  * therefore not covered here**; `CrashReporterStartupTest` in `:diagnostics` covers what they read.

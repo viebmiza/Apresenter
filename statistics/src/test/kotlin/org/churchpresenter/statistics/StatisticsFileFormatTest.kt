@@ -29,8 +29,8 @@ class StatisticsFileFormatTest {
     private lateinit var tempHome: File
     private var realHome: String? = null
 
-    private val statsFile: File get() = File(tempHome, ".churchpresenter/statistics.json")
-    private val logFile: File get() = File(tempHome, ".churchpresenter/play_log.json")
+    private val statsFile: File get() = File(tempHome, ".apresenter/statistics.json")
+    private val logFile: File get() = File(tempHome, ".apresenter/play_log.json")
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
@@ -39,7 +39,7 @@ class StatisticsFileFormatTest {
         realHome = System.getProperty("user.home")
         tempHome = Files.createTempDirectory("cp-statistics-format-test").toFile()
         System.setProperty("user.home", tempHome.absolutePath)
-        File(tempHome, ".churchpresenter").mkdirs()
+        File(tempHome, ".apresenter").mkdirs()
     }
 
     @AfterTest

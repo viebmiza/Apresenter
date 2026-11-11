@@ -47,7 +47,7 @@ class AppDataDirTest {
 
         val resolved = AppDataDir.resolve(homeDir = home.path, osName = "Mac OS X", tempDir = scratch.path)
 
-        assertEquals(File(home, ".churchpresenter").canonicalFile, resolved.canonicalFile)
+        assertEquals(File(home, ".apresenter").canonicalFile, resolved.canonicalFile)
         assertTrue(resolved.isDirectory, "the resolved directory is created")
     }
 
@@ -62,7 +62,7 @@ class AppDataDirTest {
             env = { name -> if (name == "LOCALAPPDATA") localAppData.path else null }
         )
 
-        assertEquals(File(localAppData, "ChurchPresenter").canonicalFile, resolved.canonicalFile)
+        assertEquals(File(localAppData, "Apresenter").canonicalFile, resolved.canonicalFile)
         assertTrue(resolved.isDirectory)
     }
 
@@ -77,7 +77,7 @@ class AppDataDirTest {
             env = { name -> if (name == "XDG_DATA_HOME") xdg.path else null }
         )
 
-        assertEquals(File(xdg, "ChurchPresenter").canonicalFile, resolved.canonicalFile)
+        assertEquals(File(xdg, "Apresenter").canonicalFile, resolved.canonicalFile)
     }
 
     @Test
@@ -89,7 +89,7 @@ class AppDataDirTest {
             env = { null }
         )
 
-        assertEquals(File(scratch, "ChurchPresenter").canonicalFile, resolved.canonicalFile)
+        assertEquals(File(scratch, "Apresenter").canonicalFile, resolved.canonicalFile)
     }
 
     @Test
@@ -100,7 +100,7 @@ class AppDataDirTest {
 
         val resolved = AppDataDir.resolve(homeDir = home, osName = "Linux", tempDir = null, env = { null })
 
-        assertEquals(File(home, ".churchpresenter"), resolved)
+        assertEquals(File(home, ".apresenter"), resolved)
         assertTrue(!resolved.exists())
     }
 
@@ -128,7 +128,7 @@ class AppDataDirTest {
 
         val resolved = AppDataDir.resolveForRun(home.path)
 
-        assertEquals(File(home, ".churchpresenter").canonicalFile, resolved.canonicalFile)
+        assertEquals(File(home, ".apresenter").canonicalFile, resolved.canonicalFile)
         assertTrue(resolved.isDirectory)
     }
 }

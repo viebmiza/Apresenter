@@ -64,4 +64,13 @@ class UpdateInstallTest {
             installAndQuit(installer, launch = { throw SecurityException() }, quit = {}),
         )
     }
+
+    @Test
+    fun `windows launches exe directly and msi through msiexec`() {
+        assertEquals(listOf("C:\\tmp\\Apresenter.exe"), installerLaunchCommand("Windows 11", "C:\\tmp\\Apresenter.exe"))
+        assertEquals(
+            listOf("msiexec", "/i", "C:\\tmp\\Apresenter.msi"),
+            installerLaunchCommand("Windows 11", "C:\\tmp\\Apresenter.msi"),
+        )
+    }
 }

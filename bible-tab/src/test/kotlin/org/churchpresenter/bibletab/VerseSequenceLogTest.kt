@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
  *
  * Time is injected, so the 90-minute session boundary is asserted by moving a fake clock rather
  * than by waiting; no test here sleeps. The store is a per-test temp file, so nothing touches the
- * developer's own `~/.churchpresenter`.
+ * developer's own `~/.apresenter`.
  */
 class VerseSequenceLogTest {
 

@@ -196,14 +196,14 @@ internal fun plantAutoSave(vararg titles: String) {
     // whatever the model actually declares, rather than a string this fixture guesses at.
     val itemsJson = itemsJsonFormat
         .encodeToString(ListSerializer(ScheduleItem.serializer()), items)
-    val file = File(System.getProperty("user.home"), ".churchpresenter/autosave_schedule.tmp")
+    val file = File(System.getProperty("user.home"), ".apresenter/autosave_schedule.tmp")
     file.parentFile.mkdirs()
     file.writeText("""{"version":2,"items":$itemsJson,"notes":{}}""")
 }
 
 /** Whether the autosave the tab was offered is still on disk. */
 internal fun autoSaveExists(): Boolean =
-    File(System.getProperty("user.home"), ".churchpresenter/autosave_schedule.tmp").exists()
+    File(System.getProperty("user.home"), ".apresenter/autosave_schedule.tmp").exists()
 
 /** A service order with one of each item type the row renderer draws differently. */
 internal fun ScheduleViewModel.seedService() {

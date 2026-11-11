@@ -1,7 +1,7 @@
 plugins {
     id("cp.jvm-module")
     // The Bible picker scans `user.home`; the suite gets a home of its own under build/ so a test can
-    // never touch the real ~/.churchpresenter.
+    // never touch the real ~/.apresenter.
     id("cp.test-home")
     // The strings and icons come from :strings and :icons. The dictionary's own data files are plain
     // classpath resources under src/main/resources/dictionary, read through DictionaryFiles.

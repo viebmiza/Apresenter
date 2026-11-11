@@ -24,13 +24,13 @@ import kotlin.test.assertTrue
  * in a test JVM — that top-level function is stubbed with `mockkStatic` on its file class
  * (`ConstantsKt`), which is what makes this ViewModel testable at all.
  *
- * The ViewModel also persists to `~/.churchpresenter/scenes.json` and reloads it in `init`, so
+ * The ViewModel also persists to `~/.apresenter/scenes.json` and reloads it in `init`, so
  * that file is deleted before each test to stop scenes leaking between them (and between runs —
  * `build/test-home` survives).
  */
 class SceneViewModelTest {
 
-    private val scenesFile = File(System.getProperty("user.home"), ".churchpresenter/scenes.json")
+    private val scenesFile = File(System.getProperty("user.home"), ".apresenter/scenes.json")
 
     @BeforeTest
     fun stubScreenBoundsAndClearState() {

@@ -349,7 +349,7 @@ fun main(args: Array<String>) {
     if (CefManager.macOsUnsupported) CrashReporter.setTag("jcef.macos_unsupported", "true")
     if (CefManager.windowsUnsupported) CrashReporter.setTag("jcef.windows_unsupported", "true")
 
-    io.github.vinceglb.filekit.FileKit.init(appId = "ChurchPresenter")
+    io.github.vinceglb.filekit.FileKit.init(appId = "Apresenter")
 
     Thread { AutoStartManager.syncRegistration() }.apply { isDaemon = true }.start()
 

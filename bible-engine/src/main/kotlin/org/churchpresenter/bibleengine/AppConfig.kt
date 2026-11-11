@@ -40,7 +40,7 @@ object AppConfig {
     }
 
     fun discoverBibleRoot(): String? {
-        val f = File(System.getProperty("user.home"), ".churchpresenter/settings.json")
+        val f = File(System.getProperty("user.home"), ".apresenter/settings.json")
         if (!f.exists()) return null
         return runCatching {
             val obj = jsonParser.parseToJsonElement(f.readText()).jsonObject
@@ -61,7 +61,7 @@ object AppConfig {
             stt.server.url=
 
             # Path to the Bible SPB files folder.
-            # Leave blank to auto-discover from ~/.churchpresenter/settings.json
+            # Leave blank to auto-discover from ~/.apresenter/settings.json
             # Example (Windows): bible.root=C:\Users\YourName\Documents\Bibles
             # Example (Mac/Linux): bible.root=/home/yourname/Documents/Bibles
             bible.root=

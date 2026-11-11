@@ -240,7 +240,7 @@ open class DeckLinkBridge internal constructor(
 
         // Also check saved scenes file as fallback
         return try {
-            val appDataDir = System.getProperty("user.home") + "/.churchpresenter"
+            val appDataDir = System.getProperty("user.home") + "/.apresenter"
             val scenesFile = java.io.File(appDataDir, "scenes.json")
             if (scenesFile.exists()) {
                 val json = scenesFile.readText()

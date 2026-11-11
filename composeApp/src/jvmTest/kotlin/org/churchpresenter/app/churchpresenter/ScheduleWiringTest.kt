@@ -26,7 +26,7 @@ import kotlin.test.assertTrue
 
 class ScheduleWiringTest : MainDesktopComposeHarness() {
 
-    private val scenesFile get() = File(System.getProperty("user.home"), ".churchpresenter/scenes.json")
+    private val scenesFile get() = File(System.getProperty("user.home"), ".apresenter/scenes.json")
 
     @BeforeTest
     fun clearScenes() {

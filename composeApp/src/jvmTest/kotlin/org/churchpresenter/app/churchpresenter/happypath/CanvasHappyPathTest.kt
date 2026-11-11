@@ -21,7 +21,7 @@ import kotlin.test.assertEquals
 class CanvasHappyPathTest : HappyPathHarness() {
 
     /** Where `SceneViewModel` keeps the scenes: this fork's home, shared with every other suite. */
-    private val scenesFile get() = File(System.getProperty("user.home"), ".churchpresenter/scenes.json")
+    private val scenesFile get() = File(System.getProperty("user.home"), ".apresenter/scenes.json")
 
     @BeforeTest
     fun clearScenes() {

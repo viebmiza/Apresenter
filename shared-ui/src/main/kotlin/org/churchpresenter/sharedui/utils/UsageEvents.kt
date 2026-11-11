@@ -305,7 +305,7 @@ open class UsageEventStore(private val fileProvider: () -> File) {
     }
 }
 
-/** The app-wide store, in `~/.churchpresenter/` alongside the crash reports and Q&A state. */
+/** The app-wide store, in `~/.apresenter/` alongside the crash reports and Q&A state. */
 object UsageEvents : UsageEventStore({
-    File(System.getProperty("user.home"), ".churchpresenter/usage-events.json")
+    File(System.getProperty("user.home"), ".apresenter/usage-events.json")
 })

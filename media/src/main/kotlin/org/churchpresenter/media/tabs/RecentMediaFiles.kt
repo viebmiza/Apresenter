@@ -11,12 +11,12 @@ import org.churchpresenter.core.models.io.writeTextAtomically
  * and [pinned]. [file], [pinnedFile] and [load] are `internal var`/`internal fun` for the same
  * reason: a test points them at a temp dir before calling [add]/[togglePin]/[clear]/[load], so the
  * real read/write logic runs without ever touching the developer's own recent/pinned JSON files
- * under `~/.churchpresenter`. Nothing else is widened.
+ * under `~/.apresenter`. Nothing else is widened.
  */
 object RecentMediaFiles {
     private const val MAX = 10
-    internal var file = java.io.File(System.getProperty("user.home"), ".churchpresenter/recent_media_files.json")
-    internal var pinnedFile = java.io.File(System.getProperty("user.home"), ".churchpresenter/pinned_media_files.json")
+    internal var file = java.io.File(System.getProperty("user.home"), ".apresenter/recent_media_files.json")
+    internal var pinnedFile = java.io.File(System.getProperty("user.home"), ".apresenter/pinned_media_files.json")
     val paths = mutableStateListOf<String>()
     val pinned = mutableStateListOf<String>()
 

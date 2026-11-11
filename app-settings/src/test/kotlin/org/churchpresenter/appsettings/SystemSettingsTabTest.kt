@@ -976,7 +976,7 @@ class SystemSettingsTabTest {
 
     /** The settings file the tab's own buttons read and write, under the test home. */
     private fun settingsFile() =
-        File(System.getProperty("user.home"), ".churchpresenter/settings.json")
+        File(System.getProperty("user.home"), ".apresenter/settings.json")
 
     @Test
     fun `Export Settings writes the settings to the chosen file as json`() = runComposeUiTest {
@@ -1045,7 +1045,7 @@ class SystemSettingsTabTest {
 
     @Test
     fun `Clear Remote Uploads deletes the device uploads folder once confirmed`() = runComposeUiTest {
-        val uploads = File(System.getProperty("user.home"), ".churchpresenter/device_uploads")
+        val uploads = File(System.getProperty("user.home"), ".apresenter/device_uploads")
         uploads.mkdirs()
         File(uploads, "photo.jpg").writeText("data")
         stubSwingDialogs(confirmAnswer = JOptionPane.YES_OPTION)
@@ -1064,7 +1064,7 @@ class SystemSettingsTabTest {
 
     @Test
     fun `Clear Remote Uploads keeps the uploads when declined`() = runComposeUiTest {
-        val uploads = File(System.getProperty("user.home"), ".churchpresenter/device_uploads")
+        val uploads = File(System.getProperty("user.home"), ".apresenter/device_uploads")
         uploads.mkdirs()
         val photo = File(uploads, "photo.jpg").apply { writeText("data") }
         stubSwingDialogs(confirmAnswer = JOptionPane.NO_OPTION)

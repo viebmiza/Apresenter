@@ -316,7 +316,7 @@ class SystemSettingsActionsTest {
 
     // ── Clear remote uploads ────────────────────────────────────────────────────
 
-    private val appDir get() = File(home, ".churchpresenter")
+    private val appDir get() = File(home, ".apresenter")
 
     private fun uploads(): List<File> = listOf("device_uploads", "device_presentations", "device_media").map {
         File(appDir, "$it/phone/file.bin").apply { parentFile.mkdirs(); writeText("x") }.parentFile.parentFile

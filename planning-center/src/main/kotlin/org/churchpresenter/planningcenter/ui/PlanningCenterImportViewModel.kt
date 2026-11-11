@@ -272,7 +272,7 @@ class PlanningCenterImportViewModel(
     }
 
     /**
-     * Downloads one attachment to `~/.churchpresenter/planning_center_cache/<planId>/<itemId>/`
+     * Downloads one attachment to `~/.apresenter/planning_center_cache/<planId>/<itemId>/`
      * and classifies it by extension into the schedule item type it should become. `pptx`/`ppt`/
      * `key`/`pdf` slide counts come from [PlanningCenterImportServices.countSlides]. Null on any
      * download failure or unrecognized extension.
@@ -289,7 +289,7 @@ class PlanningCenterImportViewModel(
 
         val cacheDir = File(
             System.getProperty("user.home"),
-            ".churchpresenter/planning_center_cache/$planId/$itemId"
+            ".apresenter/planning_center_cache/$planId/$itemId"
         )
         val destination = File(cacheDir, attachment.filename)
         val outcome = PlanningCenterClient.downloadFile(resolvedUrl, destination)

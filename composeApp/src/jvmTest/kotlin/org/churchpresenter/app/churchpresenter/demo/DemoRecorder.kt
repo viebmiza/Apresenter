@@ -199,7 +199,7 @@ internal fun recordTour(
     TestSingletons.latchSkikoHostOs()
     TestSingletons.latchToTestHome()
     // A previous tour's schedule autosave would open every recording on "Restore unsaved schedule?".
-    File(System.getProperty("user.home"), ".churchpresenter/autosave_schedule.tmp").delete()
+    File(System.getProperty("user.home"), ".apresenter/autosave_schedule.tmp").delete()
     // The Calendar folder defaults to the app data folder, under the home folder of whoever records:
     // pinned beside the demo library so the System page never shows a personal path.
     val calendarFolder = File(LIBRARY, "Calendar").apply { mkdirs() }

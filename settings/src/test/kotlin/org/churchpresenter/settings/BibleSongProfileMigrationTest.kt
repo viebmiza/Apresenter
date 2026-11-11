@@ -108,7 +108,7 @@ class BibleSongProfileMigrationTest {
         val manager = SettingsManager()
         manager.saveSettings(manager.migrateAndDecode(v21))
 
-        val saved = root(File(home, ".churchpresenter/settings.json").readText())
+        val saved = root(File(home, ".apresenter/settings.json").readText())
         val song = saved.getValue("songSettings").jsonObject
         val bible = saved.getValue("bibleSettings").jsonObject
         assertTrue(SONG_GLOBAL_KEYS.containsAll(song.keys), "song keys: ${song.keys - SONG_GLOBAL_KEYS}")

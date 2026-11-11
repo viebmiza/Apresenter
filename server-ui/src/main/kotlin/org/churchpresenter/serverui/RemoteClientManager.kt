@@ -21,7 +21,7 @@ data class RemoteClientLists(
 
 /**
  * Manages the persistent permanent-allow and permanent-block lists for remote companion clients.
- * Lists are stored in ~/.churchpresenter/remote_clients.json.
+ * Lists are stored in ~/.apresenter/remote_clients.json.
  *
  * Compose-observable: [allowedClients] and [blockedClients] are Compose State properties so
  * any composable that reads them will recompose when the lists change.
@@ -114,9 +114,9 @@ fun RemoteClientManager.isKnown(clientId: String): Boolean = isAllowed(clientId)
 fun RemoteClientManager.permissionsFor(clientId: String): DevicePermissions =
     permissions[clientId] ?: DevicePermissions.ALL
 
-/** Where the lists are kept between runs: `~/.churchpresenter/remote_clients.json`. */
+/** Where the lists are kept between runs: `~/.apresenter/remote_clients.json`. */
 private class RemoteClientsFile {
-    private val appDataDir = File(System.getProperty("user.home"), ".churchpresenter")
+    private val appDataDir = File(System.getProperty("user.home"), ".apresenter")
     private val clientsFile = File(appDataDir, "remote_clients.json")
 
     private val jsonFormat = Json { ignoreUnknownKeys = true; encodeDefaults = true }

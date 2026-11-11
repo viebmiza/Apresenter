@@ -13,12 +13,12 @@ import org.churchpresenter.core.models.io.writeTextAtomically
  * public for the same reason. [file], [pinnedFile] and [load] are `internal var`/`internal fun` for
  * the same reason: a test points them at a temp dir before calling [add]/[togglePin]/[clear]/[load],
  * so the real read/write logic runs without ever touching the developer's own recent/pinned JSON
- * files under `~/.churchpresenter`. Nothing else is widened.
+ * files under `~/.apresenter`. Nothing else is widened.
  */
 internal object RecentPictureFolders {
     private const val MAX = 10
-    internal var file = File(System.getProperty("user.home"), ".churchpresenter/recent_picture_folders.json")
-    internal var pinnedFile = File(System.getProperty("user.home"), ".churchpresenter/pinned_picture_folders.json")
+    internal var file = File(System.getProperty("user.home"), ".apresenter/recent_picture_folders.json")
+    internal var pinnedFile = File(System.getProperty("user.home"), ".apresenter/pinned_picture_folders.json")
     val folders = mutableStateListOf<String>()
     val pinned = mutableStateListOf<String>()
 

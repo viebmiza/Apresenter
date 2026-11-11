@@ -33,7 +33,7 @@ private val BANNER_ELEVATION = 3.dp
  * them back on again.
  *
  * The guard trips on its own after repeated crashes, so without this the only route back is editing
- * a file in `~/.churchpresenter`. [CrashReporter.reEnableVideoBackgrounds] existed for exactly this
+ * a file in `~/.apresenter`. [CrashReporter.reEnableVideoBackgrounds] existed for exactly this
  * and had no caller at all: the previous version of this banner spelled `[Re-enable]` and
  * `[Dismiss]` as literal characters inside a `Text`, with no `Button` and no `onClick` behind
  * either, and hid itself on a timer after fifteen seconds.

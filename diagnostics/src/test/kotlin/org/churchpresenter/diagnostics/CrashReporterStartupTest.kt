@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
  */
 class CrashReporterStartupTest {
 
-    private val appDir = File(System.getProperty("user.home"), ".churchpresenter")
+    private val appDir = File(System.getProperty("user.home"), ".apresenter")
     private val crashDir = File(appDir, "crash-reports")
     private val runningFile = File(appDir, ".running")
     private val crashCountFile = File(appDir, ".crash_count")

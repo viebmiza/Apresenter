@@ -25,7 +25,7 @@ internal object SavedTextBackdrops {
     /** Two rows of four in the dialog, which is as much history as fits without a scroll. */
     const val MAX = 8
 
-    private val file = java.io.File(System.getProperty("user.home"), ".churchpresenter/saved_backdrops.json")
+    private val file = java.io.File(System.getProperty("user.home"), ".apresenter/saved_backdrops.json")
 
     val looks = mutableStateListOf<TextBackdrop>()
 

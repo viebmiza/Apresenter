@@ -66,7 +66,7 @@ private val ButtonShape = AppShape(6.dp)
 /** Shared recent colors, persisted to the same file as ChurchPresenter's color picker. */
 private object RecentColors {
     private const val MAX = 12
-    private val file = java.io.File(System.getProperty("user.home"), ".churchpresenter/recent_colors.json")
+    private val file = java.io.File(System.getProperty("user.home"), ".apresenter/recent_colors.json")
     val colors = mutableStateListOf<String>()
 
     init { load() }

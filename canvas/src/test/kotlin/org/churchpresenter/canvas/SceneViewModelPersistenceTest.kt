@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
 /**
  * Whether a canvas survives the app closing.
  *
- * Scenes are written to `~/.churchpresenter/scenes.json` after every edit and read back in the
+ * Scenes are written to `~/.apresenter/scenes.json` after every edit and read back in the
  * constructor, and both halves swallow their exceptions — a write that fails, or a source type
  * that cannot be serialized, is silent. So the only way a broken save surfaces is an operator
  * reopening the app to find last week's canvas, or a scene missing the source they spent an hour
@@ -34,7 +34,7 @@ import kotlin.test.assertTrue
  */
 class SceneViewModelPersistenceTest {
 
-    private val scenesFile = File(System.getProperty("user.home"), ".churchpresenter/scenes.json")
+    private val scenesFile = File(System.getProperty("user.home"), ".apresenter/scenes.json")
 
     @BeforeTest
     fun stubScreenBoundsAndClearState() {

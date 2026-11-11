@@ -14,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.churchpresenter.settings.utils.BrandConfig
 
 private const val HTTP_OK = 200
 private const val HTTP_TOO_MANY_REQUESTS = 429
@@ -58,9 +59,10 @@ object ContactReporter {
         data object Failure : Outcome
     }
 
-    /** Public web contact form (guarded by Turnstile) — the rate-limit escalation target. */
-    const val WEB_CONTACT_URL = "https://www.churchpresenter.org/contact"
-    private const val ENDPOINT = "https://www.churchpresenter.org/api/contact-app"
+    /** Public web contact target — escalates rate-limited requests to the browser. */
+    val WEB_CONTACT_URL: String
+        get() = BrandConfig.websitePageUrl("contact", BrandConfig.CONTACT_WEB_URL)
+    private const val ENDPOINT = BrandConfig.CONTACT_API_URL
 
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
@@ -78,7 +80,7 @@ object ContactReporter {
 
     /** Non-sensitive diagnostics appended to the message body to aid bug-report triage. */
     fun defaultContext(versionDisplay: String): String =
-        "Church Presenter $versionDisplay · " +
+        "${BrandConfig.APP_NAME} $versionDisplay · " +
             "${System.getProperty("os.name")} ${System.getProperty("os.version")}"
 
     /**
@@ -90,9 +92,10 @@ object ContactReporter {
         appVersion: String,
         endpoint: String = ENDPOINT,
     ): Outcome = withContext(Dispatchers.IO) {
+        if (endpoint.isBlank()) return@withContext Outcome.NetworkError
         try {
             val response = http.post(endpoint) {
-                header(HttpHeaders.UserAgent, "ChurchPresenter/$appVersion")
+                header(HttpHeaders.UserAgent, "${BrandConfig.APP_NAME}/$appVersion")
                 contentType(ContentType.Application.Json)
                 setBody(json.encodeToString(ContactRequest.serializer(), request))
             }

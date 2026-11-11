@@ -17,11 +17,11 @@ import kotlin.test.assertTrue
  * Setting a scene's canvas size from its row in the scene list (#608).
  *
  * The same stub and state reset as `SceneViewModelTest`: `addScene()` reads `presenterScreenBounds()`,
- * which throws headless, and scenes persist to `~/.churchpresenter/scenes.json`.
+ * which throws headless, and scenes persist to `~/.apresenter/scenes.json`.
  */
 class SceneViewModelCanvasSizeTest {
 
-    private val scenesFile = File(System.getProperty("user.home"), ".churchpresenter/scenes.json")
+    private val scenesFile = File(System.getProperty("user.home"), ".apresenter/scenes.json")
 
     @BeforeTest
     fun stubScreenBoundsAndClearState() {

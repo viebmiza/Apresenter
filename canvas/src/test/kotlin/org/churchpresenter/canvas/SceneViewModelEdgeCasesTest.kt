@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 
 class SceneViewModelEdgeCasesTest {
 
-    private val scenesFile = File(System.getProperty("user.home"), ".churchpresenter/scenes.json")
+    private val scenesFile = File(System.getProperty("user.home"), ".apresenter/scenes.json")
 
     @BeforeTest
     fun stubScreenBoundsAndClearState() {

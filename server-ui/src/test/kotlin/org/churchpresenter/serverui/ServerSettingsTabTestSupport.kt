@@ -43,7 +43,7 @@ import kotlin.test.assertEquals
  * Two things make this tab different from the other settings tabs, and both shape everything here.
  *
  * **It owns real collaborators.** `RemoteClientManager` reads and writes
- * `~/.churchpresenter/remote_clients.json` *in its field initialiser*, so every test gets its own
+ * `~/.apresenter/remote_clients.json` *in its field initialiser*, so every test gets its own
  * `user.home` ([withIsolatedHome]) and constructs the manager inside it — otherwise tests would read
  * the developer's real allow/block lists and leak state into each other. `CompanionServer` binds a
  * real socket.

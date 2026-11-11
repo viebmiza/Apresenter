@@ -104,6 +104,6 @@ class ReleaseNotesTest {
 
     @Test
     fun `a pull request's number leads to its page on GitHub`() {
-        assertEquals("https://github.com/ChurchPresenter/ChurchPresenter/pull/693", pullRequestUrl(693))
+        assertEquals("https://github.com/viebmiza/Apresenter/pull/693", pullRequestUrl(693))
     }
 }

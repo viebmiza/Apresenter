@@ -197,7 +197,7 @@ private fun seedPlayHistory(today: LocalDate) {
                 )
             },
     )
-    val dir = File(System.getProperty("user.home"), ".churchpresenter").apply { mkdirs() }
+    val dir = File(System.getProperty("user.home"), ".apresenter").apply { mkdirs() }
     val json = Json { encodeDefaults = true }
     File(dir, "statistics.json").writeText(json.encodeToString(counters))
     File(dir, "play_log.json").writeText(json.encodeToString(PlayEventLog(songEvents, verseEvents)))

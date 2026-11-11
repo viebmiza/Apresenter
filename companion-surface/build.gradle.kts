@@ -1,7 +1,7 @@
 plugins {
     id("cp.jvm-module")
     // CrashReporter and UsageEvents resolve their files under `user.home`; the suite gets a home of its
-    // own under build/ so a test can never touch the real ~/.churchpresenter.
+    // own under build/ so a test can never touch the real ~/.apresenter.
     id("cp.test-home")
     id("cp.compose")
     // Committed, beside the module, as :composeApp's and :shared-ui's are.

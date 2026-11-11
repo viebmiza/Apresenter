@@ -96,7 +96,7 @@ abstract class HappyPathHarness {
     }
 
     private fun clearScheduleAutoSave() {
-        File(System.getProperty("user.home"), ".churchpresenter/autosave_schedule.tmp").delete()
+        File(System.getProperty("user.home"), ".apresenter/autosave_schedule.tmp").delete()
     }
 
     /** A song on disk under [songbook], one section per entry of [sections] (header to its line). */

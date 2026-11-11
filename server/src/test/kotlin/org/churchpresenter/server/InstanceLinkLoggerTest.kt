@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
  */
 class InstanceLinkLoggerTest {
 
-    private val logDir = File(System.getProperty("user.home"), ".churchpresenter/instance-link/logs")
+    private val logDir = File(System.getProperty("user.home"), ".apresenter/instance-link/logs")
 
     /** The single run-stamped log file this JVM writes to. */
     private fun logFile(): File = assertNotNull(

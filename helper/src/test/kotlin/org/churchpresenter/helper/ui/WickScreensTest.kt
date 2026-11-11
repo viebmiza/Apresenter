@@ -153,7 +153,7 @@ class WickScreensTest {
         waitForIdle()
         onNodeWithText("Back").performClick()
         waitForIdle()
-        onNodeWithText("Hi, I'm Wick").assertExists()
+        onNodeWithText("Hi, I'm Timóteo").assertExists()
         onNodeWithTag("helper.intro.next").performClick()
         onNodeWithTag("helper.intro.next").performClick()
         waitForIdle()

@@ -69,7 +69,7 @@ class ToolWindowOptionsTest {
         waitForIdle()
 
         assertTrue(titles.isNotEmpty())
-        assertTrue(titles.all { it == "ChurchPresenter Song and Bible Converter" })
+        assertTrue(titles.all { it == "Apresenter Song and Bible Converter" })
     }
 
     @Test

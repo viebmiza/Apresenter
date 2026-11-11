@@ -156,16 +156,16 @@ internal object WebLabel {
                 "the app."
     const val ENGINE_UNAVAILABLE_MACOS_TITLE = "Web browser requires a newer macOS"
     const val ENGINE_UNAVAILABLE_MACOS_BODY =
-            "ChurchPresenter's browser engine no longer supports this version of macOS. Update to macOS 12 " +
+            "Apresenter's browser engine no longer supports this version of macOS. Update to macOS 12 " +
                 "(Monterey) or later to use the Web tab and browser sources."
     const val ENGINE_UNAVAILABLE_WINDOWS_TITLE = "Web browser requires Windows 10 or later"
     const val ENGINE_UNAVAILABLE_WINDOWS_BODY =
-            "ChurchPresenter's browser engine no longer supports this version of Windows. Update to Windows 10 " +
+            "Apresenter's browser engine no longer supports this version of Windows. Update to Windows 10 " +
                 "or later to use the Web tab and browser sources."
     const val ENGINE_UNAVAILABLE_POLICY_TITLE = "Web browser blocked by a policy on this computer"
     const val ENGINE_UNAVAILABLE_POLICY_BODY =
-            "A software policy on this computer is blocking the browser engine ChurchPresenter downloads. Ask " +
-                "whoever manages the computer to allow ChurchPresenter, or use a computer without that " +
+            "A software policy on this computer is blocking the browser engine Apresenter downloads. Ask " +
+                "whoever manages the computer to allow Apresenter, or use a computer without that " +
                 "restriction — the Web tab and browser sources need it."
     const val SNAPSHOT_WAITING = "Waiting for snapshot..."
     const val SNAPSHOT_SCREEN_RECORDING_HINT =

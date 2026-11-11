@@ -101,7 +101,7 @@ object OmtManager {
      * the rotation happens once per process however often [ensureStarted] is called.
      */
     private val logFile: File by lazy {
-        File(System.getProperty("user.home"), ".churchpresenter/omt.log").also(::rotateOmtLog)
+        File(System.getProperty("user.home"), ".apresenter/omt.log").also(::rotateOmtLog)
     }
 
     private fun registerShutdownHook() {

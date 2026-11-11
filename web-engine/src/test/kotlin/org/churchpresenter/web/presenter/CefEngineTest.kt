@@ -123,7 +123,7 @@ class CefEngineTest {
     fun `a library the Linux system lacks is named for the operator instead of reported`() {
         // CHURCH-PRESENTER-DESKTOP-9P: the distribution's NSPR was not installed.
         val cause = UnsatisfiedLinkError(
-            "/home/u/.churchpresenter/jcef/libjcef.so: libnspr4.so: " +
+            "/home/u/.apresenter/jcef/libjcef.so: libnspr4.so: " +
                 "cannot open shared object file: No such file or directory",
         )
         engine.applyInstallOutcome(JcefInstall.Outcome.Failed(root, cause))
@@ -216,7 +216,7 @@ class CefEngineTest {
     @Test
     fun `on its own defaults a failed install lands in the crash log, and a client failure only warns`() {
         // The app makes this at startup; the reporter writes into it but does not make it.
-        val crashDir = File(System.getProperty("user.home"), ".churchpresenter/crash-reports").apply { mkdirs() }
+        val crashDir = File(System.getProperty("user.home"), ".apresenter/crash-reports").apply { mkdirs() }
         val before = crashDir.listFiles()?.size ?: 0
         val defaults = CefEngine()
 

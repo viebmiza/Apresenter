@@ -38,7 +38,7 @@ class StatisticsCcliLookupTest {
         realHome = System.getProperty("user.home")
         tempHome = Files.createTempDirectory("cp-statistics-ccli-test").toFile()
         System.setProperty("user.home", tempHome.absolutePath)
-        File(tempHome, ".churchpresenter").mkdirs()
+        File(tempHome, ".apresenter").mkdirs()
         catalog = File(tempHome, "songs").also { it.mkdirs() }
     }
 

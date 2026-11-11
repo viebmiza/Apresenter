@@ -45,7 +45,7 @@ internal fun Route.certificateRoutes() {
         }
         call.response.headers.append(
             HttpHeaders.ContentDisposition,
-            """attachment; filename="ChurchPresenter-CA.crt""""
+            """attachment; filename="Apresenter-CA.crt""""
         )
         call.respondBytes(bytes, ContentType("application", "x-x509-ca-cert"))
     }
@@ -70,7 +70,7 @@ internal fun Route.certificateRoutes() {
         }
         call.response.headers.append(
             HttpHeaders.ContentDisposition,
-            """attachment; filename="ChurchPresenter-CA.pem""""
+            """attachment; filename="Apresenter-CA.pem""""
         )
         call.respondText(pem, ContentType("application", "x-pem-file"))
     }

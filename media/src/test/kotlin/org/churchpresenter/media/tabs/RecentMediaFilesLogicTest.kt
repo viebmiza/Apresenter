@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
  * Same shape as `RecentPictureFoldersLogicTest`. [RecentMediaFiles.file] and
  * [RecentMediaFiles.pinnedFile] are repointed at a temp directory for the duration of each test, so
  * `add`/`togglePin`/`clear` run for real without ever touching the developer's own recent/pinned
- * JSON files under `~/.churchpresenter`.
+ * JSON files under `~/.apresenter`.
  */
 class RecentMediaFilesLogicTest {
 

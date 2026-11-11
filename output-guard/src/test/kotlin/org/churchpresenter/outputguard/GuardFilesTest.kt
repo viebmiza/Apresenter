@@ -89,7 +89,7 @@ class GuardFilesTest {
     @Test
     fun `the user's folder is beside the app's other state`() {
         assertEquals(
-            File(System.getProperty("user.home"), ".churchpresenter/output-guard"),
+            File(System.getProperty("user.home"), ".apresenter/output-guard"),
             GuardFiles.forUser().dir,
         )
     }

@@ -114,7 +114,7 @@ class STTManagerCaptureTest {
         throw AssertionError("timed out after ${timeoutMs}ms waiting for $what")
     }
 
-    private val logDir: File get() = File(tempHome, ".churchpresenter/bible-stt-logs")
+    private val logDir: File get() = File(tempHome, ".apresenter/bible-stt-logs")
 
     private fun snapshots(): List<String> =
         logDir.listFiles().orEmpty().map { it.name }.sorted()

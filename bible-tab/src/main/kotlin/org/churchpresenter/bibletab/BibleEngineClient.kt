@@ -160,7 +160,7 @@ class BibleEngineClient(
                     _startFailed.value = true
                     return@launch
                 }
-                val logDir = File(System.getProperty("user.home"), ".churchpresenter/bible-stt-logs")
+                val logDir = File(System.getProperty("user.home"), ".apresenter/bible-stt-logs")
                     .also { it.mkdirs() }
                 DetectionLogger.path = File(logDir, "detection-log.jsonl").absolutePath
             }
@@ -295,10 +295,10 @@ class BibleEngineClient(
         engineStopping = stopScope.launch { handle.stop() }
     }
 
-    /** Appends a line to ~/.churchpresenter/bible-stt-logs/engine-errors.jsonl for crash-level issues. */
+    /** Appends a line to ~/.apresenter/bible-stt-logs/engine-errors.jsonl for crash-level issues. */
     private fun logEngineError(message: String, detail: String = "") {
         runCatching {
-            val dir = File(System.getProperty("user.home"), ".churchpresenter/bible-stt-logs").also { it.mkdirs() }
+            val dir = File(System.getProperty("user.home"), ".apresenter/bible-stt-logs").also { it.mkdirs() }
             val file = File(dir, "engine-errors.jsonl")
             val line = buildString {
                 append("{\"ts\":\"").append(Instant.now()).append("\",")

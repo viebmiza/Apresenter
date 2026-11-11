@@ -61,6 +61,7 @@ import org.churchpresenter.sharedui.utils.rememberCenteredDialogState
  */
 internal fun installerSuffixFor(downloadUrl: String): String = when {
     downloadUrl.endsWith(".msi", ignoreCase = true) -> ".msi"
+    downloadUrl.endsWith(".exe", ignoreCase = true) -> ".exe"
     downloadUrl.endsWith(".dmg", ignoreCase = true) -> ".dmg"
     downloadUrl.endsWith(".deb", ignoreCase = true) -> ".deb"
     else -> ".bin"

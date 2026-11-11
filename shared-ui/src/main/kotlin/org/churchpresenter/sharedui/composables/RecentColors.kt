@@ -7,7 +7,7 @@ import org.churchpresenter.core.models.io.writeTextAtomically
 /** Stores recently used colors across all color picker instances, persisted to disk. */
 object RecentColors {
     private const val MAX = 12
-    private val file = java.io.File(System.getProperty("user.home"), ".churchpresenter/recent_colors.json")
+    private val file = java.io.File(System.getProperty("user.home"), ".apresenter/recent_colors.json")
     val colors = mutableStateListOf<String>()
 
     init { load() }

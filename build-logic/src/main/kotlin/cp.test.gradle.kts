@@ -46,6 +46,8 @@ tasks.withType<Test>().configureEach {
     providers.gradleProperty("hangThresholdMs").orNull?.let {
         systemProperty("churchpresenter.test.hangThresholdMs", it)
     }
+    systemProperty("user.language", "en")
+    systemProperty("user.country", "US")
     systemProperty(
         "churchpresenter.test.hangDumpDir",
         layout.buildDirectory.dir("test-results/" + name).get().asFile.absolutePath,

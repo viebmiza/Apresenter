@@ -14,7 +14,7 @@ class SplashContentTest {
     fun `the splash names the app and says it is loading`() = runComposeUiTest {
         setContent { SplashContent(ThemeMode.SYSTEM) }
 
-        onNodeWithText("Church Presenter").assertIsDisplayed()
+        onNodeWithText("Apresenter").assertIsDisplayed()
         onNodeWithText("Loading...").assertIsDisplayed()
     }
 
@@ -22,7 +22,7 @@ class SplashContentTest {
     fun `the splash draws the same in every theme`() = runComposeUiTest {
         ThemeMode.entries.forEach { theme ->
             setContent { SplashContent(theme) }
-            onNodeWithText("Church Presenter").assertIsDisplayed()
+            onNodeWithText("Apresenter").assertIsDisplayed()
         }
     }
 }

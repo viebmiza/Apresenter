@@ -354,7 +354,7 @@ class BibleViewModel(
 
     internal val remoteBibleCacheDir = File(
         System.getProperty("user.home"),
-        ".churchpresenter/instance-link/cache/bibles"
+        ".apresenter/instance-link/cache/bibles"
     )
 
     internal val actedDetectionKeys = HashSet<String>()

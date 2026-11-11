@@ -279,7 +279,7 @@ internal class PresentationStore(
 
 /** Where decks pushed from a phone are written. */
 internal val deviceUploadDir: File
-    get() = File(System.getProperty("user.home"), ".churchpresenter/device_presentations")
+    get() = File(System.getProperty("user.home"), ".apresenter/device_presentations")
 
 /** How many device-uploaded decks are kept on disk. */
 internal const val DEVICE_UPLOADS_KEPT = 10

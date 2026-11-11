@@ -20,7 +20,7 @@ import kotlin.test.assertTrue
  * IMPORTANT: [QAManager] resolves its state file from `user.home` **at construction** and both
  * loads from and saves to it, so every manager here is built while `user.home` points at a
  * throwaway directory -- otherwise a test run would read and overwrite the developer's real
- * `~/.churchpresenter/qa_state.json`.
+ * `~/.apresenter/qa_state.json`.
  */
 class QAManagerTest {
 

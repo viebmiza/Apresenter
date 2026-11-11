@@ -35,7 +35,7 @@ internal data class VerseSequenceFile(
  *
  * The app already counts how often each verse is presented ([BibleVerseStatistics]), but counts
  * cannot answer "what usually comes next" — that needs the order, which nothing kept. This does,
- * in `~/.churchpresenter/verse_sequences.json`, as counted transitions rather than an event log,
+ * in `~/.apresenter/verse_sequences.json`, as counted transitions rather than an event log,
  * so the file stays small and answering a query is a map lookup.
  *
  * References are canonical (KJV numbering, books 1-66), not the display numbering of whichever
@@ -49,7 +49,7 @@ internal data class VerseSequenceFile(
  */
 class VerseSequenceLog(
     private val file: File = File(
-        System.getProperty("user.home"), ".churchpresenter/verse_sequences.json",
+        System.getProperty("user.home"), ".apresenter/verse_sequences.json",
     ),
     private val clock: () -> Long = System::currentTimeMillis,
 ) {

@@ -49,7 +49,7 @@ class QAManagerStateTest {
     private lateinit var tempHome: File
     private var realHome: String? = null
 
-    private val stateFile: File get() = File(tempHome, ".churchpresenter/qa_state.json")
+    private val stateFile: File get() = File(tempHome, ".apresenter/qa_state.json")
 
     @BeforeTest
     fun isolateHome() {
@@ -74,7 +74,7 @@ class QAManagerStateTest {
     @AfterTest
     fun restoreHome() {
         // Before deleting the home, not after: a save still in flight would otherwise recreate
-        // `.churchpresenter/` under a directory the next test is about to claim.
+        // `.apresenter/` under a directory the next test is about to claim.
         joinSaves()
         realHome?.let { System.setProperty("user.home", it) }
         tempHome.deleteRecursively()

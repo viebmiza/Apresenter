@@ -43,6 +43,16 @@ class UpdateCheckerPlatformTest {
     }
 
     @Test
+    fun `windows falls back to exe when no msi is present`() {
+        asPlatform("Windows 11", "amd64")
+        val exeAssets = listOf(
+            "https://example.org/Apresenter-26.1.0.deb",
+            "https://example.org/Apresenter-Setup-26.1.0.exe",
+        )
+        assertEquals("https://example.org/Apresenter-Setup-26.1.0.exe", selectDownloadUrl(exeAssets))
+    }
+
+    @Test
     fun `apple silicon gets the arm64 dmg`() {
         asPlatform("Mac OS X", "aarch64")
         assertEquals("https://example.org/ChurchPresenter-26.1.0-arm64.dmg", selectDownloadUrl(releaseAssets))

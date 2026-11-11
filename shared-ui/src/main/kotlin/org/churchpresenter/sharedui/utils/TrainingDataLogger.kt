@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Best-effort JSONL logger for Bible reference training data.
- * Writes session-keyed files to ~/.churchpresenter/bible-stt-logs/:
+ * Writes session-keyed files to ~/.apresenter/bible-stt-logs/:
  *   live-references-<sessionId>.jsonl       — ground truth: which verse went live and why
  *   suggestion-outcomes-<sessionId>.jsonl   — operator reactions to detection chips
  *   operator-flags-<sessionId>.jsonl        — live "Help Dev" flags (wrong/premature/missed)
@@ -58,7 +58,7 @@ object TrainingDataLogger {
     // Resolved from user.home on every access, as CrashReporter does: a once-per-JVM lazy keeps
     // whatever user.home said the first time, which in a test is a temp dir deleted afterwards.
     private val logDir: File
-        get() = File(System.getProperty("user.home"), ".churchpresenter/bible-stt-logs").also { it.mkdirs() }
+        get() = File(System.getProperty("user.home"), ".apresenter/bible-stt-logs").also { it.mkdirs() }
 
     /** Session-keyed suffix when STT has provided an id, else the process-start timestamp. */
     private fun suffix(): String = sessionId?.let { sanitize(it) } ?: runStamp

@@ -170,7 +170,7 @@ class AppPreviewStatisticsScreenshotTest {
                 }
 
             val json = Json { encodeDefaults = true }
-            val dir = File(System.getProperty("user.home"), ".churchpresenter").apply { mkdirs() }
+            val dir = File(System.getProperty("user.home"), ".apresenter").apply { mkdirs() }
             File(dir, "statistics.json").writeText(
                 json.encodeToString(
                     DisplayStatistics.serializer(),

@@ -237,8 +237,8 @@ class DeckLinkBridgeTest {
         assertTrue(bridge.isInputConfigured(3, listOf(scene)))
         assertFalse(bridge.isInputConfigured(4, listOf(scene)))
 
-        File(home, ".churchpresenter").mkdirs()
-        File(home, ".churchpresenter/scenes.json").writeText("""[{"deckLinkIndex": 4}]""")
+        File(home, ".apresenter").mkdirs()
+        File(home, ".apresenter/scenes.json").writeText("""[{"deckLinkIndex": 4}]""")
         assertTrue(bridge.isInputConfigured(4))
         assertFalse(bridge.isInputConfigured(5))
     }

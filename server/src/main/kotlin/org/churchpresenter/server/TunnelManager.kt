@@ -133,7 +133,7 @@ class TunnelManager {
 
     internal val holdsShutdownHook: Boolean get() = processHook != null
 
-    private val dataDir = File(System.getProperty("user.home"), ".churchpresenter")
+    private val dataDir = File(System.getProperty("user.home"), ".apresenter")
 
     private val os = System.getProperty("os.name").lowercase()
     private val arch = System.getProperty("os.arch").lowercase()

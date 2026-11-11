@@ -82,7 +82,7 @@ class EditorPanelsTest {
 
     @Test
     fun `the test config panel edits the sample config`() = runDesktopComposeUiTest(900, 1600) {
-        val logos = File(temp, ".churchpresenter/churchpresenter-lottiegen/logos").apply { mkdirs() }
+        val logos = File(temp, ".apresenter/churchpresenter-lottiegen/logos").apply { mkdirs() }
         ImageIO.write(BufferedImage(8, 4, BufferedImage.TYPE_INT_ARGB), "png", File(logos, "mark.png"))
         val state = FakeEditorState()
         showDark { TestConfigPanel(state) }
@@ -226,7 +226,7 @@ class EditorPanelsTest {
     @Test
     fun `the toolbar opens new, open, save as and export, and confirms discarding`() =
         runDesktopComposeUiTest(1400, 1200) {
-        val specs = File(temp, ".churchpresenter/churchpresenter-lottiegen/style-specs").apply { mkdirs() }
+        val specs = File(temp, ".apresenter/churchpresenter-lottiegen/style-specs").apply { mkdirs() }
         StyleSpecStorage.save(StyleSpec(id = "91", name = "Kept"), File(specs, "kept.json"))
         StyleSpecStorage.save(StyleSpec(id = "92", name = "Gone"), File(specs, "gone.json"))
         val state = FakeEditorState()

@@ -147,7 +147,7 @@ object BebliaCatalogIndex {
         }
     }
 
-    private val defaultCacheFile = File(System.getProperty("user.home"), ".churchpresenter/cache/beblia-catalog.json")
+    private val defaultCacheFile = File(System.getProperty("user.home"), ".apresenter/cache/beblia-catalog.json")
 
     /** The archive is a preservation project, not a feed; it changes a few times a year. */
     private const val CACHE_TTL_MILLIS = 7L * 24 * 60 * 60 * 1000

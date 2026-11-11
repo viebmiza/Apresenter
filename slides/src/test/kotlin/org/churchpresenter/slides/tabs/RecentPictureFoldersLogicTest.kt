@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
  * `PicturesTabRecentFoldersTest` covers what the bar renders; this covers what happens when a
  * button is actually pressed. [RecentPictureFolders.file] and [RecentPictureFolders.pinnedFile] are
  * repointed at a temp directory for the duration of each test, so `add`/`togglePin`/`clear` run for
- * real without ever touching the developer's own recent/pinned JSON files under `~/.churchpresenter`.
+ * real without ever touching the developer's own recent/pinned JSON files under `~/.apresenter`.
  */
 class RecentPictureFoldersLogicTest {
 

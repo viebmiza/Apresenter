@@ -16,7 +16,7 @@ import kotlin.test.assertTrue
  */
 class SavedTextBackdropsTest {
 
-    private val file = File(System.getProperty("user.home"), ".churchpresenter/saved_backdrops.json")
+    private val file = File(System.getProperty("user.home"), ".apresenter/saved_backdrops.json")
 
     private fun look(opacity: Int) = TextBackdrop(lineBackground = true, lineBackgroundOpacity = opacity)
 

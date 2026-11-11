@@ -12,7 +12,7 @@ object ColorThemeStorage {
     private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
 
     private fun themesFile(): File {
-        val dir = File(System.getProperty("user.home"), ".churchpresenter/churchpresenter-lottiegen")
+        val dir = File(System.getProperty("user.home"), ".apresenter/churchpresenter-lottiegen")
         dir.mkdirs()
         return File(dir, "color-themes.json")
     }

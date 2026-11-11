@@ -118,8 +118,8 @@ class AppConfigTest {
 
     private fun settingsJson(contents: String) {
         System.setProperty("user.home", temp.absolutePath)
-        File(temp, ".churchpresenter").mkdirs()
-        File(temp, ".churchpresenter/settings.json").writeText(contents)
+        File(temp, ".apresenter").mkdirs()
+        File(temp, ".apresenter/settings.json").writeText(contents)
     }
 
     @Test

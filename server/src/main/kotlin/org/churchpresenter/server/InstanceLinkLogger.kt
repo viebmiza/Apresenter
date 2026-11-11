@@ -13,7 +13,7 @@ enum class InstanceLinkLogSide { PRIMARY, FOLLOWER }
 
 /**
  * Best-effort JSONL diagnostic logger for Instance Link (this app's follow-another-instance feature)
- * — writes one run-stamped file per launch to ~/.churchpresenter/instance-link/logs/.
+ * — writes one run-stamped file per launch to ~/.apresenter/instance-link/logs/.
  *
  * Intended use: open the primary's and a follower's log files side by side (or diff them by ts_ms) to
  * see exactly what was broadcast/served vs. received/applied — Instance Link's REST fetches and
@@ -48,7 +48,7 @@ object InstanceLinkLogger {
 
     // Resolved on the first caller's thread, which touches no disk -- a test fixes the path to its own
     // user.home by logging once -- and created on [writer].
-    private val logDir by lazy { File(System.getProperty("user.home"), ".churchpresenter/instance-link/logs") }
+    private val logDir by lazy { File(System.getProperty("user.home"), ".apresenter/instance-link/logs") }
 
     private val logFile by lazy { File(logDir, "$FILE_PREFIX$runStamp.jsonl") }
 

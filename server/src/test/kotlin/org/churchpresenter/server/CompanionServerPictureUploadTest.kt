@@ -50,7 +50,7 @@ import kotlin.test.assertTrue
  * Selection is the other half: a phone may send an index or a file name, and the file name wins,
  * precisely so a sort-order mismatch cannot put the wrong photo on the screen.
  *
- * `user.home` is redirected for the class, since the endpoint writes into `~/.churchpresenter`.
+ * `user.home` is redirected for the class, since the endpoint writes into `~/.apresenter`.
  */
 class CompanionServerPictureUploadTest {
 
@@ -100,7 +100,7 @@ class CompanionServerPictureUploadTest {
         private val uploadDir: File
             get() = File(
                 System.getProperty("user.home"),
-                ".churchpresenter/device_uploads/${LocalDate.now()}",
+                ".apresenter/device_uploads/${LocalDate.now()}",
             )
     }
 

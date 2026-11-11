@@ -21,7 +21,7 @@ import kotlin.test.assertTrue
  * against these numbers, so a song counted twice, missed entirely, or attributed to the wrong
  * songbook is a reporting error rather than a cosmetic one. Two stores back it — an all-time
  * per-song tally for the statistics screen, and a timestamped event log the date-filtered report
- * is computed from — and both are written to `~/.churchpresenter/` after every go-live.
+ * is computed from — and both are written to `~/.apresenter/` after every go-live.
  *
  * `user.home` is swapped per test, so a "restart" is a second manager against the same files.
  * Events are stamped with the wall clock as they are recorded, so range queries here are anchored
@@ -32,8 +32,8 @@ class StatisticsManagerTest {
     private lateinit var tempHome: File
     private var realHome: String? = null
 
-    private val statsFile: File get() = File(tempHome, ".churchpresenter/statistics.json")
-    private val logFile: File get() = File(tempHome, ".churchpresenter/play_log.json")
+    private val statsFile: File get() = File(tempHome, ".apresenter/statistics.json")
+    private val logFile: File get() = File(tempHome, ".apresenter/play_log.json")
 
     @BeforeTest
     fun isolateHome() {
@@ -43,7 +43,7 @@ class StatisticsManagerTest {
         // The app data folder already exists by the time anything is recorded in a real run —
         // settings are written at startup. StatisticsManager does not create it itself; see
         // `nothing is recorded at all when the app data folder is missing -- known gap`.
-        File(tempHome, ".churchpresenter").mkdirs()
+        File(tempHome, ".apresenter").mkdirs()
     }
 
     @AfterTest
@@ -503,14 +503,14 @@ class StatisticsManagerTest {
 
     /**
      * Was a KNOWN GAP, now closed: [StatisticsManager.save] wrote straight to
-     * `~/.churchpresenter/statistics.json` without creating the folder first and swallowed the
+     * `~/.apresenter/statistics.json` without creating the folder first and swallowed the
      * resulting failure, so on a profile where that folder did not exist yet a whole service's
      * worth of reporting data was discarded without a word. The atomic write both stores now go
      * through creates the folder, which is the `mkdirs()` this test's earlier form asked for.
      */
     @Test
     fun `a missing app data folder is created rather than losing the service`() {
-        File(tempHome, ".churchpresenter").deleteRecursively()
+        File(tempHome, ".apresenter").deleteRecursively()
         val stats = StatisticsManager()
 
         stats.sing("Amazing Grace")

@@ -377,7 +377,7 @@ class SongFileParser {
             ignoreUnknownKeys = true
             encodeDefaults = true
         }
-        private val cacheFile = File(System.getProperty("user.home"), ".churchpresenter/song_cache.json")
+        private val cacheFile = File(System.getProperty("user.home"), ".apresenter/song_cache.json")
 
         private fun readCacheFor(storageDirectory: String): SongCache? = try {
             cacheJson.decodeFromString<SongCache>(cacheFile.readText(StandardCharsets.UTF_8))

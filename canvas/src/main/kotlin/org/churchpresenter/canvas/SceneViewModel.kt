@@ -20,7 +20,7 @@ import java.util.UUID
 internal val CANVAS_SIDE_RANGE = 16..7680
 
 class SceneViewModel {
-    private val appDataDir = File(System.getProperty("user.home"), ".churchpresenter")
+    private val appDataDir = File(System.getProperty("user.home"), ".apresenter")
     private val scenesFile = File(appDataDir, "scenes.json")
 
     private val jsonFormat = Json {

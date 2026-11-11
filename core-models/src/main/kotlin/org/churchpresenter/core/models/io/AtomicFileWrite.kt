@@ -11,7 +11,7 @@ import java.nio.file.StandardCopyOption
  *
  * `File.writeText` truncates the target first, so anything reading it during the write sees a
  * partial document, and a sync client watching the folder replicates that partial document or
- * files it as a conflict. Every one of these files lives in `~/.churchpresenter`, which people do
+ * files it as a conflict. Every one of these files lives in `~/.apresenter`, which people do
  * sync between machines. Writing beside the target and moving into place makes the swap a single
  * step: the old content stands until the new content is complete.
  */

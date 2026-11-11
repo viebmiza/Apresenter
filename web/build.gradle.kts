@@ -1,7 +1,7 @@
 plugins {
     id("cp.jvm-module")
     // CefManager reads and writes under `user.home` (the JCEF install dir); the suite gets a home of its
-    // own under build/ so a test can never touch the real ~/.churchpresenter.
+    // own under build/ so a test can never touch the real ~/.apresenter.
     id("cp.test-home")
     id("cp.compose")
 }

@@ -69,8 +69,8 @@ class RedactTest {
     @Test
     fun `the transcript is one line per turn, the newest kept when it is too long`() {
         val lines = listOf(you("one\ntwo"), wick("three"), you("four"))
-        assertEquals("You: one two\nWick: three\nYou: four", transcriptOf(lines))
-        assertEquals("Wick: three\nYou: four", transcriptOf(lines, maxChars = 22))
+        assertEquals("You: one two\nTimóteo: three\nYou: four", transcriptOf(lines))
+        assertEquals("Timóteo: three\nYou: four", transcriptOf(lines, maxChars = 25))
         assertEquals("", transcriptOf(lines, maxChars = 3))
     }
 

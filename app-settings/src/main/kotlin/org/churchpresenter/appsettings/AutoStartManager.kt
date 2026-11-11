@@ -46,7 +46,7 @@ interface AutoStartSwitch {
 object AutoStartManager : AutoStartSwitch {
 
     private const val RUN_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Run"
-    internal const val APP_NAME = "ChurchPresenter"
+    internal const val APP_NAME = "Apresenter"
 
     internal enum class Platform { WINDOWS, MAC, LINUX }
 
@@ -76,10 +76,10 @@ object AutoStartManager : AutoStartSwitch {
     val isSupported: Boolean get() = exePath != null
 
     private val macPlistFile: File
-        get() = File(System.getProperty("user.home"), "Library/LaunchAgents/org.churchpresenter.app.plist")
+        get() = File(System.getProperty("user.home"), "Library/LaunchAgents/org.apresenter.app.plist")
 
     private val linuxDesktopFile: File
-        get() = File(System.getProperty("user.home"), ".config/autostart/churchpresenter.desktop")
+        get() = File(System.getProperty("user.home"), ".config/autostart/apresenter.desktop")
 
     /** The file backing autostart on a file-based platform (mac/linux); null on Windows (registry). */
     internal fun autostartFile(platform: Platform): File? = when (platform) {
@@ -221,7 +221,7 @@ internal object AutostartEntries {
         <plist version="1.0">
         <dict>
             <key>Label</key>
-            <string>org.churchpresenter.app</string>
+            <string>org.apresenter.app</string>
             <key>ProgramArguments</key>
             <array>
                 <string>${escapeXml(exe)}</string>

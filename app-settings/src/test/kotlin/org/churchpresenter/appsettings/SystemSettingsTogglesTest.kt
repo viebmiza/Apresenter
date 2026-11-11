@@ -145,7 +145,7 @@ class SystemSettingsTogglesTest {
         runComposeUiTest {
             val put = HelperSettings(dismissedSuggestions = setOf("tip.one"), snoozedUntil = mapOf("tip.two" to 9L))
             val read = tab(AppSettings(helper = put), devMode = true)
-            press("Show Wick, the helper, in the corner of the main window")
+            press("Show Timóteo, the helper, in the corner of the main window")
             press("Offer a tip of the day")
             assertFalse(read().helper.enabled)
             assertFalse(read().helper.tipsEnabled)

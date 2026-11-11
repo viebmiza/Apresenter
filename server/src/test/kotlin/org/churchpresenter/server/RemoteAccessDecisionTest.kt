@@ -14,7 +14,7 @@ import kotlin.test.assertEquals
  * is unknown, which is exactly where seven hand-written copies were free to drift.
  *
  * Plain sets, no fixtures: the function takes collections rather than `RemoteClientManager`
- * precisely so a test never touches `~/.churchpresenter/remote_clients.json`.
+ * precisely so a test never touches `~/.apresenter/remote_clients.json`.
  */
 class RemoteAccessDecisionTest {
 

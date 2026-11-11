@@ -150,7 +150,7 @@ fun SongLibraryWindow(
  * The Calendar Manager, in a window of its own beside the Song Library Manager.
  *
  * Its own module, and given only two things: the folder to keep `calendar.json` in — the same
- * `~/.churchpresenter` the rest of what the app persists lives in — and the song folder its
+ * `~/.apresenter` the rest of what the app persists lives in — and the song folder its
  * add-item picker reads. Everything it cannot do on its own goes through [CalendarHost]: putting a
  * planned run of show into the Schedule tab, and seeing what is in it.
  *

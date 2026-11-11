@@ -175,7 +175,7 @@ class DialogFramesTest {
     }
 
     @Test
-    fun `the about dialog`() = opens("About Church Presenter", resizable = false) { f ->
+    fun `the about dialog`() = opens("About Apresenter", resizable = false) { f ->
         AboutDialog(true, f.dismiss, AppSettings(), TEST_IDENTITY, frame = f.frame)
     }
 

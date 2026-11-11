@@ -48,7 +48,7 @@ class ToolWindowFramesTest {
     }
 
     @Test
-    fun `the converter`() = opens("ChurchPresenter Song and Bible Converter", DpSize(1100.dp, 800.dp)) { f ->
+    fun `the converter`() = opens("Apresenter Song and Bible Converter", DpSize(1100.dp, 800.dp)) { f ->
         ConverterWindow(ThemeMode.LIGHT, onClose = { f.closed++ }, frame = f.frame)
     }
 

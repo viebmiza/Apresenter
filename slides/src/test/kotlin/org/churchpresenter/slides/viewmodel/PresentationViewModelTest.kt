@@ -26,7 +26,7 @@ import kotlin.test.assertTrue
  * here rather than checking a binary fixture into the repo — that exercises the whole
  * load → render → disk-cache path, which is what slide navigation depends on.
  *
- * Rendering writes into `~/.churchpresenter/slides/`; the test task points `user.home` at
+ * Rendering writes into `~/.apresenter/slides/`; the test task points `user.home` at
  * `build/test-home`, and each test uses its own document so cache entries cannot collide.
  */
 class PresentationViewModelTest {

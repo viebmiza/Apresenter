@@ -50,7 +50,7 @@ composeCompiler {
 // The software bill of materials: every library the shipped app runs with, and nothing it is only
 // built or tested with. `build.yml` attaches the JSON to each release.
 tasks.cyclonedxDirectBom {
-    componentName.set("ChurchPresenter")
+    componentName.set("Apresenter")
     componentVersion.set(appVersion())
     includeConfigs.set(listOf("jvmRuntimeClasspath"))
     jsonOutput.set(layout.buildDirectory.file("reports/cyclonedx/bom.json"))
@@ -68,8 +68,8 @@ detekt {
 sentry {
     val sentryAuthToken = System.getenv("SENTRY_AUTH_TOKEN")
     includeSourceContext.set(sentryAuthToken != null)
-    org.set("church-projector")
-    projectName.set("church-presenter-desktop")
+    org.set(System.getenv("SENTRY_ORG") ?: "apresenter")
+    projectName.set(System.getenv("SENTRY_PROJECT") ?: "apresenter-desktop")
     authToken.set(sentryAuthToken)
 }
 
@@ -389,7 +389,7 @@ compose.desktop {
             // main class name ("MainKt") in the menu bar without this. macOS-only: an unrecognized
             // -Xdock option on other platforms aborts JVM startup entirely — so this one genuinely
             // does belong to the build, and is guarded on the build machine being a Mac.
-            jvmArgs("-Xdock:name=Church Presenter")
+            jvmArgs("-Xdock:name=Apresenter")
         }
 
         buildTypes.release.proguard {
@@ -398,12 +398,12 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb)
-            packageName = "ChurchPresenter"
+            packageName = "Apresenter"
             // Windows MSI limits each version segment to 0-255, so split commit count across minor.patch
             packageVersion = appVersion()
-            description = "Church Presenter - Presentation software for worship services"
-            copyright = "© ${Calendar.getInstance().get(Calendar.YEAR)} Church Presenter. All rights reserved."
-            vendor = "Church Presenter"
+            description = "Apresenter - Software de apresentação para cultos"
+            copyright = "© ${Calendar.getInstance().get(Calendar.YEAR)} Mizael G Nascimento. All rights reserved."
+            vendor = "Mizael G Nascimento"
 
             // Bundle app resources alongside the packaged app.
             // These land in Contents/app/resources/ on macOS.
@@ -423,7 +423,7 @@ compose.desktop {
             // the way MainLogic.preferredRenderApi decides the render API.
 
             macOS {
-                bundleID = "org.churchpresenter.app"
+                bundleID = "org.apresenter.app"
                 iconFile.set(project.file("src/jvmMain/appResources/macos/icon.icns"))
 
                 // ── No renderApi here ─────────────────────────────────────────
@@ -476,10 +476,10 @@ compose.desktop {
             }
 
             windows {
-                menuGroup = "ChurchPresenter"
+                menuGroup = "Apresenter"
                 perUserInstall = false
                 dirChooser = true
-                upgradeUuid = "A1B2C3D4-E5F6-4789-A012-3456789ABCDE"
+                upgradeUuid = "8F4C2A1E-9B7D-4E31-B2A5-6C8D9E0F1234"
                 iconFile.set(project.file("src/jvmMain/appResources/windows/icon.ico"))
 
                 // ── No renderApi here, deliberately ───────────────────────────
@@ -577,7 +577,7 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     )
 
     // Point the whole test JVM at a throwaway home directory. Several singletons resolve
-    // ~/.churchpresenter paths in a `by lazy` or a constructor -- captured ONCE per JVM -- so
+    // ~/.apresenter paths in a `by lazy` or a constructor -- captured ONCE per JVM -- so
     // without this a test could permanently latch onto (and write into, or delete from) the
     // developer's real settings, autosave, QA state or STT training logs. Individual tests may
     // still override user.home per-test; they restore to this fake one, not the real one.
@@ -586,7 +586,7 @@ tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     // repoints user.home at <this>/worker-N before discovery, so no two forks share the directory.
     // The task-level value still has to be set, because it is what a fork sees if that listener does
     // not run -- and the one thing that must never happen is a test reaching the developer's real
-    // ~/.churchpresenter.
+    // ~/.apresenter.
     val testHome = layout.buildDirectory.dir("test-home").get().asFile
     doFirst { testHome.mkdirs() }
     systemProperty("user.home", testHome.absolutePath)

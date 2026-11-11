@@ -58,18 +58,19 @@ sealed class UpdateCheckResult {
 
 object UpdateChecker {
 
-    private const val RELEASES_API_URL =
-        "https://api.github.com/repos/ChurchPresenter/ChurchPresenter/releases?per_page=50"
+    private val RELEASES_API_URL: String
+        get() = org.churchpresenter.settings.utils.BrandConfig.CUSTOM_UPDATE_MANIFEST_URL
+            .ifBlank { org.churchpresenter.settings.utils.BrandConfig.RELEASES_API_URL }
     const val RELEASES_URL =
-        "https://github.com/ChurchPresenter/ChurchPresenter/releases/latest"
+        org.churchpresenter.settings.utils.BrandConfig.RELEASES_URL
 
     /** Where the pull requests a release's notes name are, by number. */
-    const val PULLS_URL = "https://github.com/ChurchPresenter/ChurchPresenter/pull"
+    const val PULLS_URL =
+        org.churchpresenter.settings.utils.BrandConfig.PULLS_URL
 
-    // Count-only beacon on churchpresenter.org that attributes downloads to the
-    // app's updater (vs. the website's download buttons vs. GitHub directly).
+    // Disabled by default until an Apresenter website download-counter endpoint is configured.
     private const val DOWNLOAD_BEACON_URL =
-        "https://www.churchpresenter.org/api/download"
+        org.churchpresenter.settings.utils.BrandConfig.DOWNLOAD_BEACON_URL
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -119,7 +120,8 @@ object UpdateChecker {
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
             connection.setRequestProperty("Accept", "application/vnd.github+json")
-            connection.setRequestProperty("User-Agent", "ChurchPresenter/${identity.appVersion}")
+            val appName = org.churchpresenter.settings.utils.BrandConfig.APP_NAME
+            connection.setRequestProperty("User-Agent", "$appName/${identity.appVersion}")
             connection.connectTimeout = CONNECT_TIMEOUT_MS
             connection.readTimeout = READ_TIMEOUT_MS
 
@@ -227,7 +229,7 @@ object UpdateChecker {
         beaconUrl: String = DOWNLOAD_BEACON_URL,
         retryDelay: Duration = QUICK_RETRY_DELAY,
     ): Job? {
-        if (!identity.isRelease) return null
+        if (!identity.isRelease || beaconUrl.isBlank()) return null
         return beaconScope.launch {
             // True once the server answered at all — any HTTP status counts,
             // since a 4xx/5xx means the request arrived and a retry won't help.
@@ -239,7 +241,8 @@ object UpdateChecker {
                 // The website's CSRF middleware 403s cross-origin POSTs with a
                 // form-like (or absent) content type; JSON passes it.
                 connection.setRequestProperty("Content-Type", "application/json")
-                connection.setRequestProperty("User-Agent", "ChurchPresenter/${identity.appVersion}")
+                val appName = org.churchpresenter.settings.utils.BrandConfig.APP_NAME
+                connection.setRequestProperty("User-Agent", "$appName/${identity.appVersion}")
                 connection.connectTimeout = CONNECT_TIMEOUT_MS
                 connection.readTimeout = READ_TIMEOUT_MS
                 connection.responseCode // send the request
@@ -283,6 +286,7 @@ internal fun selectDownloadUrl(urls: List<String>): String? {
     return when {
         os.contains("win") ->
             urls.firstOrNull { it.endsWith(".msi", ignoreCase = true) }
+                ?: urls.firstOrNull { it.endsWith(".exe", ignoreCase = true) }
         os.contains("mac") && arch == "aarch64" ->
             urls.firstOrNull { it.contains("arm64", ignoreCase = true) && it.endsWith(".dmg", ignoreCase = true) }
         os.contains("mac") ->

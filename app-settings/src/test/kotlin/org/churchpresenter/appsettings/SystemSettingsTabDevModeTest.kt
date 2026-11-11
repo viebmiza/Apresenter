@@ -150,7 +150,7 @@ class SystemSettingsTabDevModeTest {
                 SystemSettingsTab(settings = start, onSettingsChange = { applied = it(start) })
             }
         }
-        onNodeWithText("Show Wick, the helper, in the corner of the main window").performScrollTo().performClick()
+        onNodeWithText("Show Timóteo, the helper, in the corner of the main window").performScrollTo().performClick()
         waitForIdle()
         assertFalse(applied.helper.enabled)
         onNodeWithText("Offer a tip of the day").performScrollTo().performClick()

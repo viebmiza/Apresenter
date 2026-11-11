@@ -70,7 +70,7 @@ class CompanionServerQaModerationTest {
          * `user.home` is redirected for the whole class: `QAManager` persists its session under it and
          * restores that file on construction, so without this each test would start holding the
          * questions the previous one asked — and the real one would be writing into the developer's
-         * own `~/.churchpresenter`.
+         * own `~/.apresenter`.
          */
         private var realHome: String? = null
         private lateinit var tempHome: File
@@ -83,7 +83,7 @@ class CompanionServerQaModerationTest {
          * which shows up as a count that is right for one test and wrong for the one after it.
          */
         private val qaStateFile: File
-            get() = File(System.getProperty("user.home"), ".churchpresenter/qa_state.json")
+            get() = File(System.getProperty("user.home"), ".apresenter/qa_state.json")
 
         @JvmStatic
         @BeforeClass

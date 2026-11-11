@@ -24,7 +24,7 @@ class ContactReporterTest {
     @Test
     fun `the rate-limit escalation target is a public https url`() {
         assertTrue(ContactReporter.WEB_CONTACT_URL.startsWith("https://"), "must not fall back to http")
-        assertTrue(ContactReporter.WEB_CONTACT_URL.contains("churchpresenter.org"))
+        assertTrue(ContactReporter.WEB_CONTACT_URL.contains("viebmiza/Apresenter"))
     }
 
     @Test

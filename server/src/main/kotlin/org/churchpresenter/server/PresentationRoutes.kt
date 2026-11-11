@@ -173,7 +173,7 @@ private fun Route.presentationSlideRoutes(
                  * Body: { "name": "slides.pdf", "data": "data:application/pdf;base64,…" }
                  *
                  * Decodes the base64 data-URI, saves the file to
-                 * ~/.churchpresenter/device_presentations/, and emits [server.onPresentationUploaded]
+                 * ~/.apresenter/device_presentations/, and emits [server.onPresentationUploaded]
                  * so the desktop can load it into PresentationViewModel.
                  *
                  * Response: { "ok": true, "id": "<hex-hash>", "name": "<fileName>" }
@@ -207,7 +207,7 @@ private fun Route.mediaUploadRoutes(
                  *
                  * Streaming (rather than a base64 JSON body) keeps memory flat on both ends so
                  * large video files don't OOM the phone or the desktop. Saves to
-                 * ~/.churchpresenter/device_media/ and returns the absolute path so the companion
+                 * ~/.apresenter/device_media/ and returns the absolute path so the companion
                  * can Go Live / Add to Schedule a local MediaItem pointing at it.
                  *
                  * Response: { "ok": true, "path": "<abs path>", "name": "<title>", "mediaType": "local|audio" }
@@ -245,7 +245,7 @@ private fun Route.mediaUploadRoutes(
                         }
                         val uploadDir = File(
                             System.getProperty("user.home"),
-                            ".churchpresenter/device_media"
+                            ".apresenter/device_media"
                         ).also { it.mkdirs() }
                         val uniqueName = if (File(uploadDir, safeName).exists()) {
                             val ts   = System.currentTimeMillis()

@@ -40,7 +40,7 @@ class SettingsManagerTest {
         home.deleteRecursively()
     }
 
-    private val appDir: File get() = File(home, ".churchpresenter")
+    private val appDir: File get() = File(home, ".apresenter")
     private val settingsFile: File get() = File(appDir, "settings.json")
 
     private fun writeSettings(json: String) {

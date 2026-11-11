@@ -21,14 +21,18 @@ internal class SongDialogRequests {
         private set
     var creatingNew by mutableStateOf(false)
         private set
+    var searchingOnline by mutableStateOf(false)
+        private set
 
     fun edit(song: SongItem?) { editing = song }
     fun delete(song: SongItem?) { deleting = song }
     fun createNew() { creatingNew = true }
+    fun searchOnline() { searchingOnline = true }
 
     fun closeEditor() { editing = null }
     fun closeDelete() { deleting = null }
     fun closeNew() { creatingNew = false }
+    fun closeOnlineSearch() { searchingOnline = false }
 }
 
 /**

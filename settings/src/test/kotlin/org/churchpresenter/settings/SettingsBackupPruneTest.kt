@@ -37,7 +37,7 @@ class SettingsBackupPruneTest {
         home.deleteRecursively()
     }
 
-    private val appDir: File get() = File(home, ".churchpresenter").also { it.mkdirs() }
+    private val appDir: File get() = File(home, ".apresenter").also { it.mkdirs() }
 
     /** A backup written [minutesAgo] minutes ago, so "newest three" has something to sort on. */
     private fun backup(name: String, minutesAgo: Long): File =
@@ -107,7 +107,7 @@ class SettingsBackupPruneTest {
 
     @Test
     fun `pruning an app directory that does not exist does not throw`() {
-        File(home, ".churchpresenter").deleteRecursively()
+        File(home, ".apresenter").deleteRecursively()
 
         SettingsManager().pruneBackups()
     }

@@ -62,8 +62,8 @@ class AboutContentTest {
 
     @Test
     fun `the app name and copyright are shown`() = dialog {
-        onNodeWithText("Church Presenter").assertExists()
-        onNodeWithText("© 2026 Church Presenter").assertExists()
+        onNodeWithText("Apresenter").assertExists()
+        onNodeWithText("© 2026 Apresenter").assertExists()
     }
 
     @Test
@@ -143,7 +143,7 @@ class AboutContentTest {
             dialog {
                 onNodeWithText("Open Crash Logs").performClick()
             }
-            val expectedDir = File(fakeHome, ".churchpresenter/crash-reports")
+            val expectedDir = File(fakeHome, ".apresenter/crash-reports")
             assertTrue(expectedDir.exists(), "the crash-reports folder is created if it isn't there yet")
             assertEquals(expectedDir, openedFile)
         } finally {

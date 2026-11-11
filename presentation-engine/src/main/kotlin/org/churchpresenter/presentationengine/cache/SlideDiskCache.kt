@@ -32,7 +32,7 @@ class SlideCacheSupersededException(dir: File) :
  * Schema v1 entries (bare `mtime.txt`, no manifest) are treated as invalid and re-rendered once.
  */
 class SlideDiskCache(
-    private val baseDir: File = File(System.getProperty("user.home"), ".churchpresenter/slides")
+    private val baseDir: File = File(System.getProperty("user.home"), ".apresenter/slides")
 ) {
 
     companion object {

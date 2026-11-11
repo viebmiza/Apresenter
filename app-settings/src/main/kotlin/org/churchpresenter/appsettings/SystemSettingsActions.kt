@@ -235,7 +235,7 @@ internal fun clearRemoteUploads(
         // uploaded files", and decks and media pushed from a phone are written beside them and
         // were never cleaned by anything.
         val home = java.io.File(System.getProperty("user.home"))
-        REMOTE_UPLOAD_DIRS.forEach { java.io.File(home, ".churchpresenter/$it").deleteRecursively() }
+        REMOTE_UPLOAD_DIRS.forEach { java.io.File(home, ".apresenter/$it").deleteRecursively() }
         ui.showMessage(clearedMsg, title, SettingsMessageKind.INFO)
     }
 }

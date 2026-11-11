@@ -21,8 +21,8 @@ import org.churchpresenter.core.models.io.writeTextAtomically
  */
 object RecentPresentationFiles {
     private const val MAX = 10
-    internal var file = File(System.getProperty("user.home"), ".churchpresenter/recent_presentation_files.json")
-    internal var pinnedFile = File(System.getProperty("user.home"), ".churchpresenter/pinned_presentation_files.json")
+    internal var file = File(System.getProperty("user.home"), ".apresenter/recent_presentation_files.json")
+    internal var pinnedFile = File(System.getProperty("user.home"), ".apresenter/pinned_presentation_files.json")
     val files = mutableStateListOf<String>()
     val pinned = mutableStateListOf<String>()
 

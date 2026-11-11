@@ -180,7 +180,7 @@ class LocalLibraryContentTest {
 
         waitUntil("bundled entry materialized") { result.dismissed == 1 }
 
-        val expected = File(tempHome, ".churchpresenter/stock-backgrounds/$REAL_BUNDLED_IMAGE")
+        val expected = File(tempHome, ".apresenter/stock-backgrounds/$REAL_BUNDLED_IMAGE")
         assertEquals(expected.absolutePath, result.selected)
         assertTrue(expected.exists())
     }
@@ -188,7 +188,7 @@ class LocalLibraryContentTest {
     @Test
     fun `a bundled entry shadowed by a downloaded file of the same name selects the downloaded copy directly`() {
         val downloaded = File(tempHome, REAL_BUNDLED_IMAGE).apply { writeBytes(byteArrayOf(9)) }
-        val materialized = File(tempHome, ".churchpresenter/stock-backgrounds/$REAL_BUNDLED_IMAGE")
+        val materialized = File(tempHome, ".apresenter/stock-backgrounds/$REAL_BUNDLED_IMAGE")
 
         dialog(
             downloadedFiles = listOf(downloaded),

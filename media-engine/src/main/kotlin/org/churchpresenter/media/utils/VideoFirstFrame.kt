@@ -12,7 +12,7 @@ import org.churchpresenter.sharedui.utils.HeicDecoder
  * without playing it.
  *
  * Written by the bundled ffmpeg (`-frames:v 1`, the same invocation [HeicDecoder] uses for a single
- * picture) and kept under `~/.churchpresenter/cache/preview-frames/`, keyed by the clip's path, its
+ * picture) and kept under `~/.apresenter/cache/preview-frames/`, keyed by the clip's path, its
  * modification time and its length -- so a clip replaced under the same name is extracted again,
  * and an unchanged one is extracted once per machine rather than once per dialog.
  *
@@ -25,7 +25,7 @@ object VideoFirstFrame {
     private const val FFMPEG_TIMEOUT_SECONDS = 10L
 
     /** Where the extracted frames are kept. */
-    fun cacheDir(): File = File(System.getProperty("user.home"), ".churchpresenter/cache/preview-frames")
+    fun cacheDir(): File = File(System.getProperty("user.home"), ".apresenter/cache/preview-frames")
 
     /** The file [video]'s frame is cached as in [dir]: its path, mtime and length hashed together. */
     fun cacheFileFor(video: File, dir: File = cacheDir()): File {
