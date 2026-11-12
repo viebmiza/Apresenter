@@ -101,6 +101,10 @@ Garante que o **Apresenter** possa ser instalado e executado no mesmo computador
   - **Tradução PT-BR:** revisar `calendar/src/main/composeResources/values-pt/strings.xml` trocando termos de Portugal (*cânticos*, *guardar*, *ficheiro*, *separador*) por Português do Brasil.
   - **Modo local sem nuvem:** manter a opção de sincronização remota oculta/desativada enquanto não houver servidor de relay próprio, focando 100% em uso offline (repetições, modelos, PDF e carregamento automático no Roteiro).
   - **Atualizar o Timóteo (`:helper`):** atualizar `CalendarRules.kt`, `ActionText.kt` (`helper_open_calendar*`), glossário em português (`Portuguese.kt`) e catálogo (`updateWickCatalog`) explicando o novo fluxo do Calendário.
+- [ ] **Tradução PT-BR completa do P&R (`:qa` + páginas web do `:server`):**
+  - Adicionar em `strings/src/main/composeResources/values-pt/strings.xml` as 10 chaves faltantes do `:qa` (`qa_close_history`, `qa_delete_session`, `qa_no_session_banner`, `qa_resume_session`, `qa_session_label`, `qa_session_name_label`, `qa_session_option`, `qa_session_running`, `qa_show_less`, `qa_start_session`).
+  - Traduzir para Português (BR) as páginas web servidas aos celulares/moderadores em `server/src/main/resources/companion/` (`qa-submission.html`, `qa-voting.html`, `qa-admin.html` e revisar `presentation-remote.html`).
+  - Atualizar o catálogo/textos do **Timóteo** (`:helper:updateWickCatalog`) caso novos rótulos de UI sejam alterados.
 - [ ] **Futuro site próprio:**
   - Preencher `WEBSITE_URL`, `CONTACT_API_URL`, `CUSTOM_UPDATE_MANIFEST_URL` (se usar site além do GitHub Releases) em `BrandConfig.kt` quando o domínio/site estiver no ar.
 - [ ] **Simplificações e melhorias após testes reais:**
