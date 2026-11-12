@@ -477,6 +477,7 @@ compose.desktop {
 
             windows {
                 menuGroup = "Apresenter"
+                shortcut = true
                 perUserInstall = false
                 dirChooser = true
                 upgradeUuid = "8F4C2A1E-9B7D-4E31-B2A5-6C8D9E0F1234"
