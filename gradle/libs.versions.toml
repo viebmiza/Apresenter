@@ -51,7 +51,7 @@ pitestJunit5 = "1.2.3"
 jackson-core = { module = "com.fasterxml.jackson.core:jackson-core", version.ref = "jackson-core" }
 # The embedded Chromium the Web tab and the output window browse with; its natives are per
 # platform, in :composeApp.
-jcefmaven = { module = "me.friwi:jcefmaven", version = "143.0.14" }
+jcefmaven = { module = "me.friwi:jcefmaven", version = "152.0.6" }
 detekt-formatting = { module = "io.gitlab.arturbosch.detekt:detekt-formatting", version.ref = "detekt" }
 # What :detekt-rules is written against: the rule API, and the harness its tests lint code with.
 detekt-api = { module = "io.gitlab.arturbosch.detekt:detekt-api", version.ref = "detekt" }
