@@ -97,15 +97,22 @@ Garante que o **Apresenter** possa ser instalado e executado no mesmo computador
   - Preencher `WEBSITE_URL`, `CONTACT_API_URL`, `CUSTOM_UPDATE_MANIFEST_URL` (se usar site além do GitHub Releases) em `BrandConfig.kt` quando o domínio/site estiver no ar.
 - [ ] **Simplificações e melhorias após testes reais:**
   - Avaliar durante o uso quais abas manter/ocultar por padrão para operadores iniciantes e quais melhorias adicionais criar.
-- [ ] **Aplicativo Android (`.apk`) e futuro iOS:**
-  - Criar ou importar o repositório mobile separado (equivalente ao companion app na porta `8765`, já que este repositório contém apenas o aplicativo Desktop JVM e o servidor local `:server`).
+- [ ] **Aplicativo Android (`.apk`) — Celular, Tablet e Android TV (`Platform.ANDROID_TV`) + futuro iOS:**
+  - Criar repositório/app Android separado (compatível com o protocolo local do `:server` na porta `8765`, sem necessidade de Raspberry Pi ou Mini PC atrás da TV):
+    - **Modo Controle / Músico (Celular e Tablet):** controle remoto de apresentação, Bíblia, roteiro e palco/cifras para músicos.
+    - **Modo TV / Signage (`Platform.ANDROID_TV` em Smart TVs Android/Google TV e TV Box):**
+      - Descoberta automática na rede via mDNS (`SignageAdvert.kt`) ou entrada manual por IP/porta;
+      - Pareamento com código via WebSocket `/api/signage/ws` (`PairingQueue` -> token salvo localmente);
+      - Download e cache offline do `Manifest` (`GET /api/signage/manifest`) e arquivos por SHA-256 (`GET /api/signage/files/{sha256}`), mantendo fotos, vídeos e agenda rodando mesmo com o PC da projeção desligado;
+      - Suporte progressivo via flags `Features` (fotos/vídeos, agenda semanal, mensagens urgentes na tela e links web em WebView).
+    - **Fallback Web no `:server` (opcional) para Smart TVs não-Android (Samsung Tizen / LG webOS):** player leve em HTML/JS servido direto pelo Apresenter para abrir no navegador da própria TV.
 
 ---
 
 ## Fase 6 — Validação, CI/CD e Distribuição Profissional
 
-- [x] Verificações principais executadas após o commit `67d7a2b`: `checkModuleLayers`, `detekt` e suítes unitárias/UI dos módulos alterados.
-- [ ] Rodar suíte completa em CI e gerar instalador **`.exe` / `.msi`** assinado (ou via GitHub Actions `.github/workflows/build.yml` + GitHub Releases em `viebmiza/Apresenter`) para distribuição nas igrejas e auto-atualização sem Microsoft Store.
-- [ ] Validar fluxo ponta a ponta do auto-updater (`Verificar Atualizações` -> download com verificação SHA-256 -> execução `.exe` / `msiexec /i`).
+- [x] Verificações principais executadas após o commit `67d7a2b` e após configuração de versão (`checkModuleLayers`, `:composeApp:detekt`, `:updater:test`).
+- [x] Primeira Release pública publicada em `viebmiza/Apresenter`: **`v1.0.1` (`Apresenter Alpha 1.0.1`)** via GitHub Actions (`.github/workflows/build.yml`) com instaladores Windows `.msi` e `.exe` anexados.
+- [ ] Validar fluxo ponta a ponta do auto-updater em produção (`v1.0.1` -> `v1.0.2`: `Verificar Atualizações` -> download com verificação SHA-256 -> `msiexec /i`).
 - [ ] (Opcional/Recomendado para produção) Configurar certificado de assinatura de código (Code Signing) no Windows para evitar alertas do Windows Defender SmartScreen nas igrejas.
 
