@@ -109,15 +109,12 @@ Garante que o **Apresenter** possa ser instalado e executado no mesmo computador
   - Preencher `WEBSITE_URL`, `CONTACT_API_URL`, `CUSTOM_UPDATE_MANIFEST_URL` (se usar site além do GitHub Releases) em `BrandConfig.kt` quando o domínio/site estiver no ar.
 - [ ] **Simplificações e melhorias após testes reais:**
   - Avaliar durante o uso quais abas manter/ocultar por padrão para operadores iniciantes e quais melhorias adicionais criar.
-- [ ] **Aplicativo Android (`.apk`) — Celular, Tablet e Android TV (`Platform.ANDROID_TV`) + futuro iOS:**
-  - Criar repositório/app Android separado (compatível com o protocolo local do `:server` na porta `8765`, sem necessidade de Raspberry Pi ou Mini PC atrás da TV):
-    - **Modo Controle / Músico (Celular e Tablet):** controle remoto de apresentação, Bíblia, roteiro e palco/cifras para músicos.
-    - **Modo TV / Signage (`Platform.ANDROID_TV` em Smart TVs Android/Google TV e TV Box):**
-      - Descoberta automática na rede via mDNS (`SignageAdvert.kt`) ou entrada manual por IP/porta;
-      - Pareamento com código via WebSocket `/api/signage/ws` (`PairingQueue` -> token salvo localmente);
-      - Download e cache offline do `Manifest` (`GET /api/signage/manifest`) e arquivos por SHA-256 (`GET /api/signage/files/{sha256}`), mantendo fotos, vídeos e agenda rodando mesmo com o PC da projeção desligado;
-      - Suporte progressivo via flags `Features` (fotos/vídeos, agenda semanal, mensagens urgentes na tela e links web em WebView).
-    - **Fallback Web no `:server` (opcional) para Smart TVs não-Android (Samsung Tizen / LG webOS):** player leve em HTML/JS servido direto pelo Apresenter para abrir no navegador da própria TV.
+- [ ] **Aplicativo Android (`Apresenter-Android`) — 1 Repositório, 2 APKs por Release (Celular + TV Apenas Receptor):**
+  - Repositório dedicado `C:\dev\Apresenter-Android` (`viebmiza/Apresenter-Android`) compilado automaticamente pelo GitHub Actions gerando **dois `.apk` separados por release**:
+    - **`:app-mobile` (`Apresenter-Celular.apk`, `org.apresenter.mobile`):** interface 100% toque para controle remoto de apresentação, Bíblia, Roteiro, músicas/palco para músicos e P&R integrado conectado ao `:server` (porta `8765`).
+    - **`:app-tv` (`Apresenter-TV.apk`, `org.apresenter.tv`):** **apenas receptor** de Sinalização (`Platform.ANDROID_TV`) para Smart TVs Android/Google TV e TV Box — sem controles nem câmera, `touchscreen` e `leanback` com `required="false"`, navegação D-pad, pareamento por código via WebSocket `/api/signage/ws`, mDNS (`_churchpresenter._tcp.`), UDP Nudge (`47640`) e cache offline do `Manifest` + mídias por SHA-256 (`GET /api/signage/files/{sha256}`).
+    - **`:core` (`org.apresenter.android.core`):** biblioteca compartilhada entre os dois APKs com descoberta mDNS, cliente Companion (`/ws`, `/api/*`), protocolo/decisor do Signage e cache offline verificando SHA-256.
+    - **Fallback Web no `:server` (opcional futuro) para Smart TVs não-Android (Samsung Tizen / LG webOS):** player leve em HTML/JS servido direto pelo Apresenter para abrir no navegador da própria TV.
 
 ---
 
