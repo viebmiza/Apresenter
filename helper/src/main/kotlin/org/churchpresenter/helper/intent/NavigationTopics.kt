@@ -70,6 +70,7 @@ internal object NavigationTopics {
         listOf("web", "website", "browser") to Tabs.WEB,
         listOf("canvas", "camera", "scene") to Tabs.CANVAS,
         listOf("dictionary", "strong") to Tabs.DICTIONARY,
+        listOf("signage", "tv", "android tv", "lobby") to Tabs.SIGNAGE,
     )
 
     /** The tour for [normalized], or null when it names nothing the helper knows. */

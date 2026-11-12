@@ -372,6 +372,10 @@ internal val PORTUGUESE = Glossary(
         "remoto*" to "remote",
         "celular*" to "phone",
         "telefone*" to "phone",
+        "sinalização*" to "signage",
+        "sinalizacao*" to "signage",
+        "android tv" to "android tv",
+        "tv*" to "tv",
         "integraç*" to "integrations",
         "integrac*" to "integrations",
 

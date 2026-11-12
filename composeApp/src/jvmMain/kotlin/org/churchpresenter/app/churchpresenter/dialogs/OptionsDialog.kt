@@ -436,7 +436,7 @@ private fun SettingsTabContent(
             onSettingsChange = onSettingsChange,
             companionServer = companionServer,
             remoteClientManager = remoteClientManager,
-            calendarSync = calendarSync,
+            calendarSync = calendarSync?.takeIf { builtInRelayEndpoints.relayUrl.isNotBlank() },
             builtInRelayUrl = builtInRelayEndpoints.relayUrl,
         )
         TAB_ATEM -> AtemSettingsTab(settings = settings, onSettingsChange = onSettingsChange)

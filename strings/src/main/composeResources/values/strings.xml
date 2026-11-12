@@ -4176,7 +4176,7 @@
     <string name="signage_wipe_confirm">Wipe</string>
     <string name="signage_nothing">Nothing (idle card)</string>
     <string name="signage_no_screens">No screens yet</string>
-    <string name="signage_no_screens_hint">Install the signage player on a Raspberry Pi or mini PC behind the TV. Once it is on the same network it shows up here to approve.</string>
+    <string name="signage_no_screens_hint">Install the Apresenter TV app on your Smart TV (Android TV / TV Box) or on a mini PC behind the TV. Once it is on the same Wi-Fi network it shows up here to approve.</string>
     <string name="signage_picture_seconds">Seconds per picture</string>
     <string name="signage_folder_counts">%1$d pictures · %2$d videos · %3$d s each</string>
     <string name="signage_add_playlist">Add a playlist</string>
