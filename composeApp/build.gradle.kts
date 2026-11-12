@@ -476,6 +476,7 @@ compose.desktop {
             }
 
             windows {
+                menu = true
                 menuGroup = "Apresenter"
                 shortcut = true
                 perUserInstall = false
