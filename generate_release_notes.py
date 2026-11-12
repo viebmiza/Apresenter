@@ -22,19 +22,21 @@ if sys.stdout.encoding != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
 CATEGORIES = [
-    ("Songs",          r"song|favorite|column|composer|writer|songbook"),
-    ("Recents",        r"recent"),
-    ("Q&A / QR",       r"qa|q&a|qr|qr code|cooldown"),
-    ("Media",          r"media|video|audio|\bplay\b|\bstop\b"),
-    ("Bible",          r"bible|verse|scripture"),
-    ("Schedule",       r"schedule|playlist"),
-    ("Pictures",       r"picture|image|photo"),
-    ("Presentations",  r"presentation|slide|powerpoint|pdf"),
-    ("Displays",       r"display|screen|lock|output"),
-    ("Localization",   r"language|translation|locali|i18n|string"),
-    ("Settings",       r"setting|config|preference|theme"),
-    ("Build",          r"submodule|ci|build|gradle|workflow"),
-    ("UI / General",   r""),
+    ("Músicas",              r"song|favorite|column|composer|writer|songbook|m[uú]sica"),
+    ("Recentes",             r"recent"),
+    ("P&R / QR Code",        r"\bqa\b|q&a|p&r|qr|qr code|cooldown"),
+    ("Mídia",                r"media|video|audio|m[ií]dia|\bplay\b|\bstop\b"),
+    ("Bíblia",               r"bible|verse|scripture|b[ií]blia"),
+    ("Roteiro e Calendário", r"schedule|playlist|calendar|calend[aá]rio|roteiro"),
+    ("Imagens",              r"picture|image|photo|imagem|imagens"),
+    ("Apresentações",        r"presentation|slide|powerpoint|pdf|apresenta"),
+    ("Telas e Saídas",       r"display|screen|lock|output|tela"),
+    ("Assistente Timóteo",   r"helper|wick|tim[oó]teo"),
+    ("Transcrição / STT",    r"\bstt\b|whisper|caption"),
+    ("Tradução e Idiomas",   r"language|translation|locali|i18n|string|pt-br|portugu[eê]s"),
+    ("Configurações",        r"setting|config|preference|theme"),
+    ("Build e Automação",    r"submodule|ci|build|gradle|workflow"),
+    ("Geral / Interface",    r""),
 ]
 
 NOISE = re.compile(
@@ -58,7 +60,7 @@ def categorize(msg):
     for name, pattern in CATEGORIES:
         if not pattern or re.search(pattern, lower):
             return name
-    return "UI / General"
+    return "Geral / Interface"
 
 # GitHub's merge commits carry the PR title as the first line of the commit body, so the whole
 # changelog is computable from git alone — no API calls, nothing to rate-limit in CI.
@@ -150,15 +152,15 @@ def main():
     build_linux      = flag(6)
 
     print("---")
-    print("Download the installer for your platform below.\n")
+    print("Baixe abaixo o instalador do **Apresenter** para o seu sistema.\n")
     if build_windows:
-        print(f"- **Windows:** Apresenter-{version}-WINDOWS-x64.msi / Apresenter-{version}-WINDOWS-x64.exe")
+        print(f"- **Windows (recomendado):** `Apresenter-{version}-WINDOWS-x64.msi` (ou `.exe`)")
     if build_macos_arm:
-        print(f"- **macOS (Apple Silicon / M-series):** Apresenter-{version}-MACOS-arm64.dmg")
+        print(f"- **macOS (Apple Silicon / M-series):** `Apresenter-{version}-MACOS-arm64.dmg`")
     if build_macos_x64:
-        print(f"- **macOS (Intel):** Apresenter-{version}-MACOS-x64.dmg")
+        print(f"- **macOS (Intel):** `Apresenter-{version}-MACOS-x64.dmg`")
     if build_linux:
-        print(f"- **Linux (Ubuntu 22.04, Debian 12, Linux Mint 21 or newer):** apresenter_{version}_amd64-DEBIAN-x64.deb")
+        print(f"- **Linux (Ubuntu 22.04, Debian 12, Linux Mint 21 ou superior):** `apresenter_{version}_amd64-DEBIAN-x64.deb`")
 
 if __name__ == "__main__":
     main()

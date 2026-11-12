@@ -122,6 +122,9 @@ Garante que o **Apresenter** possa ser instalado e executado no mesmo computador
 
 - [x] Verificações principais executadas após o commit `67d7a2b` e após configuração de versão (`checkModuleLayers`, `:composeApp:detekt`, `:updater:test`).
 - [x] Primeira Release pública publicada em `viebmiza/Apresenter`: **`v1.0.1` (`Apresenter Alpha 1.0.1`)** via GitHub Actions (`.github/workflows/build.yml`) com instaladores Windows `.msi` e `.exe` anexados.
-- [ ] Validar fluxo ponta a ponta do auto-updater em produção (`v1.0.1` -> `v1.0.2`: `Verificar Atualizações` -> download com verificação SHA-256 -> `msiexec /i`).
+- [x] Release `v1.0.2` publicada com teste inicial do auto-updater (`v1.0.1` -> `v1.0.2`: download, verificação SHA-256 e migração de `settingsVersion = 26`).
+- [ ] **Melhorias no instalador e atualizador Windows (`v1.0.3`):**
+  - Em `UpdateInstall.kt` / `UpdateAvailableDialog.kt`: rodar upgrade do `.msi` com progresso limpo (`/qb`) para não parecer instalação do zero e exibir notas de atualização geradas em Português (BR) via `generate_release_notes.py`.
+  - Avaliar remover o wrapper `.exe` do `jpackage` (priorizando somente `.msi` no Windows), evitando travamentos silenciosos pós-UAC quando a mesma versão já está registrada no Windows Registry ou quando a pasta de instalação foi apagada manualmente.
 - [ ] (Opcional/Recomendado para produção) Configurar certificado de assinatura de código (Code Signing) no Windows para evitar alertas do Windows Defender SmartScreen nas igrejas.
 
