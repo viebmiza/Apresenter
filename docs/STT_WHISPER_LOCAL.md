@@ -26,7 +26,7 @@ Você precisa de **Python 3.10 a 3.13** instalado e das bibliotecas abaixo:
 pip install openai-whisper sounddevice numpy
 ```
 
-*(O script ponte [scripts/whisper_stt_server.py](../scripts/whisper_stt_server.py) implementa o protocolo WebSocket/Socket.IO v4 usando apenas a biblioteca padrão do Python — não precisa instalar `python-socketio` nem Node.js.)*
+*(O script ponte [tools/whisper_stt_server.py](../tools/whisper_stt_server.py) implementa o protocolo WebSocket/Socket.IO v4 usando apenas a biblioteca padrão do Python — não precisa instalar `python-socketio` nem Node.js.)*
 
 ### Qual modelo Whisper escolher?
 - **`tiny`**: bem rápido em processador comum (CPU), ótimo para testar ou computadores mais simples (~75 MB).
@@ -39,7 +39,7 @@ pip install openai-whisper sounddevice numpy
 No PowerShell ou Terminal, dentro da pasta `C:\dev\Apresenter`, liste as entradas disponíveis:
 
 ```powershell
-python scripts/whisper_stt_server.py --list-devices
+python tools/whisper_stt_server.py --list-devices
 ```
 
 Anote o número `[N]` correspondente à sua **interface de áudio USB** ou entrada **Line-In** ligada na mesa de som (ou use o padrão apenas para testes).
@@ -50,18 +50,18 @@ Anote o número `[N]` correspondente à sua **interface de áudio USB** ou entra
 
 ### Teste rápido no microfone padrão (modelo rápido `tiny`):
 ```powershell
-python scripts/whisper_stt_server.py --model tiny --language pt
+python tools/whisper_stt_server.py --model tiny --language pt
 ```
 
 ### Uso recomendado com placa da mesa de som (modelo `small`):
 ```powershell
-python scripts/whisper_stt_server.py --model small --language pt --device 1 --port 8766
+python tools/whisper_stt_server.py --model small --language pt --device 1 --port 8766
 ```
 
 ### Se o Whisper estiver rodando em outro computador na rede da igreja:
 Use `--host 0.0.0.0` no computador que recebe o áudio da mesa de som:
 ```powershell
-python scripts/whisper_stt_server.py --model small --language pt --device 1 --host 0.0.0.0 --port 8766
+python tools/whisper_stt_server.py --model small --language pt --device 1 --host 0.0.0.0 --port 8766
 ```
 
 Parâmetros úteis:
