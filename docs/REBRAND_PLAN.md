@@ -15,6 +15,7 @@
 2. **Centralizar identidade antes de editar dezenas de arquivos:** Em vez de sair fazendo "localizar e substituir" cego, criaremos um ponto único de configuração da marca (`BrandConfig`) e migraremos referências aos poucos.
 3. **Preservar os pacotes internos (`org.churchpresenter.*`) no início:** Renomear o namespace Java/Kotlin de 50+ módulos no Dia 1 gera conflitos desnecessários e quebra testes por reflexão (`ThemeKt`). Faremos isso só no final, se desejado.
 4. **Conformidade com GPL v3:** Como o original é `GNU GPL v3` (`LICENSE.txt`), o **Apresenter** mantém a licença GPL v3, preserva os avisos de copyright originais indicando ser uma versão modificada por Mizael G Nascimento, e mantém o código-fonte acessível a quem receber o software.
+5. **Assistente Timóteo sempre atualizado (`:helper`):** Toda nova função ou mudança de fluxo na interface deve atualizar as regras de intenção/glossário em português (`helper/intent/`), respostas (`ActionText.kt` / `:strings`) e o catálogo semântico (`.\gradlew.bat :helper:updateWickCatalog`), para que o Timóteo dentro do app saiba responder dúvidas sobre os recursos novos.
 
 ---
 
@@ -93,6 +94,13 @@ Garante que o **Apresenter** possa ser instalado e executado no mesmo computador
 
 - [x] **Novo Recurso — Pesquisa de Músicas na Internet (`:songs`):**
   - Implementados `OnlineSongSearchClient.kt`, `OnlineSongLyricsFormatter.kt`, `OnlineSongSearchDialog.kt` e `OnlineSongSearchParts.kt`, permitindo pesquisar por título, artista ou trecho da letra (LRCLIB + fallback iTunes/Lyrics.ovh), visualizar os slides formatados e importar direto na biblioteca.
+  - *(Pendência para próxima versão: ensinar ao assistente **Timóteo** no módulo `:helper` como responder perguntas sobre a Pesquisa de Músicas na Internet.)*
+- [ ] **Melhorias no Calendário (Planejamento de Cultos — Próxima Etapa `v1.0.2+`):**
+  - **Visibilidade na interface:** tirar `"CALENDAR"` do padrão oculto em `hiddenScheduleButtons` (`AppSettings.kt`) para o botão ficar visível direto na barra do **Roteiro**, além de posição de destaque no menu.
+  - **Criação e repetição mais intuitivas:** facilitar criação de cultos recorrentes (*Semanal*, *Quinzenal*, *Mensal*) e salvamento/uso de **Modelos** e **Predefinições** sem depender de caminhos escondidos no menu de cópia.
+  - **Tradução PT-BR:** revisar `calendar/src/main/composeResources/values-pt/strings.xml` trocando termos de Portugal (*cânticos*, *guardar*, *ficheiro*, *separador*) por Português do Brasil.
+  - **Modo local sem nuvem:** manter a opção de sincronização remota oculta/desativada enquanto não houver servidor de relay próprio, focando 100% em uso offline (repetições, modelos, PDF e carregamento automático no Roteiro).
+  - **Atualizar o Timóteo (`:helper`):** atualizar `CalendarRules.kt`, `ActionText.kt` (`helper_open_calendar*`), glossário em português (`Portuguese.kt`) e catálogo (`updateWickCatalog`) explicando o novo fluxo do Calendário.
 - [ ] **Futuro site próprio:**
   - Preencher `WEBSITE_URL`, `CONTACT_API_URL`, `CUSTOM_UPDATE_MANIFEST_URL` (se usar site além do GitHub Releases) em `BrandConfig.kt` quando o domínio/site estiver no ar.
 - [ ] **Simplificações e melhorias após testes reais:**
