@@ -15,13 +15,31 @@ import javax.inject.Inject
 /** The version's first segment: the two-digit year of the build. */
 val versionYear: Int = Calendar.getInstance().get(Calendar.YEAR) % 100
 
+private fun Project.versionProperties(): Properties =
+    loadPropsFile(rootProject.file("version.properties").path)
+
 /**
- * The app's version: year, then the commit count split across two segments, because Windows MSI
- * limits each version segment to 0-255.
+ * The app's version (`X.Y.Z`): reads `version` from `version.properties` when configured, or falls
+ * back to `YY.(commits / 256).(commits % 256)`. All three segments stay numeric `0..255` so Windows
+ * MSI `ProductVersion` and [UpdateChecker.isNewerVersion] both accept it cleanly.
  */
 fun Project.appVersion(): String {
+    val configured = versionProperties().getProperty("version", "").trim().removePrefix("v")
+    if (configured.isNotEmpty()) return configured
     val commits = gitCommitCount()
     return "$versionYear.${commits / 256}.${commits % 256}"
+}
+
+/** Optional release stage label from `version.properties` (e.g. `Alpha`, `Beta`, or blank). */
+fun Project.appStage(): String =
+    versionProperties().getProperty("stage", "").trim()
+
+/** Human-facing version line for About/diagnostics (e.g. `Alpha 1.0.1 (abc1234)`). */
+fun Project.appVersionDisplay(commitHash: String): String {
+    val version = appVersion()
+    val stage = appStage()
+    val base = if (stage.isNotEmpty()) "$stage $version" else version
+    return "$base ($commitHash)"
 }
 
 fun Project.gitCommitCount(): Int = gitOutput("rev-list", "--count", "HEAD")?.toIntOrNull() ?: 0

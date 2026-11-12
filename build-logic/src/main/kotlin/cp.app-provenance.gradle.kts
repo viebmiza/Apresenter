@@ -1,4 +1,5 @@
 import org.churchpresenter.buildlogic.appVersion
+import org.churchpresenter.buildlogic.appVersionDisplay
 import org.churchpresenter.buildlogic.gitBuildType
 import org.churchpresenter.buildlogic.gitCommitCount
 import org.churchpresenter.buildlogic.gitCommitHash
@@ -13,6 +14,7 @@ val generateBuildConfig = tasks.register("generateBuildConfig") {
     val commitHash = gitCommitHash()
     val commits = gitCommitCount()
     val appVersion = appVersion()
+    val versionDisplay = appVersionDisplay(commitHash)
     // A packaged installer build (packageDmg/Msi/Exe/Deb, packageDistributionForCurrentOS,
     // signing/notarization — see .github/workflows/build.yml) is a real release. A plain
     // `run` or IDE launch is a developer build. Used to tag live-map pings dev vs. user.
@@ -79,7 +81,7 @@ val generateBuildConfig = tasks.register("generateBuildConfig") {
             |    const val APP_VERSION = "$appVersion"
             |    const val COMMIT_HASH = "$commitHash"
             |    const val COMMIT_COUNT = "$commits"
-            |    const val VERSION_DISPLAY = "$appVersion ($commitHash)"
+            |    const val VERSION_DISPLAY = "$versionDisplay"
             |    const val IS_RELEASE = $isRelease
             |    const val REPO_SLUG = "$repoSlug"
             |    const val BUILD_TYPE = "$buildType"

@@ -1,6 +1,9 @@
 name: Build Platforms
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       windows:
@@ -69,10 +72,11 @@ permissions:
 
 jobs:
   version:
-    if: ${{ inputs.release }}
+    if: ${{ github.event_name == 'push' || inputs.release }}
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.VERSION }}
+      release_name: ${{ steps.version.outputs.RELEASE_NAME }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -83,11 +87,23 @@ jobs:
         id: version
         env:
           INPUT_VERSION: ${{ inputs.version }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ -n "$INPUT_VERSION" ]; then
-            VERSION="$INPUT_VERSION"
-            # Auto-add v prefix if missing
+          PROP_VERSION=""
+          PROP_STAGE=""
+          if [ -f version.properties ]; then
+            PROP_VERSION=$(grep -E '^version=' version.properties | head -1 | cut -d'=' -f2- | tr -d '\r' | xargs || true)
+            PROP_STAGE=$(grep -E '^stage=' version.properties | head -1 | cut -d'=' -f2- | tr -d '\r' | xargs || true)
+          fi
+          if [ "$REF_TYPE" = "tag" ] && [ -n "$REF_NAME" ]; then
+            VERSION="$REF_NAME"
             [[ "$VERSION" != v* ]] && VERSION="v$VERSION"
+          elif [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
+            [[ "$VERSION" != v* ]] && VERSION="v$VERSION"
+          elif [ -n "$PROP_VERSION" ]; then
+            VERSION="v${PROP_VERSION#v}"
           else
             YEAR=$(date +%y)
             COMMITS=$(git rev-list --count HEAD)
@@ -96,11 +112,17 @@ jobs:
             PATCH=$((COMMITS % 256))
             VERSION="v${MAJOR}.${MINOR}.${PATCH}"
           fi
+          if [ -n "$PROP_STAGE" ]; then
+            RELEASE_NAME="Apresenter ${PROP_STAGE} ${VERSION#v}"
+          else
+            RELEASE_NAME="Apresenter ${VERSION}"
+          fi
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Version: $VERSION"
+          echo "RELEASE_NAME=$RELEASE_NAME" >> "$GITHUB_OUTPUT"
+          echo "Version: $VERSION | Release Name: $RELEASE_NAME"
 
   build-windows:
-    if: ${{ inputs.windows }}
+    if: ${{ github.event_name == 'push' || inputs.windows }}
     runs-on: windows-latest
     env:
       WINDOWS_SIGNING_ENABLED: ${{ secrets.WINDOWS_CERTIFICATE_PFX != '' && 'true' || 'false' }}
@@ -136,12 +158,12 @@ jobs:
         run: |
           SIGNING_DIR="$RUNNER_TEMP/signing/windows"
           mkdir -p "$SIGNING_DIR"
-          echo "$CERTIFICATE_PFX" | base64 --decode > "$SIGNING_DIR/churchpresenter-windows.pfx"
+          echo "$CERTIFICATE_PFX" | base64 --decode > "$SIGNING_DIR/apresenter-windows.pfx"
           {
-            echo "certFile=churchpresenter-windows.pfx"
+            echo "certFile=apresenter-windows.pfx"
             echo "certPassword=${CERTIFICATE_PASSWORD}"
             echo "timestampUrl=http://timestamp.digicert.com"
-            echo "subjectName=Church Presenter"
+            echo "subjectName=Mizael G Nascimento"
           } > "$SIGNING_DIR/signing.properties"
           # local.properties is read with java.util.Properties, where a backslash is an escape:
           # D:\a\_temp would load as D:a_temp. Write the path with forward slashes.
@@ -168,12 +190,13 @@ jobs:
           PLANNING_CENTER_CLIENT_SECRET: ${{ secrets.PLANNING_CENTER_CLIENT_SECRET }}
           CALENDAR_RELAY_URL: ${{ secrets.CALENDAR_RELAY_URL }}
           CALENDAR_RELAY_CONFIG_URL: ${{ secrets.CALENDAR_RELAY_CONFIG_URL }}
-        run: ./gradlew :composeApp:signWindowsMsi
+        run: ./gradlew :composeApp:signWindowsMsi :composeApp:signWindowsExe
 
       # Its own step, bounded and allowed to fail: the MSIX is only for the Store (store-submit.yml),
       # and a makeappx that stalls must not hold back the signed MSI, the release or the nightly.
       - name: Package MSIX
         id: msix
+        if: ${{ vars.MSIX_IDENTITY_NAME != '' }}
         shell: bash
         timeout-minutes: 20
         continue-on-error: true
@@ -194,18 +217,26 @@ jobs:
           "-Pmsix.publisher=$MSIX_PUBLISHER"
           "-Pmsix.publisherDisplayName=$MSIX_PUBLISHER_DISPLAY_NAME"
 
-      - name: Rename MSI (add WINDOWS-x64 label)
+      - name: Rename Windows installers (add WINDOWS-x64 label)
         shell: bash
         run: |
+          mkdir -p release-win
           for f in composeApp/build/compose/binaries/main/msi/*.msi; do
-            mv "$f" "${f%.msi}-WINDOWS-x64.msi"
+            [ -e "$f" ] || continue
+            base=$(basename "$f" .msi)
+            mv "$f" "release-win/${base}-WINDOWS-x64.msi"
+          done
+          for f in composeApp/build/compose/binaries/main/exe/*.exe; do
+            [ -e "$f" ] || continue
+            base=$(basename "$f" .exe)
+            mv "$f" "release-win/${base}-WINDOWS-x64.exe"
           done
 
       - name: Upload artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-msi
-          path: composeApp/build/compose/binaries/main/msi
+          path: release-win
           retention-days: 2
 
       # For store-submit.yml or a hand upload; not attached to the GitHub release, since an MSIX
@@ -734,7 +765,7 @@ jobs:
               done < <(dpkg-deb -f /deb/*.deb Recommends | tr "," "\n" | sed "s/^ *//; s/ *\$//" | grep .)
               failed=$recommends_missing
               # The JDK libraries find libjvm.so through the java launcher, which ldd does not run.
-              jvm=$(find /opt/churchpresenter -name libjvm.so | head -1)
+              jvm=$(find /opt/apresenter -name libjvm.so | head -1)
               [ -n "$jvm" ] || { echo "::error::no libjvm.so in the package"; exit 1; }
               export LD_LIBRARY_PATH=$(dirname "$jvm")
               count=0
@@ -747,8 +778,8 @@ jobs:
                   echo "::error::$f cannot load on Ubuntu 22.04:"
                   echo "$missing" | sed "s/^/    /"
                 fi
-              done < <(find /opt/churchpresenter -type f -print0)
-              echo "ldd checked $count ELF files under /opt/churchpresenter"
+              done < <(find /opt/apresenter -type f -print0)
+              echo "ldd checked $count ELF files under /opt/apresenter"
               [ "$count" -gt 0 ] || { echo "::error::no ELF files found to check"; exit 1; }
               exit $failed
             '
@@ -772,17 +803,17 @@ jobs:
       - name: Generate SBOM
         run: |
           ./gradlew :composeApp:cyclonedxDirectBom
-          cp composeApp/build/reports/cyclonedx/bom.json ChurchPresenter-sbom.cdx.json
+          cp composeApp/build/reports/cyclonedx/bom.json Apresenter-sbom.cdx.json
 
       - name: Upload SBOM
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom
-          path: ChurchPresenter-sbom.cdx.json
+          path: Apresenter-sbom.cdx.json
           retention-days: 2
 
   release:
-    if: ${{ always() && inputs.release && needs.version.result == 'success' }}
+    if: ${{ always() && (github.event_name == 'push' || inputs.release) && needs.version.result == 'success' }}
     needs: [version, build-windows, build-macos, build-macos-x64, build-linux]
     runs-on: ubuntu-latest
     permissions:
@@ -794,7 +825,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download Windows artifact
-        if: ${{ inputs.windows && needs.build-windows.result == 'success' }}
+        if: ${{ (github.event_name == 'push' || inputs.windows) && needs.build-windows.result == 'success' }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: windows-msi
@@ -851,9 +882,9 @@ jobs:
           PREV_TAG=$(gh release list --limit 5 --json tagName \
             -q '[.[] | select(.tagName != "nightly")][0].tagName // empty' 2>/dev/null || echo "")
           if [ -n "$PREV_TAG" ]; then
-            NOTES=$(python3 generate_release_notes.py "$PREV_TAG" "$VERSION" "${{ inputs.windows && needs.build-windows.result == 'success' }}" "${{ inputs.macos_arm64 && needs.build-macos.result == 'success' }}" "${{ inputs.macos_x64 && needs.build-macos-x64.result == 'success' }}" "${{ inputs.linux && needs.build-linux.result == 'success' }}")
+            NOTES=$(python3 generate_release_notes.py "$PREV_TAG" "$VERSION" "${{ (github.event_name == 'push' || inputs.windows) && needs.build-windows.result == 'success' }}" "${{ inputs.macos_arm64 && needs.build-macos.result == 'success' }}" "${{ inputs.macos_x64 && needs.build-macos-x64.result == 'success' }}" "${{ inputs.linux && needs.build-linux.result == 'success' }}")
           else
-            NOTES="Download the installer for your platform below."
+            NOTES="Baixe abaixo o instalador do **Apresenter** para o seu sistema."
           fi
           echo "BODY<<EOF" >> "$GITHUB_OUTPUT"
           echo "$NOTES" >> "$GITHUB_OUTPUT"
@@ -863,9 +894,9 @@ jobs:
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           tag_name: ${{ needs.version.outputs.version }}
-          name: ChurchPresenter ${{ needs.version.outputs.version }}
+          name: ${{ needs.version.outputs.release_name }}
           body: ${{ steps.body.outputs.BODY }}
-          prerelease: ${{ inputs.prerelease }}
+          prerelease: ${{ inputs.prerelease == true }}
           files: |
             release/windows/*
             release/macos/*

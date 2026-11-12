@@ -1,8 +1,7 @@
+import org.churchpresenter.buildlogic.appVersion
 import org.churchpresenter.buildlogic.desktopSigningRepoPath
-import org.churchpresenter.buildlogic.gitCommitCount
 import org.churchpresenter.buildlogic.isConfigured
 import org.churchpresenter.buildlogic.signingProps
-import org.churchpresenter.buildlogic.versionYear
 import org.churchpresenter.buildlogic.webEngineRecommends
 import org.churchpresenter.buildlogic.withPreT64Alternatives
 import java.io.File
@@ -151,10 +150,9 @@ tasks.register("packageMsix") {
         if (!isWindows) logger.info("packageMsix skipped: not running on Windows")
         isWindows
     }
-    val commits = gitCommitCount()
     // MSIX takes four segments and the Store requires the last to be 0; the first three are the
     // MSI's, so both installers of one build carry the same version.
-    val msixVersion = "$versionYear.${commits / 256}.${commits % 256}.0"
+    val msixVersion = "${appVersion()}.0"
     val appImage = layout.buildDirectory.dir("compose/binaries/main/app/Apresenter")
     val stagingDir = layout.buildDirectory.dir("msix/layout")
     val outDir = layout.buildDirectory.dir("compose/binaries/main/msix")

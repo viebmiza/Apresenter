@@ -152,13 +152,13 @@ def main():
     print("---")
     print("Download the installer for your platform below.\n")
     if build_windows:
-        print(f"- **Windows:** ChurchPresenter-{version}-WINDOWS-x64.msi")
+        print(f"- **Windows:** Apresenter-{version}-WINDOWS-x64.msi / Apresenter-{version}-WINDOWS-x64.exe")
     if build_macos_arm:
-        print(f"- **macOS (Apple Silicon / M-series):** ChurchPresenter-{version}-MACOS-arm64.dmg")
+        print(f"- **macOS (Apple Silicon / M-series):** Apresenter-{version}-MACOS-arm64.dmg")
     if build_macos_x64:
-        print(f"- **macOS (Intel):** ChurchPresenter-{version}-MACOS-x64.dmg")
+        print(f"- **macOS (Intel):** Apresenter-{version}-MACOS-x64.dmg")
     if build_linux:
-        print(f"- **Linux (Ubuntu 22.04, Debian 12, Linux Mint 21 or newer):** churchpresenter_{version}_amd64-DEBIAN-x64.deb")
+        print(f"- **Linux (Ubuntu 22.04, Debian 12, Linux Mint 21 or newer):** apresenter_{version}_amd64-DEBIAN-x64.deb")
 
 if __name__ == "__main__":
     main()
