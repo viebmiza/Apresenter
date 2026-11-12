@@ -168,7 +168,7 @@ fun FrameWindowScope.NavigationTopBar(
         FileMenu(fileLabel, fileMnemonic, ::accelerator, onNewSchedule, onOpenSchedule, onSaveSchedule,
             onSaveScheduleAs, onCloseSchedule, onExit)
         ScheduleMenu(scheduleLabel, scheduleMnemonic, ::accelerator, onAddToSchedule, onRemoveFromSchedule,
-            onClearSchedule)
+            onClearSchedule, onCalendar)
         EditMenu(editLabel, editMnemonic, ::accelerator, onSettings, onStatistics)
         ConnectMenu(onConnectToInstance, onDisconnectInstance, isInstanceLinkConnected)
         ViewMenu(theme, currentTheme, hasCustomTheme, onCustomizeTheme,
@@ -250,6 +250,7 @@ private fun MenuBarScope.ScheduleMenu(
     onAddToSchedule: () -> Unit,
     onRemoveFromSchedule: () -> Unit,
     onClearSchedule: () -> Unit,
+    onCalendar: () -> Unit,
 ) {
     Menu(label, mnemonic = mnemonic) {
         Item(
@@ -263,6 +264,11 @@ private fun MenuBarScope.ScheduleMenu(
             shortcut = accel(ShortcutAction.REMOVE_FROM_SCHEDULE)
         )
         Item(stringResource(Res.string.menu_clear_schedule), onClick = onClearSchedule)
+        Item(
+            stringResource(Res.string.open_calendar_manager),
+            onClick = onCalendar,
+            shortcut = accel(ShortcutAction.OPEN_CALENDAR_MANAGER),
+        )
     }
 }
 

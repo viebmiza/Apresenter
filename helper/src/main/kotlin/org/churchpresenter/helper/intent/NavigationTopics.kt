@@ -19,6 +19,7 @@ import org.churchpresenter.strings.generated.resources.helper_hint_background
 import org.churchpresenter.strings.generated.resources.helper_hint_clear
 import org.churchpresenter.strings.generated.resources.helper_hint_live_preview
 import org.churchpresenter.strings.generated.resources.helper_hint_new_song
+import org.churchpresenter.strings.generated.resources.helper_hint_online_song_search
 import org.churchpresenter.strings.generated.resources.helper_hint_projection_page
 import org.churchpresenter.strings.generated.resources.helper_hint_schedule
 import org.churchpresenter.strings.generated.resources.helper_hint_server_page
@@ -34,6 +35,11 @@ import org.jetbrains.compose.resources.StringResource
  */
 internal object NavigationTopics {
     private val TOPICS: List<Pair<List<String>, () -> GuideTour>> = listOf(
+        listOf(
+            "search online", "search song online", "search a song online", "search lyrics online",
+            "find song online", "find a song online", "find lyrics online",
+            "online lyrics", "lyrics online", "online song", "song online",
+        ) to ::onlineSongSearch,
         listOf("add a song", "new song", "add song", "create a song", "write a song", "create song") to ::newSong,
         listOf("projection", "second screen", "projector", "screens", "displays", "outputs", "monitor") to ::projection,
         listOf("remote", "phone", "tablet", "companion", "mobile", "ipad") to ::remoteServer,
@@ -84,6 +90,18 @@ internal object NavigationTopics {
             GuideStep(
                 GuideTargets.NEW_SONG,
                 helperText(Res.string.helper_hint_new_song),
+                before = HelperAction.SelectTab(Tabs.SONGS),
+            ),
+        ),
+    )
+
+    /** The Songs tab, then its Search Online Lyrics button. */
+    internal fun onlineSongSearch() = GuideTour(
+        listOf(
+            tabStep(Tabs.SONGS),
+            GuideStep(
+                GuideTargets.ONLINE_SONG_SEARCH,
+                helperText(Res.string.helper_hint_online_song_search),
                 before = HelperAction.SelectTab(Tabs.SONGS),
             ),
         ),

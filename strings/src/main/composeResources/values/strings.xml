@@ -3346,7 +3346,7 @@
          Weekly, Every 2 wk, Monthly, Load into Schedule), whose labels are that window's strings
          (calendar/src/main/composeResources/values/strings.xml): translate them the way that file does. -->
     <string name="helper_open_calendar">Opening the Calendar Manager. Pick a day and click Add service, then under Start from choose a blank service, a template or an earlier one. Add songs, verses and slides to its run of show.</string>
-    <string name="helper_open_calendar_repeat">Opening the Calendar Manager. Add the service once, then click the copy icon in its run of show header and set Repeat to Weekly, Every 2 wk or Monthly.</string>
+    <string name="helper_open_calendar_repeat">Opening the Calendar Manager. Pick a day and click Add service, then set Repeat to Weekly, Every 2 wk or Monthly right inside the sheet — or click the copy icon in an existing service’s run of show header.</string>
     <string name="helper_open_calendar_template">Opening the Calendar Manager. Plan a service, then click the template icon in its run of show header to save it. New services can start from it under Start from.</string>
     <string name="helper_open_calendar_load">Opening the Calendar Manager. Pick the service and click Load into Schedule, or turn on auto-load so it goes into the Schedule tab by itself before it starts.</string>
     <string name="helper_open_calendar_automate">Opening the Calendar Manager. Click a row in a service's run of show to set when it starts on its own and how long it runs, then arm the service.</string>
@@ -3367,6 +3367,7 @@
     <string name="helper_hint_tab">This is the %1$s tab.</string>
     <string name="helper_hint_control">This is %1$s.</string>
     <string name="helper_hint_new_song">Click here to write a new song.</string>
+    <string name="helper_hint_online_song_search">Click here to search for song lyrics online and import them.</string>
     <!-- %1$s is the Edit Song button's name (edit_song), passed in so the hint names it as the
          translated UI does. -->
     <string name="helper_hint_pick_and_edit">Pick the song, then click %1$s.</string>

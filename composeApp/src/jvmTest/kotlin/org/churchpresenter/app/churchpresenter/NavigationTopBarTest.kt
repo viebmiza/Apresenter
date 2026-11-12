@@ -251,22 +251,26 @@ class NavigationTopBarTest {
         var add = 0
         var remove = 0
         var clear = 0
+        var calendar = 0
         navigationTopBar(
             onAddToSchedule = { add++ },
             onRemoveFromSchedule = { remove++ },
             onClearSchedule = { clear++ },
+            onCalendar = { calendar++ },
         ) {
             val schedule = getMenu(1)
             assertEquals("Schedule", schedule.text)
-            assertEquals(3, schedule.itemCount)
+            assertEquals(4, schedule.itemCount)
             assertEquals("Add to Schedule", schedule.getItem(0).text)
             assertEquals("Remove from Schedule", schedule.getItem(1).text)
             assertEquals("Clear Schedule", schedule.getItem(2).text)
+            assertEquals("Calendar Manager", schedule.getItem(3).text)
             for (i in 0 until schedule.itemCount) schedule.getItem(i).doClick(0)
         }
         assertEquals(1, add)
         assertEquals(1, remove)
         assertEquals(1, clear)
+        assertEquals(1, calendar)
     }
 
     @Test

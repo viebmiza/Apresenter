@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.performTextInput
 import org.churchpresenter.calendar.CalendarStore
 import org.churchpresenter.calendar.model.CalendarDocument
+import org.churchpresenter.calendar.model.DEFAULT_REPEAT_COUNT
 import org.churchpresenter.calendar.model.SavedTemplate
 import org.churchpresenter.calendar.model.ServiceKind
 import org.churchpresenter.calendar.model.ServiceRepeat
@@ -159,4 +160,19 @@ class ServiceSheetDeepTest {
             assertTrue(!shows("Applies to"))
             assertTrue(!shows("Start from"), "and nothing to start from — it already exists")
         }
+
+    @Test
+    fun `a new service with weekly repeat creates the whole recurring series`() = withCalendar { folder ->
+        clickFirst("Add service")
+        awaitText("New service")
+        typeIntoFirstField("Sunday Worship")
+
+        clickInSheet("Weekly", anchor = "New service")
+        clickInSheet("Create $DEFAULT_REPEAT_COUNT", anchor = "New service")
+
+        val services = stored(folder).services.sortedBy { it.date }
+        assertEquals(DEFAULT_REPEAT_COUNT, services.size)
+        assertTrue(services.all { it.name == "Sunday Worship" && it.repeat == ServiceRepeat.WEEKLY.id })
+        assertEquals(1, services.map { it.seriesId }.distinct().size)
+    }
 }

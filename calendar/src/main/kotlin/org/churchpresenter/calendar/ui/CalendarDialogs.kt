@@ -186,7 +186,17 @@ private fun ServiceDialog(
         today = today,
         onSave = { form ->
             if (existing == null) {
-                state.addService(form.name, form.startTime, form.kind, form.template, form.date)
+                val created = state.addService(form.name, form.startTime, form.kind, form.template, form.date)
+                val extraDates = form.extraRepeatDates()
+                if (extraDates.isNotEmpty()) {
+                    state.copyService(
+                        service = created,
+                        dates = extraDates,
+                        includeRunOfShow = true,
+                        includeCues = true,
+                        repeat = form.repeat,
+                    )
+                }
                 onServiceAdded()
             } else {
                 state.updateService(

@@ -54,13 +54,30 @@ internal fun featureTopicsRule(r: Request): Resolution? {
         r.hasPhrase(Vocabulary.BIBLE_HISTORY) -> highlight(FeatureTours.bibleHistory())
         text.any { it.isDigit() } -> null
         r.hasPhrase(Vocabulary.MULTI_VERSE) -> highlight(FeatureTours.multiVerse())
-        aboutBible && (searching || r.hasPhrase(Vocabulary.FIND_VERSE)) -> highlight(FeatureTours.bibleSearch())
-        aboutSongs && (searching || r.hasPhrase(Vocabulary.FIND_SONG)) -> highlight(FeatureTours.songSearch())
-        r.has(Vocabulary.WEBSITE) || r.hasPhrase(Vocabulary.WEB_PAGE) -> highlight(FeatureTours.website())
-        else -> null
+        else -> searchFeatureAction(r, text, aboutSongs, aboutBible, searching)
     }
     return action?.let(::act)
 }
+
+private fun searchFeatureAction(
+    r: Request,
+    text: String,
+    aboutSongs: Boolean,
+    aboutBible: Boolean,
+    searching: Boolean,
+): HelperAction? = when {
+    aboutBible && (searching || r.hasPhrase(Vocabulary.FIND_VERSE)) -> highlight(FeatureTours.bibleSearch())
+    !r.has(Vocabulary.WEBSITE) && !r.hasPhrase(Vocabulary.WEB_PAGE) &&
+        (aboutSongs || searching) && isOnlineSongQuery(text) -> highlight(NavigationTopics.onlineSongSearch())
+    aboutSongs && (searching || r.hasPhrase(Vocabulary.FIND_SONG)) -> highlight(FeatureTours.songSearch())
+    r.has(Vocabulary.WEBSITE) || r.hasPhrase(Vocabulary.WEB_PAGE) -> highlight(FeatureTours.website())
+    else -> null
+}
+
+private fun isOnlineSongQuery(text: String): Boolean =
+    text.containsWordPrefix("online") ||
+        text.containsPhrase("on the internet") ||
+        text.containsPhrase("from the internet")
 
 private fun highlight(tour: GuideTour) = HelperAction.Highlight(tour)
 

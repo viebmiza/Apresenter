@@ -168,16 +168,7 @@ fun CopySheet(
                 verticalArrangement = Arrangement.spacedBy(13.dp),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 14.dp),
             ) {
-                Column {
-                    FieldLabel(stringResource(Res.string.calendar_copy_repeat))
-                    Spacer(Modifier.height(6.dp))
-                    SegmentedSelector(
-                        options = ServiceRepeat.entries,
-                        selected = repeat,
-                        label = { repeatLabel(it) },
-                        onSelect = { repeat = it },
-                    )
-                }
+                RepeatSelector(repeat = repeat, onSelect = { repeat = it })
                 if (once) {
                     PasteOn(selected = target, onSelect = { target = it })
                 } else {
@@ -250,7 +241,21 @@ private fun targetLabel(target: CopyTarget): String = stringResource(
 
 /** `How many times`, as a number with a stacked up/down pair — the design's stepper. */
 @Composable
-private fun CountStepper(count: Int, onChange: (Int) -> Unit) {
+internal fun RepeatSelector(repeat: ServiceRepeat, onSelect: (ServiceRepeat) -> Unit) {
+    Column {
+        FieldLabel(stringResource(Res.string.calendar_copy_repeat))
+        Spacer(Modifier.height(6.dp))
+        SegmentedSelector(
+            options = ServiceRepeat.entries,
+            selected = repeat,
+            label = { repeatLabel(it) },
+            onSelect = onSelect,
+        )
+    }
+}
+
+@Composable
+internal fun CountStepper(count: Int, onChange: (Int) -> Unit, minCount: Int = 1) {
     val scheme = MaterialTheme.colorScheme
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
         Text(
@@ -268,7 +273,9 @@ private fun CountStepper(count: Int, onChange: (Int) -> Unit) {
         ) {
             CompactTextField(
                 value = count.toString(),
-                onValueChange = { typed -> typed.toIntOrNull()?.let { onChange(it.coerceIn(1, MAX_REPEAT_COUNT)) } },
+                onValueChange = { typed ->
+                    typed.toIntOrNull()?.let { onChange(it.coerceIn(minCount, MAX_REPEAT_COUNT)) }
+                },
                 height = TARGET_HEIGHT - 4.dp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.width(COUNT_FIELD),
@@ -281,7 +288,11 @@ private fun CountStepper(count: Int, onChange: (Int) -> Unit) {
                 ) {
                     onChange(count + 1)
                 }
-                StepButton(Icons.Filled.KeyboardArrowDown, stringResource(Res.string.calendar_count_down), count > 1) {
+                StepButton(
+                    icon = Icons.Filled.KeyboardArrowDown,
+                    description = stringResource(Res.string.calendar_count_down),
+                    enabled = count > minCount,
+                ) {
                     onChange(count - 1)
                 }
             }
@@ -319,7 +330,7 @@ private fun StepButton(
  * the planner, and a Sunday that already has the morning is exactly where an evening series goes.
  */
 @Composable
-private fun DatePreview(dates: List<LocalDate>, monthly: Boolean, hasServices: (LocalDate) -> Boolean) {
+internal fun DatePreview(dates: List<LocalDate>, monthly: Boolean, hasServices: (LocalDate) -> Boolean) {
     val scheme = MaterialTheme.colorScheme
     val heading = if (dates.size == 1) {
         stringResource(Res.string.calendar_copy_creates_one)

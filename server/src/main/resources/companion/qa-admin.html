@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Q&A Admin</title>
+<title>Moderação P&amp;R</title>
 <style>
 /*QA_SHARED_CSS*/
 :root{--qa-bg:#1e1e2e;--qa-surface:#2a2a3e;--qa-ink:#e0e0e0;--qa-muted:#a0a0ad;--qa-border:#3b3b5c}
@@ -59,52 +59,52 @@ body.hide-actions .q-actions{display:none}
 </head>
 <body>
 <div id="login-screen" class="login" style="display:none">
-<h1>Q&A Admin</h1>
-<p style="color:var(--qa-muted);margin-top:8px">Enter the Q&amp;A admin password to continue</p>
-<label class="sr-only" for="pw-input">Admin password</label>
-<input type="password" id="pw-input" aria-label="Admin password" placeholder="Password" onkeydown="if(event.key==='Enter')doLogin()">
-<button class="btn btn-live" id="login-btn" onclick="doLogin()">Login</button>
-<p id="connecting-msg" style="display:none;color:var(--qa-muted);margin-top:8px">Waiting for approval on the desktop…</p>
+<h1>Moderação P&amp;R</h1>
+<p style="color:var(--qa-muted);margin-top:8px">Digite a senha de administração do P&amp;R para continuar</p>
+<label class="sr-only" for="pw-input">Senha de administração</label>
+<input type="password" id="pw-input" aria-label="Senha de administração" placeholder="Senha" onkeydown="if(event.key==='Enter')doLogin()">
+<button class="btn btn-live" id="login-btn" onclick="doLogin()">Entrar</button>
+<p id="connecting-msg" style="display:none;color:var(--qa-muted);margin-top:8px">Aguardando aprovação no computador…</p>
 <div class="err" id="pw-err" style="display:none"></div>
 </div>
 
 <div id="main-app" style="display:none">
 <div class="header">
-<h1>Q&A Admin</h1>
-<span id="status" role="status" aria-live="polite" style="font-size:13px;color:var(--qa-muted)">Connecting...</span>
+<h1>Moderação P&amp;R</h1>
+<span id="status" role="status" aria-live="polite" style="font-size:13px;color:var(--qa-muted)">Conectando...</span>
 </div>
 
-<div id="session-banner" class="banner" role="status" style="display:none">No session running — nobody can submit questions yet.</div>
+<div id="session-banner" class="banner" role="status" style="display:none">Nenhuma sessão em andamento — ninguém pode enviar perguntas ainda.</div>
 
 <div id="display-bar" class="status-bar" style="display:none">
-<span id="display-text">Displaying question...</span>
-<button class="btn" onclick="clearDisplay()">Clear Display</button>
+<span id="display-text">Exibindo pergunta...</span>
+<button class="btn" onclick="clearDisplay()">Limpar Tela</button>
 </div>
 
 <div class="add-bar" id="add-bar" style="display:none">
-<label class="sr-only" for="add-input">Add a question</label>
-<textarea id="add-input" rows="1" aria-label="Add a question" placeholder="Add a question..." title="Enter adds it; Shift+Enter starts a new line" spellcheck="true" onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();addQ()}" oninput="growAdd()"></textarea>
-<button class="btn btn-approve" onclick="addQ()">Add</button>
+<label class="sr-only" for="add-input">Adicionar pergunta</label>
+<textarea id="add-input" rows="1" aria-label="Adicionar pergunta" placeholder="Adicionar uma pergunta..." title="Enter envia; Shift+Enter quebra linha" spellcheck="true" onkeydown="if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();addQ()}" oninput="growAdd()"></textarea>
+<button class="btn btn-approve" onclick="addQ()">Adicionar</button>
 </div>
 
 <div class="toolbar">
-<label class="sr-only" for="view-select">View</label>
-<select id="view-select" class="sort-select" aria-label="View" onchange="setFilter(this.value)">
-<option value="ALL">All (0)</option>
-<option value="INCOMING">Incoming (0)</option>
-<option value="APPROVED">Approved (0)</option>
-<option value="INCOMING_APPROVED">Incoming + Approved (0)</option>
-<option value="DONE">Done (0)</option>
-<option value="DENIED">Denied (0)</option>
+<label class="sr-only" for="view-select">Visualizar</label>
+<select id="view-select" class="sort-select" aria-label="Visualizar" onchange="setFilter(this.value)">
+<option value="ALL">Todas (0)</option>
+<option value="INCOMING">Recebidas (0)</option>
+<option value="APPROVED">Aprovadas (0)</option>
+<option value="INCOMING_APPROVED">Recebidas + Aprovadas (0)</option>
+<option value="DONE">Concluídas (0)</option>
+<option value="DENIED">Negadas (0)</option>
 </select>
-<label class="sr-only" for="sort-select">Sort</label>
-<select id="sort-select" class="sort-select" aria-label="Sort" onchange="setSort(this.value)">
-<option value="newest">Newest</option>
-<option value="oldest">Oldest</option>
-<option value="most" class="vote-sort">Most votes</option>
-<option value="least" class="vote-sort">Least votes</option>
+<label class="sr-only" for="sort-select">Ordenar</label>
+<select id="sort-select" class="sort-select" aria-label="Ordenar" onchange="setSort(this.value)">
+<option value="newest">Mais recentes</option>
+<option value="oldest">Mais antigas</option>
+<option value="most" class="vote-sort">Mais votadas</option>
+<option value="least" class="vote-sort">Menos votadas</option>
 </select>
-<button class="tab" id="actions-btn" aria-pressed="true" onclick="toggleActions()">Hide actions</button>
+<button class="tab" id="actions-btn" aria-pressed="true" onclick="toggleActions()">Ocultar ações</button>
 </div>
 
 <div class="list" id="list"></div>
@@ -125,8 +125,7 @@ function setHeaders(){
 }
 setHeaders();
 
-// Sends /api/qa/auth and waits for the desktop operator to approve this device — mirrors the
-// presentation remote's connection handshake, showing a "waiting for approval" state meanwhile.
+// Sends /api/qa/auth and waits for the desktop operator to approve this device
 async function attemptAuth(){
   const btn=document.getElementById('login-btn');
   const msg=document.getElementById('connecting-msg');
@@ -138,14 +137,13 @@ async function attemptAuth(){
   try{
     const r=await fetch('/api/qa/auth',{method:'POST',headers});
     if(r.ok){authed=true;document.getElementById('login-screen').style.display='none';document.getElementById('main-app').style.display='block';load();checkStatus();return true}
-    // Opening the page with no password yet is not a wrong guess: just ask for it.
     if(r.status===401&&!password){document.getElementById('pw-input').focus();return false}
-    errEl.textContent=r.status===403?'Connection request denied':'Incorrect password';
+    errEl.textContent=r.status===403?'Solicitação de conexão negada':'Senha incorreta';
     errEl.style.display='block';
     document.getElementById('pw-input').focus();
     return false
   }catch(e){
-    errEl.textContent='Could not reach the app';
+    errEl.textContent='Não foi possível conectar ao Apresenter';
     errEl.style.display='block';
     return false
   }finally{
@@ -159,14 +157,13 @@ async function doLogin(){
   await attemptAuth();
 }
 
-// Auto-connect on load — approval popup (if any) surfaces on the desktop while this awaits
 attemptAuth();
 
 function lockOut(){
   authed=false;password='';localStorage.removeItem('qa_admin_pw');
   document.getElementById('main-app').style.display='none';
   document.getElementById('login-screen').style.display='block';
-  document.getElementById('pw-err').textContent='Session expired. Please log in again.';
+  document.getElementById('pw-err').textContent='Sessão expirada. Entre novamente.';
   document.getElementById('pw-err').style.display='block';
   document.getElementById('pw-input').value='';document.getElementById('pw-input').focus();
 }
@@ -177,7 +174,6 @@ async function load(){
     const r=await fetch('/api/qa/questions',{headers});
     if(r.status===401){lockOut();return}
     if(r.ok)questions=await r.json();
-    // Skip the full innerHTML rebuild when nothing relevant changed (prevents flicker/mis-taps).
     const sig=JSON.stringify(questions.map(q=>[q.id,q.status,q.text,q.upvotes,q.downvotes,q.submitterName]))+'|'+displayedId;
     if(sig===lastLoadSig)return;
     lastLoadSig=sig;
@@ -186,11 +182,10 @@ async function load(){
 }
 
 function render(){
-  // Show/hide clear display bar
   const dbar=document.getElementById('display-bar');
   if(displayedId){
     const dq=questions.find(q=>q.id===displayedId);
-    document.getElementById('display-text').textContent='Displaying: '+(dq?dq.text.split('\n')[0].substring(0,50):'...');
+    document.getElementById('display-text').textContent='Exibindo: '+(dq?dq.text.split('\n')[0].substring(0,50):'...');
     dbar.style.display='flex';
   }else{dbar.style.display='none'}
   let filtered;
@@ -208,30 +203,30 @@ function render(){
     INCOMING_APPROVED:questions.filter(q=>q.status==='PENDING'||q.status==='APPROVED').length,
     DONE:questions.filter(q=>q.status==='DONE').length,
     DENIED:questions.filter(q=>q.status==='DENIED').length};
-  const names={ALL:'All',INCOMING:'Incoming',APPROVED:'Approved',INCOMING_APPROVED:'Incoming + Approved',DONE:'Done',DENIED:'Denied'};
+  const names={ALL:'Todas',INCOMING:'Recebidas',APPROVED:'Aprovadas',INCOMING_APPROVED:'Recebidas + Aprovadas',DONE:'Concluídas',DENIED:'Negadas'};
   document.querySelectorAll('#view-select option').forEach(o=>{o.textContent=names[o.value]+' ('+counts[o.value]+')'});
 
   filtered=sortQuestions(filtered);
-  if(!filtered.length){list.innerHTML='<div class="empty">No questions</div>';return}
+  if(!filtered.length){list.innerHTML='<div class="empty">Nenhuma pergunta</div>';return}
   list.innerHTML=filtered.map(q=>{
     const time=new Date(q.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     const isLive=q.id===displayedId;
     let label='';
-    if(q.status==='DONE')label='<span class="q-label done">Done</span> ';
-    else if(q.status==='DENIED')label='<span class="q-label denied">Denied</span> ';
-    let actions='<button class="btn btn-edit" onclick="editQ(\''+q.id+'\')">Edit</button>';
+    if(q.status==='DONE')label='<span class="q-label done">Concluída</span> ';
+    else if(q.status==='DENIED')label='<span class="q-label denied">Negada</span> ';
+    let actions='<button class="btn btn-edit" onclick="editQ(\''+q.id+'\')">Editar</button>';
     if(q.status==='PENDING'){
-      actions+='<button class="btn btn-approve" onclick="action(\'approve\',\''+q.id+'\')">Approve</button><button class="btn btn-deny" onclick="action(\'deny\',\''+q.id+'\')">Deny</button>';
+      actions+='<button class="btn btn-approve" onclick="action(\'approve\',\''+q.id+'\')">Aprovar</button><button class="btn btn-deny" onclick="action(\'deny\',\''+q.id+'\')">Negar</button>';
     }else if(q.status==='APPROVED'){
-      actions+=(isLive?'':'<button class="btn btn-live" onclick="action(\'display\',\''+q.id+'\')">Go Live</button>')+'<button class="btn btn-done" onclick="action(\'done\',\''+q.id+'\')">Done</button><button class="btn btn-deny" onclick="action(\'deny\',\''+q.id+'\')">Deny</button>';
+      actions+=(isLive?'':'<button class="btn btn-live" onclick="action(\'display\',\''+q.id+'\')">Transmitir</button>')+'<button class="btn btn-done" onclick="action(\'done\',\''+q.id+'\')">Concluir</button><button class="btn btn-deny" onclick="action(\'deny\',\''+q.id+'\')">Negar</button>';
     }else if(q.status==='DONE'){
-      actions+='<button class="btn btn-back" onclick="action(\'approve\',\''+q.id+'\')">Back to Incoming</button>';
-      actions+='<button class="btn btn-golive-confirm" onclick="confirmGoLive(\''+q.id+'\')">Go Live</button>';
+      actions+='<button class="btn btn-back" onclick="action(\'approve\',\''+q.id+'\')">Voltar p/ Recebidas</button>';
+      actions+='<button class="btn btn-golive-confirm" onclick="confirmGoLive(\''+q.id+'\')">Transmitir</button>';
     }else if(q.status==='DENIED'){
-      actions+='<button class="btn btn-approve" onclick="action(\'approve\',\''+q.id+'\')">Approve</button>';
-      actions+='<button class="btn btn-golive-confirm" onclick="confirmGoLive(\''+q.id+'\')">Go Live</button>';
+      actions+='<button class="btn btn-approve" onclick="action(\'approve\',\''+q.id+'\')">Aprovar</button>';
+      actions+='<button class="btn btn-golive-confirm" onclick="confirmGoLive(\''+q.id+'\')">Transmitir</button>';
     }
-    actions+='<button class="btn btn-del" onclick="del(\''+q.id+'\')">Del</button>';
+    actions+='<button class="btn btn-del" onclick="del(\''+q.id+'\')">Excluir</button>';
     const nameTag=q.submitterName?'<span style="color:#888;font-size:12px">'+esc(q.submitterName)+':</span> ':'';
     const upTag=q.upvotes>0?'<span style="display:inline-block;background:#e3f2fd;color:#1565c0;font-size:11px;font-weight:700;padding:2px 4px;border-radius:4px;margin-right:2px">&#9650; '+q.upvotes+'</span>':'';
     const dnTag=q.downvotes>0?'<span style="display:inline-block;background:#ffebee;color:#c62828;font-size:11px;font-weight:700;padding:2px 4px;border-radius:4px;margin-right:4px">&#9660; '+q.downvotes+'</span>':'';
@@ -241,7 +236,6 @@ function render(){
   markLong();
 }
 
-// Every question is shown whole at first; one that runs past three lines gets Show less / Show more.
 const collapsed=new Set();
 function markLong(){
   document.querySelectorAll('.q-words').forEach(el=>{
@@ -252,7 +246,7 @@ function markLong(){
     const clamped=el.classList.contains('clamp');
     const long=clamped?el.scrollHeight>el.clientHeight+1:el.scrollHeight>lh*3+1;
     btn.hidden=!long;
-    btn.textContent=clamped?'Show more':'Show less';
+    btn.textContent=clamped?'Mostrar mais':'Mostrar menos';
     btn.setAttribute('aria-expanded',String(!clamped));
   });
 }
@@ -273,7 +267,7 @@ function confirmGoLive(id){
   }
   pendingConfirm=id;
   const el=document.getElementById('q-'+id);
-  if(el){const btns=el.querySelectorAll('.btn-golive-confirm');btns.forEach(b=>{b.textContent='Confirm Go Live?';b.style.opacity='1'})}
+  if(el){const btns=el.querySelectorAll('.btn-golive-confirm');btns.forEach(b=>{b.textContent='Confirmar Transmissão?';b.style.opacity='1'})}
   setTimeout(()=>{if(pendingConfirm===id){pendingConfirm=null;load()}},3000);
 }
 async function action(act,id){
@@ -285,14 +279,14 @@ async function action(act,id){
   }catch(e){}
 }
 async function del(id){
-  if(!confirm('Delete this question? This cannot be undone.'))return;
+  if(!confirm('Excluir esta pergunta? Esta ação não pode ser desfeita.'))return;
   try{const r=await fetch('/api/qa/questions/'+id,{method:'DELETE',headers});if(r.status===401){lockOut();return}load()}catch(e){}
 }
 function editQ(id){
   const q=questions.find(q=>q.id===id);if(!q)return;
   editingId=id;
   const el=document.getElementById('qt-'+id);if(!el)return;
-  el.innerHTML='<div class="edit-area"><textarea id="edit-'+id+'" spellcheck="true" aria-label="Edit question"></textarea><button class="btn btn-approve" onclick="saveEdit(\''+id+'\')">Save</button><button class="btn btn-del" onclick="cancelEdit()">Cancel</button></div>';
+  el.innerHTML='<div class="edit-area"><textarea id="edit-'+id+'" spellcheck="true" aria-label="Editar pergunta"></textarea><button class="btn btn-approve" onclick="saveEdit(\''+id+'\')">Salvar</button><button class="btn btn-del" onclick="cancelEdit()">Cancelar</button></div>';
   const ta=document.getElementById('edit-'+id);if(ta){ta.value=q.text;ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length)}
 }
 async function saveEdit(id){
@@ -316,7 +310,6 @@ function setFilter(f){
   render();
 }
 try{const v=localStorage.getItem('qa_admin_view');if(v&&document.querySelector('#view-select option[value="'+v+'"]')){filter=v;document.getElementById('view-select').value=v}}catch(e){}
-// The desktop's four orders. A vote order breaks ties newest first, so it never looks unsorted.
 function sortQuestions(list){
   const newest=(a,b)=>b.timestamp-a.timestamp;
   const s=votingEnabled?sortBy:(sortBy==='most'||sortBy==='least'?'newest':sortBy);
@@ -330,18 +323,16 @@ function setSort(v){
   try{localStorage.setItem('qa_admin_sort',v)}catch(e){}
   render();
 }
-// Vote orders are offered only while voting is on; with it off every count is 0.
 function syncSortOptions(){
   const sel=document.getElementById('sort-select');
   sel.querySelectorAll('.vote-sort').forEach(o=>{o.hidden=!votingEnabled;o.disabled=!votingEnabled});
   sel.value=(!votingEnabled&&(sortBy==='most'||sortBy==='least'))?'newest':sortBy;
 }
 syncSortOptions();
-// Hiding the buttons leaves a read-only list, for following along on a phone without mis-taps.
 function applyActions(hidden){
   document.body.classList.toggle('hide-actions',hidden);
   const b=document.getElementById('actions-btn');
-  b.textContent=hidden?'Show actions':'Hide actions';
+  b.textContent=hidden?'Mostrar ações':'Ocultar ações';
   b.setAttribute('aria-pressed',String(!hidden));
 }
 function toggleActions(){
@@ -357,15 +348,14 @@ function growAdd(){
 async function checkStatus(){
   if(!authed)return;
   try{const r=await fetch('/api/qa/status');const d=await r.json();
-    document.getElementById('status').textContent=d.sessionActive?('Session: '+(d.sessionName||'Active')):'No session running';
+    document.getElementById('status').textContent=d.sessionActive?('Sessão: '+(d.sessionName||'Ativa')):'Nenhuma sessão ativa';
     document.getElementById('status').style.color=d.sessionActive?'#66bb6a':'#ef5350';
     document.getElementById('session-banner').style.display=d.sessionActive?'none':'block';
-    // Questions are added to a running session; with none, there is nothing to add them to.
     document.getElementById('add-bar').style.display=d.sessionActive?'flex':'none';
     if(!!d.votingEnabled!==votingEnabled){votingEnabled=!!d.votingEnabled;syncSortOptions();render()}
     const newDisplayed=d.displayedQuestionId||null;
     if(newDisplayed!==displayedId){displayedId=newDisplayed;render()}
-  }catch(e){document.getElementById('status').textContent='Disconnected';document.getElementById('status').style.color='#ef5350'}
+  }catch(e){document.getElementById('status').textContent='Desconectado';document.getElementById('status').style.color='#ef5350'}
 }
 
 setInterval(()=>{if(authed)load()},3000);

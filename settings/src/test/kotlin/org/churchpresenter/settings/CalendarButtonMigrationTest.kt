@@ -47,38 +47,44 @@ class CalendarButtonMigrationTest {
     """.trimIndent()
 
     @Test
-    fun `a schema 9 file as v26_11_161 wrote it has the Calendar button hidden and sync off`() {
+    fun `a schema 9 file upgrades through schema 26 with Calendar visible and sync off`() {
         val settings = decode(documentWith(version = 9, hidden = "[]"))
-        assertEquals(setOf(CALENDAR), settings.hiddenScheduleButtons)
+        assertEquals(emptySet(), settings.hiddenScheduleButtons)
         // Nothing in the upgrade may switch phone sync on or pair with the relay on the user's behalf.
         assertFalse(settings.calendarSync.enabled)
         assertFalse(settings.calendarSync.isPaired)
     }
 
     @Test
-    fun `a file with no version at all is migrated too`() {
+    fun `a file with no version at all is migrated cleanly`() {
         val settings = decode("""{"hiddenScheduleButtons": []}""")
-        assertTrue(CALENDAR in settings.hiddenScheduleButtons)
-    }
-
-    @Test
-    fun `buttons the operator had already hidden stay hidden`() {
-        val settings = decode(documentWith(version = 9, hidden = """["UNDO","REDO"]"""))
-        assertEquals(setOf("UNDO", "REDO", CALENDAR), settings.hiddenScheduleButtons)
-    }
-
-    @Test
-    fun `a current file with the button turned on is left alone`() {
-        val settings = decode(
-            documentWith(version = AppSettings.CURRENT_SETTINGS_VERSION, hidden = "[]"),
-        )
         assertFalse(CALENDAR in settings.hiddenScheduleButtons)
     }
 
     @Test
-    fun `a fresh install starts with the button hidden and phone sync off`() {
-        val settings = AppSettings()
+    fun `buttons the operator had already hidden stay hidden while Calendar becomes visible`() {
+        val settings = decode(documentWith(version = 9, hidden = """["UNDO","REDO"]"""))
+        assertEquals(setOf("UNDO", "REDO"), settings.hiddenScheduleButtons)
+    }
+
+    @Test
+    fun `a schema 25 file with Calendar hidden reveals it once on upgrade to schema 26`() {
+        val settings = decode(documentWith(version = 25, hidden = """["CALENDAR","ZOOM"]"""))
+        assertEquals(setOf("ZOOM"), settings.hiddenScheduleButtons)
+    }
+
+    @Test
+    fun `a current file where the user chose to hide Calendar is left alone`() {
+        val settings = decode(
+            documentWith(version = AppSettings.CURRENT_SETTINGS_VERSION, hidden = """["CALENDAR"]"""),
+        )
         assertTrue(CALENDAR in settings.hiddenScheduleButtons)
+    }
+
+    @Test
+    fun `a fresh install starts with the button visible and phone sync off`() {
+        val settings = AppSettings()
+        assertFalse(CALENDAR in settings.hiddenScheduleButtons)
         assertFalse(settings.calendarSync.enabled)
     }
 

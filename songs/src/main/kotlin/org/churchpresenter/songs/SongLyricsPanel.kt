@@ -317,6 +317,7 @@ private fun LyricsActionBar(
             painter = painterResource(IconRes.drawable.ic_web),
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            modifier = Modifier.guideTarget(GuideTargets.ONLINE_SONG_SEARCH),
         )
 
         // New Song button

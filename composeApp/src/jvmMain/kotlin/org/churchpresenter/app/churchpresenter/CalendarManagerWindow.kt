@@ -56,21 +56,25 @@ internal fun MainWindowScope.CalendarManagerWindow() {
                     // The switch in the calendar's own settings; the same flag the
                     // Server tab's card shows, so the two never disagree.
                     recordUsage = { usage -> UsageEvents.record(calendarUsageEvent(usage)) },
-                    cloudSync = CalendarCloudSync(
-                        enabled = { appSettings.calendarSync.enabled },
-                        setEnabled = { on ->
-                            appSettings = appSettings.copy(
-                                calendarSync = appSettings.calendarSync.copy(enabled = on),
-                            )
-                            settingsManager.saveSettings(appSettings)
-                        },
-                        invitePhone = {
-                            coroutineScope.launch {
-                                calendarEnrollQr = calendarSync.invitePhone().asInvite(calendarSync)
-                            }
-                        },
-                        nextSyncAt = { calendarSync.nextPullAt.value?.toEpochMilli() },
-                    ),
+                    cloudSync = if (builtInRelayEndpoints.relayUrl.isNotBlank()) {
+                        CalendarCloudSync(
+                            enabled = { appSettings.calendarSync.enabled },
+                            setEnabled = { on ->
+                                appSettings = appSettings.copy(
+                                    calendarSync = appSettings.calendarSync.copy(enabled = on),
+                                )
+                                settingsManager.saveSettings(appSettings)
+                            },
+                            invitePhone = {
+                                coroutineScope.launch {
+                                    calendarEnrollQr = calendarSync.invitePhone().asInvite(calendarSync)
+                                }
+                            },
+                            nextSyncAt = { calendarSync.nextPullAt.value?.toEpochMilli() },
+                        )
+                    } else {
+                        null
+                    },
                     // How long a row runs by itself, so a plan does not have
                     // to be timed by hand: a clip's own duration, read from
                     // its header, and a slideshow's count times the interval

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vote on Questions</title>
+<title>Votar nas Perguntas</title>
 <style>
 /*QA_SHARED_CSS*/
 :root{--qa-bg:#f5f5f5;--qa-surface:#fff;--qa-ink:#1e1e2e;--qa-sub:#5f5f6b;--qa-muted:#616161;--qa-up-bg:#e3f2fd;--qa-down-bg:#ffebee;--qa-score-pos:#2e7d32;--qa-score-neg:#c62828}
@@ -37,11 +37,11 @@ a.back:hover{background:var(--qa-primary-hover)}
 </head>
 <body>
 <main class="container">
-<h1 id="page-title">Vote on Questions</h1>
-<p class="sub" id="page-sub">Vote on the questions you'd like answered</p>
+<h1 id="page-title">Votar nas Perguntas</h1>
+<p class="sub" id="page-sub">Vote nas perguntas que você gostaria de ver respondidas</p>
 <div id="questions"></div>
 <div id="msg" class="msg" role="status" aria-live="polite" style="display:none"></div>
-<a class="back" href="/qa">&larr; Submit a question</a>
+<a class="back" href="/qa">&larr; Enviar uma pergunta</a>
 </main>
 <script>
 const questionsEl=document.getElementById('questions'),msgEl=document.getElementById('msg');
@@ -55,7 +55,7 @@ async function loadQuestions(){
       document.getElementById('page-title').style.display='none';
       document.getElementById('page-sub').style.display='none';
       questionsEl.innerHTML='';
-      msgEl.textContent='Voting is not enabled right now.';
+      msgEl.textContent='A votação não está habilitada no momento.';
       msgEl.className='msg off';msgEl.style.display='block';
       lastDataHash='';
       return;
@@ -68,13 +68,13 @@ async function loadQuestions(){
         document.getElementById('page-title').style.display='none';
         document.getElementById('page-sub').style.display='none';
         questionsEl.innerHTML='';
-        msgEl.textContent='Q&A session is not active right now.';
+        msgEl.textContent='A sessão de Perguntas e Respostas não está ativa no momento.';
         msgEl.className='msg off';msgEl.style.display='block';
       } else {
         document.getElementById('page-title').style.display='';
         document.getElementById('page-sub').style.display='';
         msgEl.style.display='none';
-        questionsEl.innerHTML='<div class="empty">No questions yet. Check back soon!</div>';
+        questionsEl.innerHTML='<div class="empty">Nenhuma pergunta ainda. Volte em breve!</div>';
       }
       lastDataHash='';
       return;
@@ -99,9 +99,9 @@ async function loadQuestions(){
       const scoreColor=score>0?'var(--qa-score-pos)':score<0?'var(--qa-score-neg)':'var(--qa-muted)';
       return '<div class="question-card" id="qc-'+q.id+'">'
         +'<div class="vote-btns">'
-        +'<button class="vote-btn'+(dir==='up'?' voted':'')+'" id="up-'+q.id+'" aria-label="Upvote" aria-pressed="'+(dir==='up')+'" onclick="vote(\''+q.id+'\',\'up\')"><span class="vote-arrow" aria-hidden="true">&#9650;</span></button>'
+        +'<button class="vote-btn'+(dir==='up'?' voted':'')+'" id="up-'+q.id+'" aria-label="Votar a favor" aria-pressed="'+(dir==='up')+'" onclick="vote(\''+q.id+'\',\'up\')"><span class="vote-arrow" aria-hidden="true">&#9650;</span></button>'
         +'<span class="vote-score" id="vs-'+q.id+'" data-score="'+score+'" style="color:'+scoreColor+'">'+score+'</span>'
-        +'<button class="vote-btn'+(dir==='down'?' down-voted':'')+'" id="dn-'+q.id+'" aria-label="Downvote" aria-pressed="'+(dir==='down')+'" onclick="vote(\''+q.id+'\',\'down\')"><span class="vote-arrow" aria-hidden="true">&#9660;</span></button>'
+        +'<button class="vote-btn'+(dir==='down'?' down-voted':'')+'" id="dn-'+q.id+'" aria-label="Votar contra" aria-pressed="'+(dir==='down')+'" onclick="vote(\''+q.id+'\',\'down\')"><span class="vote-arrow" aria-hidden="true">&#9660;</span></button>'
         +'</div>'
         +'<div class="q-content">'
         +'<div class="q-text">'+escHtml(q.text)+'</div>'

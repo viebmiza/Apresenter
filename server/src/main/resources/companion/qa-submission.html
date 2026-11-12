@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ask a Question</title>
+<title>Enviar Pergunta</title>
 <style>
 /*QA_SHARED_CSS*/
 :root{--qa-bg:#f5f5f5;--qa-surface:#fff;--qa-ink:#1e1e2e;--qa-sub:#5f5f6b;--qa-border:#e0e0e0;--qa-muted:#616161}
@@ -32,18 +32,18 @@ button:disabled{background:#9aa0a6;cursor:not-allowed}
 </head>
 <body>
 <main class="card">
-<h1 id="page-title">Ask a Question</h1>
-<p class="sub" id="page-sub">Your question will be reviewed before being displayed.</p>
+<h1 id="page-title">Faça uma Pergunta</h1>
+<p class="sub" id="page-sub">Sua pergunta passará pela moderação antes de aparecer no telão.</p>
 <div id="form-area">
-<label class="sr-only" for="name">Your name (optional)</label>
-<input type="text" id="name" class="name-input" placeholder="Your name (optional)" aria-label="Your name (optional)">
-<label class="sr-only" for="q">Your question</label>
-<textarea id="q" maxlength="500" placeholder="Type your question here..."></textarea>
+<label class="sr-only" for="name">Seu nome (opcional)</label>
+<input type="text" id="name" class="name-input" placeholder="Seu nome (opcional)" aria-label="Seu nome (opcional)">
+<label class="sr-only" for="q">Sua pergunta</label>
+<textarea id="q" maxlength="500" placeholder="Digite sua pergunta aqui..."></textarea>
 <div id="charcount" aria-live="polite">0 / 500</div>
-<button id="btn" onclick="submit()">Submit Question</button>
+<button id="btn" onclick="submit()">Enviar Pergunta</button>
 </div>
 <div id="msg" class="msg" role="status" aria-live="polite" style="display:none"></div>
-<a id="vote-link" href="/qa/vote" style="display:none;text-align:center;margin-top:12px;text-decoration:none;width:100%;min-height:48px;padding:14px;background:var(--qa-success);color:#fff;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:background .2s;box-sizing:border-box">Vote on Questions</a>
+<a id="vote-link" href="/qa/vote" style="display:none;text-align:center;margin-top:12px;text-decoration:none;width:100%;min-height:48px;padding:14px;background:var(--qa-success);color:#fff;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:background .2s;box-sizing:border-box">Votar nas Perguntas</a>
 </main>
 <script>
 const q=document.getElementById('q'),btn=document.getElementById('btn'),msg=document.getElementById('msg'),cc=document.getElementById('charcount'),nameField=document.getElementById('name');
@@ -58,22 +58,22 @@ if(submitTime>0){
 q.addEventListener('input',()=>{cc.textContent=q.value.length+' / 500'});
 async function submit(){
   const text=q.value.trim();
-  if(!text){show('Please enter a question','err');return}
-  btn.disabled=true;btn.textContent='Submitting...';
+  if(!text){show('Por favor, digite uma pergunta','err');return}
+  btn.disabled=true;btn.textContent='Enviando...';
   try{
     const name=nameField.value.trim();
     const r=await fetch('/api/qa/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,name})});
     if(r.ok){showThanks();sessionStorage.setItem('qa_submit_time',Date.now().toString());sessionStorage.setItem('qa_cooldown',cooldown.toString())}
     else if(r.status===429){showThanks()}
-    else if(r.status===403){show('Q&A session is not active right now.','off')}
-    else{const d=await r.json().catch(()=>({}));show(d.error||'Submission failed','err');btn.disabled=false;btn.textContent='Submit Question'}
-  }catch(e){show('Network error. Please try again.','err');btn.disabled=false;btn.textContent='Submit Question'}
+    else if(r.status===403){show('A sessão de Perguntas e Respostas não está ativa no momento.','off')}
+    else{const d=await r.json().catch(()=>({}));show(d.error||'Falha ao enviar','err');btn.disabled=false;btn.textContent='Enviar Pergunta'}
+  }catch(e){show('Erro de rede. Tente novamente.','err');btn.disabled=false;btn.textContent='Enviar Pergunta'}
 }
 function showThanks(){
   document.getElementById('form-area').style.display='none';
   document.getElementById('page-title').style.display='none';
   document.getElementById('page-sub').style.display='none';
-  msg.innerHTML='<strong>Thanks for submitting your question!</strong>';
+  msg.innerHTML='<strong>Obrigado por enviar sua pergunta!</strong>';
   msg.className='msg ok';msg.style.display='block';
   submitted=true;
 }
@@ -90,11 +90,11 @@ async function checkStatus(){
         submitted=false;sessionStorage.removeItem('qa_submit_time');sessionStorage.removeItem('qa_cooldown');
         document.getElementById('form-area').style.display='block';msg.style.display='none';
         document.getElementById('page-title').style.display='';document.getElementById('page-sub').style.display='';
-        btn.disabled=false;btn.textContent='Submit Question';q.value='';
+        btn.disabled=false;btn.textContent='Enviar Pergunta';q.value='';
       }
       return;
     }
-    if(!d.sessionActive){document.getElementById('form-area').style.display='none';document.getElementById('page-title').style.display='none';document.getElementById('page-sub').style.display='none';show('Q&A session is not active right now.','off')}
+    if(!d.sessionActive){document.getElementById('form-area').style.display='none';document.getElementById('page-title').style.display='none';document.getElementById('page-sub').style.display='none';show('A sessão de Perguntas e Respostas não está ativa no momento.','off')}
     else{document.getElementById('form-area').style.display='block';document.getElementById('page-title').style.display='';document.getElementById('page-sub').style.display='';if(msg.className.includes('off'))msg.style.display='none'}
   }catch(e){}
 }

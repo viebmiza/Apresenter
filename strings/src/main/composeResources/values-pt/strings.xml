@@ -1266,6 +1266,16 @@
     <string name="qa_stop_session">Encerrar Sessão</string>
     <string name="qa_new_session">Nova Sessão</string>
     <string name="qa_resume">Retomar (%1$d)</string>
+    <string name="qa_resume_session">Retomar</string>
+    <string name="qa_session_option">%1$s (%2$d)</string>
+    <string name="qa_session_running">Sessão: %1$s</string>
+    <string name="qa_session_label">Sessão</string>
+    <string name="qa_close_history">Fechar histórico</string>
+    <string name="qa_session_name_label">Nome da sessão</string>
+    <string name="qa_start_session">Iniciar</string>
+    <string name="qa_delete_session">Excluir Sessão</string>
+    <string name="qa_no_session_banner">Nenhuma sessão em andamento — ninguém pode enviar perguntas ainda.</string>
+    <string name="qa_show_less">Mostrar menos</string>
     <string name="qa_incoming">Recebidas</string>
     <string name="qa_all">Todas</string>
     <string name="qa_approved">Aprovadas</string>
@@ -3285,9 +3295,9 @@
     <string name="helper_open_converter_documents">Abrindo o Conversor em documentos. Escolha os arquivos PDF, Word, PowerPoint ou Keynote com as letras e depois converta.</string>
     <string name="helper_open_song_library">Abrindo o Gerenciador da biblioteca de músicas. Selecione as músicas que você quer alterar (Shift-clique para um intervalo, ou Ctrl/Cmd-clique em cada uma), escolha Edição em lote…, marque os campos a alterar e aplique.</string>
     <string name="helper_open_calendar">Abrindo o Gerenciador de calendário. Escolha um dia e clique em Adicionar culto; depois, em Começar a partir de, escolha um culto em branco, um modelo ou um anterior. Adicione músicas, versículos e slides à ordem do culto.</string>
-    <string name="helper_open_calendar_repeat">Abrindo o Gerenciador de calendário. Adicione o culto uma vez, depois clique no ícone de copiar no cabeçalho da ordem do culto e defina Repetição como Semanal, A cada 2 sem. ou Mensal.</string>
+    <string name="helper_open_calendar_repeat">Abrindo o Gerenciador de calendário. Escolha um dia, clique em Adicionar culto e escolha Semanal, A cada 2 sem. ou Mensal em Repetir — ou clique no ícone de copiar no cabeçalho da ordem do culto.</string>
     <string name="helper_open_calendar_template">Abrindo o Gerenciador de calendário. Planeje um culto e depois clique no ícone de modelo no cabeçalho da ordem do culto para salvá-lo. Novos cultos podem começar dele em Começar a partir de.</string>
-    <string name="helper_open_calendar_load">Abrindo o Gerenciador de calendário. Escolha o culto e clique em Carregar no programa, ou ative o carregamento automático para que ele vá sozinho para a aba Roteiro antes de começar.</string>
+    <string name="helper_open_calendar_load">Abrindo o Gerenciador de calendário. Escolha o culto e clique em Carregar no Roteiro, ou ative o carregamento automático para que ele vá sozinho para a aba Roteiro antes de começar.</string>
     <string name="helper_open_calendar_automate">Abrindo o Gerenciador de calendário. Clique em uma linha da ordem do culto para definir quando ela começa sozinha e quanto tempo dura; depois ative o culto.</string>
     <string name="helper_open_shortcuts">Abrindo os Atalhos de Teclado.</string>
     <string name="helper_open_display_setup">Vamos configurar suas telas.</string>
@@ -3301,6 +3311,7 @@
     <string name="helper_tour_stop">Parar</string>
     <string name="helper_hint_tab">Esta é a aba %1$s.</string>
     <string name="helper_hint_new_song">Clique aqui para escrever uma música nova.</string>
+    <string name="helper_hint_online_song_search">Clique aqui para pesquisar letras de músicas na internet e importá-las.</string>
     <string name="helper_hint_pick_and_edit">Escolha a música e clique em %1$s.</string>
     <string name="helper_hint_chords_switch">Ative %1$s, se estiver desativado. As ferramentas de acordes abrem abaixo da pré-visualização.</string>
     <string name="helper_hint_chord_palette">Coloque o cursor logo antes da sílaba e clique em um acorde aqui. Você também pode digitar acordes entre colchetes, como [G]Maravilhosa [C]graça, ou colar uma cifra com os acordes acima da letra, e ela é convertida para você.</string>

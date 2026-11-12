@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import org.churchpresenter.theme.AppShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -36,6 +39,7 @@ import androidx.compose.ui.window.DialogProperties
 import org.churchpresenter.calendar.generated.resources.Res
 import org.churchpresenter.calendar.generated.resources.calendar_add_service_save
 import org.churchpresenter.calendar.generated.resources.calendar_cancel
+import org.churchpresenter.calendar.generated.resources.calendar_copy_create
 import org.churchpresenter.calendar.generated.resources.calendar_delete
 import org.churchpresenter.calendar.generated.resources.calendar_edit_service
 import org.churchpresenter.calendar.generated.resources.calendar_invalid_time
@@ -47,6 +51,7 @@ import org.churchpresenter.calendar.generated.resources.calendar_service_name_hi
 import org.churchpresenter.calendar.generated.resources.calendar_service_start
 import org.churchpresenter.calendar.generated.resources.calendar_service_type
 import org.churchpresenter.calendar.generated.resources.calendar_start_from
+import org.churchpresenter.calendar.model.DEFAULT_REPEAT_COUNT
 import org.churchpresenter.calendar.model.PlannedService
 import org.churchpresenter.calendar.model.ServiceKind
 import org.churchpresenter.calendar.model.ServiceRepeat
@@ -54,6 +59,7 @@ import org.churchpresenter.calendar.model.ServiceTemplate
 import org.churchpresenter.calendar.model.clockText
 import org.churchpresenter.calendar.model.parseClockText
 import org.churchpresenter.calendar.model.parseStoredDate
+import org.churchpresenter.calendar.model.recurrenceDates
 import org.churchpresenter.calendar.model.storedTime
 import org.jetbrains.compose.resources.stringResource
 import java.time.LocalDate
@@ -66,6 +72,10 @@ import org.churchpresenter.theme.raised
 import org.churchpresenter.theme.elevationPalette
 
 private val SHEET_WIDTH = 460.dp
+private val MAX_FIELDS_HEIGHT = 540.dp
+
+internal fun ServiceForm.extraRepeatDates(): List<LocalDate> =
+    if (repeat == ServiceRepeat.NONE) emptyList() else recurrenceDates(date, repeat, (repeatCount - 1).coerceAtLeast(1))
 
 /** `Start time` and `Type` share the row as 1 : 1.3, so three segment labels are not truncated. */
 private const val TYPE_FLEX = 1.3f
@@ -84,6 +94,8 @@ data class ServiceForm(
     val wholeSeries: Boolean = false,
     /** The day it is on: the one it was opened for, or the one it is being moved to. */
     val date: LocalDate = LocalDate.MIN,
+    val repeat: ServiceRepeat = ServiceRepeat.NONE,
+    val repeatCount: Int = DEFAULT_REPEAT_COUNT,
 )
 
 /**
@@ -148,11 +160,12 @@ fun ServiceSheet(
                 }
                 Spacer(Modifier.weight(1f))
                 QuietButton(label = stringResource(Res.string.calendar_cancel), onClick = onDismiss)
+                val extraDates = if (existing == null) form.extraRepeatDates() else emptyList()
                 PrimaryButton(
-                    label = if (existing == null) {
-                        stringResource(Res.string.calendar_add_service_save)
-                    } else {
-                        stringResource(Res.string.calendar_save)
+                    label = when {
+                        existing != null -> stringResource(Res.string.calendar_save)
+                        form.repeat == ServiceRepeat.NONE -> stringResource(Res.string.calendar_add_service_save)
+                        else -> stringResource(Res.string.calendar_copy_create, 1 + extraDates.size)
                     },
                     onClick = {
                         startAt?.let { onSave(form.copy(name = form.name.trim(), startTime = storedTime(it))) }
@@ -189,7 +202,11 @@ private fun ServiceFields(
     val timeValid = parseClockText(form.startTime) != null
     Column(
         verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 13.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(max = MAX_FIELDS_HEIGHT)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 15.dp, vertical = 13.dp),
     ) {
         Column {
             FieldLabel(stringResource(Res.string.calendar_service_name))
@@ -277,6 +294,34 @@ private fun ServiceFields(
                 }
             }
         }
+
+        if (existing == null) {
+            ServiceRepeatSection(form = form, servicesOn = servicesOn, onChange = onChange)
+        }
+    }
+}
+
+@Composable
+private fun ServiceRepeatSection(
+    form: ServiceForm,
+    servicesOn: (LocalDate) -> List<PlannedService>,
+    onChange: (ServiceForm) -> Unit,
+) {
+    RepeatSelector(
+        repeat = form.repeat,
+        onSelect = { onChange(form.copy(repeat = it)) },
+    )
+    if (form.repeat != ServiceRepeat.NONE) {
+        CountStepper(
+            count = form.repeatCount,
+            minCount = 2,
+            onChange = { onChange(form.copy(repeatCount = it)) },
+        )
+        DatePreview(
+            dates = listOf(form.date) + form.extraRepeatDates(),
+            monthly = form.repeat == ServiceRepeat.MONTHLY,
+            hasServices = { servicesOn(it).isNotEmpty() },
+        )
     }
 }
 

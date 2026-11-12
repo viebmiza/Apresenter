@@ -94,17 +94,17 @@ Garante que o **Apresenter** possa ser instalado e executado no mesmo computador
 
 - [x] **Novo Recurso — Pesquisa de Músicas na Internet (`:songs`):**
   - Implementados `OnlineSongSearchClient.kt`, `OnlineSongLyricsFormatter.kt`, `OnlineSongSearchDialog.kt` e `OnlineSongSearchParts.kt`, permitindo pesquisar por título, artista ou trecho da letra (LRCLIB + fallback iTunes/Lyrics.ovh), visualizar os slides formatados e importar direto na biblioteca.
-  - *(Pendência para próxima versão: ensinar ao assistente **Timóteo** no módulo `:helper` como responder perguntas sobre a Pesquisa de Músicas na Internet.)*
-- [ ] **Melhorias no Calendário (Planejamento de Cultos — Próxima Etapa `v1.0.2+`):**
-  - **Visibilidade na interface:** tirar `"CALENDAR"` do padrão oculto em `hiddenScheduleButtons` (`AppSettings.kt`) para o botão ficar visível direto na barra do **Roteiro**, além de posição de destaque no menu.
-  - **Criação e repetição mais intuitivas:** facilitar criação de cultos recorrentes (*Semanal*, *Quinzenal*, *Mensal*) e salvamento/uso de **Modelos** e **Predefinições** sem depender de caminhos escondidos no menu de cópia.
-  - **Tradução PT-BR:** revisar `calendar/src/main/composeResources/values-pt/strings.xml` trocando termos de Portugal (*cânticos*, *guardar*, *ficheiro*, *separador*) por Português do Brasil.
-  - **Modo local sem nuvem:** manter a opção de sincronização remota oculta/desativada enquanto não houver servidor de relay próprio, focando 100% em uso offline (repetições, modelos, PDF e carregamento automático no Roteiro).
-  - **Atualizar o Timóteo (`:helper`):** atualizar `CalendarRules.kt`, `ActionText.kt` (`helper_open_calendar*`), glossário em português (`Portuguese.kt`) e catálogo (`updateWickCatalog`) explicando o novo fluxo do Calendário.
-- [ ] **Tradução PT-BR completa do P&R (`:qa` + páginas web do `:server`):**
-  - Adicionar em `strings/src/main/composeResources/values-pt/strings.xml` as 10 chaves faltantes do `:qa` (`qa_close_history`, `qa_delete_session`, `qa_no_session_banner`, `qa_resume_session`, `qa_session_label`, `qa_session_name_label`, `qa_session_option`, `qa_session_running`, `qa_show_less`, `qa_start_session`).
-  - Traduzir para Português (BR) as páginas web servidas aos celulares/moderadores em `server/src/main/resources/companion/` (`qa-submission.html`, `qa-voting.html`, `qa-admin.html` e revisar `presentation-remote.html`).
-  - Atualizar o catálogo/textos do **Timóteo** (`:helper:updateWickCatalog`) caso novos rótulos de UI sejam alterados.
+  - Assistente **Timóteo** (`:helper`) ensinado (`GuideTargets.ONLINE_SONG_SEARCH`, `NavigationTopics`, `Portuguese.kt` e `wick/catalog.tsv`) a responder dúvidas sobre a Pesquisa de Músicas na Internet.
+- [x] **Melhorias no Calendário (`v1.0.2`):**
+  - **Visibilidade na interface:** removido `"CALENDAR"` de `hiddenScheduleButtons` (`AppSettings.kt`, migração versão `26` em `SettingsManager.kt`) e adicionado atalho no menu **Roteiro** (`NavigationTopBar.kt`).
+  - **Criação e repetição mais intuitivas:** seleção de repetição (*Uma vez*, *Semanal*, *A cada 2 sem.*, *Mensal*), quantidade e prévia das datas diretamente na janela de **Novo culto** (`ServiceSheet.kt` + `CalendarDialogs.kt`).
+  - **Tradução PT-BR:** revisado `calendar/src/main/composeResources/values-pt/strings.xml` trocando termos de Portugal (*cânticos*, *guardar*, *ficheiro*, *separador*, *ecrã*, *diapositivos*, *em ciclo*, *equipa*) por Português do Brasil.
+  - **Modo local sem nuvem:** opção de sincronização remota ocultada em `CalendarManagerWindow.kt` quando `relayUrl` está vazio (`BuiltInRelay.kt`).
+  - **Atualizar o Timóteo (`:helper`):** atualizados `helper_open_calendar_repeat`, `helper_open_calendar_load`, `NavigationTopics.kt`, `Portuguese.kt` e `wick/catalog.tsv` via `:helper:updateWickCatalog`.
+- [x] **Tradução PT-BR completa do P&R (`:qa` + páginas web do `:server`):**
+  - Adicionadas em `strings/src/main/composeResources/values-pt/strings.xml` as 10 chaves faltantes do `:qa` (`qa_close_history`, `qa_delete_session`, `qa_no_session_banner`, `qa_resume_session`, `qa_session_label`, `qa_session_name_label`, `qa_session_option`, `qa_session_running`, `qa_show_less`, `qa_start_session`).
+  - Traduzidas para Português (BR) as páginas web de P&R servidas aos celulares/moderadores em `server/src/main/resources/companion/` (`qa-submission.html`, `qa-voting.html` e `qa-admin.html`; `presentation-remote.html` mantido para revisão futura).
+  - Catálogo semântico do **Timóteo** atualizado com `:helper:updateWickCatalog`.
 - [ ] **Futuro site próprio:**
   - Preencher `WEBSITE_URL`, `CONTACT_API_URL`, `CUSTOM_UPDATE_MANIFEST_URL` (se usar site além do GitHub Releases) em `BrandConfig.kt` quando o domínio/site estiver no ar.
 - [ ] **Simplificações e melhorias após testes reais:**

@@ -102,7 +102,7 @@ data class AppSettings(
      * Turned on from the panel's own options menu, and once on it stays on. Existing settings are
      * brought to the same starting point by the migration to schema 11.
      */
-    val hiddenScheduleButtons: Set<String> = setOf("CALENDAR"),
+    val hiddenScheduleButtons: Set<String> = emptySet(),
     val previewPanelWidthDp: Int = 280,
     val previewPanelCollapsed: Boolean = false,
     val maximizedLayout: WindowLayoutSettings = WindowLayoutSettings(),
@@ -202,6 +202,6 @@ data class AppSettings(
          * Purely *additive* fields need no bump: `ignoreUnknownKeys` plus a default already handles
          * those in both directions.
          */
-        const val CURRENT_SETTINGS_VERSION = 25
+        const val CURRENT_SETTINGS_VERSION = 26
     }
 }

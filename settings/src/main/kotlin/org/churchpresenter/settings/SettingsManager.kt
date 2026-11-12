@@ -24,6 +24,9 @@ private const val VERSION_PREVIEW_LAYOUTS = 20
 /** Version 25: the Signage tab came out of dev mode and starts hidden, as STT does. */
 private const val VERSION_SIGNAGE_TAB = 25
 
+/** Version 26: Apresenter surfaces the Calendar button on the Schedule toolbar by default. */
+private const val VERSION_SHOW_CALENDAR_BUTTON = 26
+
 // Load, migrate, save, import and export, all against one file. The per-version steps it runs are
 // in
 // the Settings*Migrations.kt files beside it, the repairs in SettingsRepair.kt and the backups in
@@ -189,6 +192,9 @@ class SettingsManager {
             // A file written before it existed has an explicit hidden list that cannot mention it,
             // so without this every existing install would open with a tab nobody asked for.
             settings = settings.copy(hiddenTabs = settings.hiddenTabs + "SIGNAGE")
+        }
+        if (fromVersion < VERSION_SHOW_CALENDAR_BUTTON) {
+            settings = settings.copy(hiddenScheduleButtons = settings.hiddenScheduleButtons - "CALENDAR")
         }
         // The primary/secondary-bible output shorthand ("primary"/"secondary" bibleMode, converted
         // to a position in the stack) used to be migrated here as a typed, per-[ScreenAssignment]

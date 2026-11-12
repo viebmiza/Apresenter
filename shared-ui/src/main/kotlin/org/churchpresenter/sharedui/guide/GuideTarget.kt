@@ -25,6 +25,7 @@ object GuideTargets {
     val BACKGROUND_BUTTON = GuideTarget("toolbar.background")
     val SETTINGS_BUTTON = GuideTarget("toolbar.settings")
     val NEW_SONG = GuideTarget("songs.new")
+    val ONLINE_SONG_SEARCH = GuideTarget("songs.onlineSearch")
     val EDIT_SONG = GuideTarget("songs.edit")
     val ADD_SONG_LANGUAGE = GuideTarget("songEditor.addLanguage")
     val SONG_CHORDS_SWITCH = GuideTarget("songEditor.chordsSwitch")

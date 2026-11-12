@@ -565,6 +565,8 @@ configurations.configureEach {
 // the PresentationEngine sub-build already uses for its suite.
 tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
     systemProperty("java.awt.headless", "true")
+    systemProperty("user.language", "en")
+    systemProperty("user.country", "US")
 
     // Pixel density for the app-preview screenshots, for exporting retina-sized captures:
     //   ./gradlew :composeApp:recordRoborazziJvm --tests '*AppPreview*' -PpreviewDensity=2

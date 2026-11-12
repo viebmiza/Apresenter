@@ -127,6 +127,12 @@ class WickRequestsTest {
         assertEquals(listOf(songsTab, GuideTargets.NEW_SONG), tourTargets("where do I add a song"))
         assertEquals(listOf(songsTab, GuideTargets.EDIT_SONG), tourTargets("how do I edit song").take(2))
         assertEquals(listOf(songsTab, GuideTargets.EDIT_SONG), tourTargets("how do I change a song").take(2))
+        assertEquals(listOf(songsTab, GuideTargets.ONLINE_SONG_SEARCH), tourTargets("search song online"))
+        assertEquals(listOf(songsTab, GuideTargets.ONLINE_SONG_SEARCH), tourTargets("find lyrics online"))
+        val ptOnline = assertIs<HelperAction.Highlight>(action("pesquisar música na internet", "pt"))
+        assertEquals(listOf(songsTab, GuideTargets.ONLINE_SONG_SEARCH), ptOnline.tour.steps.map { it.target })
+        val ptOnlineAlt = assertIs<HelperAction.Highlight>(action("buscar letra online", "pt"))
+        assertEquals(listOf(songsTab, GuideTargets.ONLINE_SONG_SEARCH), ptOnlineAlt.tour.steps.map { it.target })
         // Pointed at, not opened: the tab changes only when Next moves on to the button.
         val first = assertIs<HelperAction.Highlight>(action("how do I add song")).tour.steps.first()
         assertEquals(null, first.before)
