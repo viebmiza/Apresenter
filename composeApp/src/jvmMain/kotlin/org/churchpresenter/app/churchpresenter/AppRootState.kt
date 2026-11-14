@@ -75,7 +75,8 @@ internal class AppRootState(
     // main hands over one that has already read the file, so the first composition does not.
     val settingsManager: SettingsManager = SettingsManager(),
 ) {
-    var appReady by mutableStateOf(false)
+    // Ready immediately at startup so MainWindow renders without a transitory splash window
+    var appReady by mutableStateOf(true)
     val statisticsManager = StatisticsManager()
     val verseSequenceLog = VerseSequenceLog()
     var appSettings by mutableStateOf(settingsManager.loadSettings().let {

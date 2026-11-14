@@ -42,7 +42,6 @@ internal object AppWindowIcons {
 
     /** From now on, every window this app opens gets the app icon's frames. */
     fun install() {
-        if (frames.isEmpty()) return
         Toolkit.getDefaultToolkit().addAWTEventListener(
             { event ->
                 if (event.id == WindowEvent.WINDOW_OPENED) (event.source as? Window)?.let(::applyTo)

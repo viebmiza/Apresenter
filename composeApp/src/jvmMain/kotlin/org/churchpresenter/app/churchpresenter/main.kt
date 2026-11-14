@@ -211,7 +211,8 @@ private fun setLatchedSystemProperties() {
     // Skiko latches this on its first SkiaLayer, so a later set is ignored.
     val osName = System.getProperty("os.name", "")
     // Only Windows ever writes one (renderFallbackAfterFirstFrame).
-    val saved = savedRenderFallback(renderFallbackFile(AppDataDir.resolve()), renderFallbackGpu())
+    // Evaluate renderFallbackGpu lazily so JNA / EnumDisplayDevicesW is never invoked at startup when no fallback file exists.
+    val saved = savedRenderFallback(renderFallbackFile(AppDataDir.resolve()), ::renderFallbackGpu)
     preferredRenderApi(osName, DevFlags.renderApiOverride, saved = saved)?.let {
         System.setProperty("skiko.renderApi", it)
     }
@@ -251,6 +252,7 @@ fun main(args: Array<String>) {
 
     // Before the first window: every window gets the app icon's pixel frames as it opens.
     AppWindowIcons.install()
+    Thread { AppWindowIcons.frames }.apply { isDaemon = true; name = "app-icons-warmup" }.start()
     // Before the first window: a Ctrl shortcut's typed character never reaches a text field.
     installShortcutResidueFilter()
 
@@ -262,7 +264,8 @@ fun main(args: Array<String>) {
         if (DevFlags.watchEventThreadIo) EventThreadIoMonitor.startLogging()
     }
 
-    val startupSettings = SettingsManager().loadSettings()
+    val settingsManager = SettingsManager()
+    val startupSettings = settingsManager.loadSettings()
     val offscreenWeb = startupSettings.projectionSettings.offscreenWebEnabled
     if (offscreenWeb) turnOffLinuxVsync()
     CrashReporter.initialize(
@@ -284,9 +287,9 @@ fun main(args: Array<String>) {
     UiWatchdog.start(uiStallReporter::budgetMs, uiStallReporter::answered, uiStallReporter::stalled)
     // The same for the updater, which compares releases against this version.
     UpdateChecker.initialize(UpdaterIdentity(appVersion = BuildConfig.APP_VERSION, isRelease = BuildConfig.IS_RELEASE))
-    // The installer a previous update ran is still in the temp directory: it could not be deleted
-    // while it was running. The single-instance guard above means no download is in flight.
-    deleteLeftoverUpdateInstallers()
+    // The installer a previous update ran is still in the temp directory: delete it asynchronously
+    // so filesystem scans on large %TEMP% directories never block UI launch.
+    Thread { deleteLeftoverUpdateInstallers() }.apply { isDaemon = true; name = "installer-cleanup" }.start()
     // Which renderer was live is the first thing a GPU driver crash needs and the one thing the
     // report never carried. "default" means the platform's own choice, which is not the same fact
     // as any named API — a report from a machine on Direct3D-by-default and one pinned to it are
@@ -294,37 +297,39 @@ fun main(args: Array<String>) {
     // can arrive before those run. This is the API asked for; what the main window actually draws
     // with is render.api.actual, set once it has drawn (MainWindow).
     CrashReporter.setTag("render.api", System.getProperty("skiko.renderApi") ?: "default")
-    // Which renderer ran is only half the fact: whether a GPU driver fault is an NVIDIA, AMD or
-    // Intel problem is the axis such a group has to be split by, and no report carried it at all.
-    // Empty off Windows and on any machine the call fails, so an absent tag means "not known"
-    // rather than a guess. Beside render.api for the same reason: a render fault can arrive early.
-    CrashReporter.setConfigTags(GpuInfo.crashTags())
+    // GPU hardware tags are read via JNA/EnumDisplayDevices in background so main thread is not blocked.
+    Thread {
+        runCatching { CrashReporter.setConfigTags(GpuInfo.crashTags()) }
+    }.apply { isDaemon = true; name = "gpu-tags" }.start()
 
     if (shouldBundleDefaultBible(startupSettings.bibleSettings)) bundleDefaultBible(startupSettings)
 
-    val pendingUsageEvents = LiveMapReporter.eventsToReport(startupSettings, UsageEvents.unreported())
-    val previousRun = UsageEvents.lastRun()
-    LiveMapReporter.pingOnOpen(
-        identity = appTelemetryIdentity,
-        installId = analyticsInstallId(startupSettings.analyticsReportingEnabled) { CrashReporter.installId() },
-        updateCheckInterval = startupSettings.updateCheckInterval,
-        setup = {
-            LiveMapReporter.setupFacts(
-                startupSettings,
-                screenCount = LiveMapReporter.detectScreenCount(),
-                songCounts = LiveMapReporter.gatherSongCounts(startupSettings, ::bundledSongCount),
-                sessionMinutes = previousRun.sessionMinutes,
-                liveMinutes = previousRun.liveMinutes,
-                liveStalls = previousRun.liveStalls,
-                signageScreens = SignageHub.pairedScreensByPlatform(startupSettings.signageFolder().toPath()),
-            )
-        },
-        events = pendingUsageEvents,
-        onDelivered = {
-            UsageEvents.markReported(pendingUsageEvents)
-            if (!previousRun.isEmpty) UsageEvents.clearLastRun()
-        }
-    )
+    // Telemetry and usage stats are gathered and pinged asynchronously in the background.
+    Thread {
+        val pendingUsageEvents = LiveMapReporter.eventsToReport(startupSettings, UsageEvents.unreported())
+        val previousRun = UsageEvents.lastRun()
+        LiveMapReporter.pingOnOpen(
+            identity = appTelemetryIdentity,
+            installId = analyticsInstallId(startupSettings.analyticsReportingEnabled) { CrashReporter.installId() },
+            updateCheckInterval = startupSettings.updateCheckInterval,
+            setup = {
+                LiveMapReporter.setupFacts(
+                    startupSettings,
+                    screenCount = LiveMapReporter.detectScreenCount(),
+                    songCounts = LiveMapReporter.gatherSongCounts(startupSettings, ::bundledSongCount),
+                    sessionMinutes = previousRun.sessionMinutes,
+                    liveMinutes = previousRun.liveMinutes,
+                    liveStalls = previousRun.liveStalls,
+                    signageScreens = SignageHub.pairedScreensByPlatform(startupSettings.signageFolder().toPath()),
+                )
+            },
+            events = pendingUsageEvents,
+            onDelivered = {
+                UsageEvents.markReported(pendingUsageEvents)
+                if (!previousRun.isEmpty) UsageEvents.clearLastRun()
+            }
+        )
+    }.apply { isDaemon = true; name = "telemetry-ping" }.start()
 
     // One camera enumeration at startup, so a capture that fails before any picker has been opened
     // can still report what the machine had. A fifth of camera reports arrived carrying
@@ -393,21 +398,17 @@ fun main(args: Array<String>) {
     )
 
     exitIfSystemFontsUnavailable(olderThanWindows10 = CefManager.windowsUnsupported)
-    runApplication(startupSettings, coroutineExceptionHandler, relaunchedByGuard = RELAUNCHED_ARGUMENT in args)
+    runApplication(settingsManager, startupSettings, coroutineExceptionHandler, relaunchedByGuard = RELAUNCHED_ARGUMENT in args)
 }
 
 /** Opens the windows, once [main] has done everything that comes before them. */
 @OptIn(ExperimentalComposeUiApi::class)
 private fun runApplication(
+    settingsManager: SettingsManager,
     startupSettings: AppSettings,
     coroutineExceptionHandler: CoroutineExceptionHandler,
     relaunchedByGuard: Boolean,
 ) {
-    // Read here, on this thread, so the manager the app keeps already holds the settings and the
-    // first composition does not read the file on the event thread. Not main's first read:
-    // bundleDefaultBible may have written the file since.
-    val settingsManager = SettingsManager().also { it.loadSettings() }
-
     application(exitProcessOnExit = true) {
         // Held above every window so each one -- the main window, Settings, every dialog -- is drawn
         // with the same accent, font and text size, and a change reaches all of them at once.

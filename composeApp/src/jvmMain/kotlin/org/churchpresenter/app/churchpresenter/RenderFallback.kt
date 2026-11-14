@@ -35,11 +35,15 @@ internal fun renderFallbackAfterFirstFrame(osName: String, requested: String?, a
     if (osName.lowercase().contains("win") && requested == null && actual == "OPENGL") SOFTWARE_RENDER_API else null
 
 /** The render API saved for [gpu], or null when none was saved or it was saved for another GPU. */
-internal fun savedRenderFallback(file: File, gpu: String?): String? {
+internal fun savedRenderFallback(file: File, gpu: String?): String? = savedRenderFallback(file) { gpu }
+
+/** The render API saved for [gpuProvider], evaluating [gpuProvider] only if [file] exists. */
+internal fun savedRenderFallback(file: File, gpuProvider: () -> String?): String? {
     if (!file.isFile) return null
     val props = Properties()
     runCatching { file.inputStream().use { props.load(it) } }.onFailure { return null }
-    return props.getProperty(KEY_API)?.takeIf { props.getProperty(KEY_GPU).orEmpty() == gpu.orEmpty() }
+    val currentGpu = gpuProvider()
+    return props.getProperty(KEY_API)?.takeIf { props.getProperty(KEY_GPU).orEmpty() == currentGpu.orEmpty() }
 }
 
 /** Saves [api] for [gpu], so a new GPU or driver setup gets the platform default again. */

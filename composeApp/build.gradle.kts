@@ -341,8 +341,8 @@ compose.desktop {
         resolvedJdk21Home()?.let { javaHome = it }
 
         jvmArgs(
-            // Memory
-            "-Xms768m",
+            // Memory: lean initial heap for ultra-fast startup, expanding up to 3GB as needed
+            "-Xms256m",
             "-Xmx3072m",
             // GC: Low-latency tuning for 60 FPS presentations without dropped frames
             "-XX:+UseG1GC",
@@ -351,7 +351,6 @@ compose.desktop {
             "-XX:G1ReservePercent=20",
             "-XX:MaxGCPauseMillis=20",
             "-XX:+ParallelRefProcEnabled",
-            "-XX:+AlwaysPreTouch",
             "-XX:+UseStringDeduplication",
             // Rendering hints (renderApi is set per-platform in the blocks below / jvmArgs above)
             "-Dawt.useSystemAAFontSettings=on",
