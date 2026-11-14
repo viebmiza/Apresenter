@@ -2,7 +2,6 @@ package org.churchpresenter.app.churchpresenter
 
 import org.churchpresenter.media.composables.warmVlcInBackground
 import org.churchpresenter.sharedui.utils.LocalSimulateMissingOutputs
-import org.churchpresenter.app.churchpresenter.utils.appTelemetryIdentity
 import org.churchpresenter.dialogs.showAlreadyRunningDialog
 import androidx.compose.ui.window.ApplicationScope
 import androidx.compose.ui.window.application
@@ -23,14 +22,7 @@ import androidx.compose.runtime.DisposableEffect
 import org.churchpresenter.app.churchpresenter.utils.AppWindowIcons
 import org.churchpresenter.sharedui.utils.addGuardedShutdownHook
 import org.churchpresenter.updater.StorePackage
-import org.churchpresenter.updater.UpdateChecker
-import org.churchpresenter.updater.UpdaterIdentity
-import org.churchpresenter.updater.deleteLeftoverUpdateInstallers
 import org.churchpresenter.sharedui.utils.DevFlags
-import org.churchpresenter.telemetry.GpuInfo
-import org.churchpresenter.lowerthird.render.LottieFonts
-import org.churchpresenter.sharedui.utils.SystemFonts
-import org.churchpresenter.presentationengine.fonts.SlideFontRegistry
 import churchpresenter.composeapp.generated.resources.Res
 import kotlinx.coroutines.runBlocking
 import org.churchpresenter.settings.AppSettings
@@ -46,13 +38,9 @@ import org.churchpresenter.media.composables.vlcCustomPath
 import org.churchpresenter.lowerthird.render.LottieRenderCache
 import org.churchpresenter.server.CalendarSyncService
 import org.churchpresenter.settings.calendarFolder
-import org.churchpresenter.settings.signageFolder
 import org.churchpresenter.settings.utils.AppDataDir
-import org.churchpresenter.signage.hub.SignageHub
 import org.churchpresenter.settings.utils.Constants
-import org.churchpresenter.songs.bundledSongCount
 import org.churchpresenter.appsettings.AutoStartManager
-import org.churchpresenter.diagnostics.BuildIdentity
 import org.churchpresenter.diagnostics.CrashReporter
 import org.churchpresenter.diagnostics.EventThreadIoMonitor
 import org.churchpresenter.diagnostics.StartupProbe
@@ -64,7 +52,6 @@ import org.churchpresenter.outputguard.RELAUNCHED_ARGUMENT
 import org.churchpresenter.outputguard.runOutputGuard
 import org.churchpresenter.diagnostics.UiStallSpec
 import org.churchpresenter.diagnostics.UiWatchdog
-import org.churchpresenter.telemetry.LiveMapReporter
 import org.churchpresenter.sharedui.utils.RunRecord
 import org.churchpresenter.sharedui.utils.UsageEvents
 import java.io.File
@@ -211,8 +198,8 @@ private fun setLatchedSystemProperties() {
     // Skiko latches this on its first SkiaLayer, so a later set is ignored.
     val osName = System.getProperty("os.name", "")
     // Only Windows ever writes one (renderFallbackAfterFirstFrame).
-    // Evaluate renderFallbackGpu lazily so JNA / EnumDisplayDevicesW is never invoked at startup when no fallback file exists.
-    val saved = savedRenderFallback(renderFallbackFile(AppDataDir.resolve()), ::renderFallbackGpu)
+    val fallbackFile = renderFallbackFile(AppDataDir.resolve())
+    val saved = if (fallbackFile.isFile) savedRenderFallback(fallbackFile, renderFallbackGpu()) else null
     preferredRenderApi(osName, DevFlags.renderApiOverride, saved = saved)?.let {
         System.setProperty("skiko.renderApi", it)
     }
@@ -241,24 +228,13 @@ fun main(args: Array<String>) {
 
     // The Canvas receives NDI and OMT over the app's own libraries; hand it them before any UI.
     NetworkInputs.install(AppNetworkInputs)
-
-    // ImageIO caches its output stream in a temp file by default, so every slide JPEG the
-    // presentation cache writes depended on java.io.tmpdir being writable — and where it was not,
-    // ImageIO.write failed with the useless "Can't create an ImageOutputStream!" rather than
-    // anything naming a temp directory. That was 75 reports across four churches. The images this
-    // app writes are single slides and thumbnails, small enough to stage in memory, so the temp
-    // file buys nothing and costs a dependency on a directory the app does not control.
     javax.imageio.ImageIO.setUseCache(false)
 
     // Before the first window: every window gets the app icon's pixel frames as it opens.
     AppWindowIcons.install()
     Thread { AppWindowIcons.frames }.apply { isDaemon = true; name = "app-icons-warmup" }.start()
-    // Before the first window: a Ctrl shortcut's typed character never reaches a text field.
     installShortcutResidueFilter()
 
-    // A dev build can stall its own UI on a schedule (-Dchurchpresenter.injectUiStall=<ms>,<everySec>)
-    // to show what a stall costs the outputs -- see docs/SHOW_CONTROL.md, Output isolation.
-    // Asked to, it also logs every blocking call its event thread makes -- DevFlags.watchEventThreadIo.
     if (!BuildConfig.IS_RELEASE) {
         UiStallSpec.parse(System.getProperty(UiStallInjector.PROPERTY))?.let { UiStallInjector.start(it) }
         if (DevFlags.watchEventThreadIo) EventThreadIoMonitor.startLogging()
@@ -268,76 +244,11 @@ fun main(args: Array<String>) {
     val startupSettings = settingsManager.loadSettings()
     val offscreenWeb = startupSettings.projectionSettings.offscreenWebEnabled
     if (offscreenWeb) turnOffLinuxVsync()
-    CrashReporter.initialize(
-        startupSettings.analyticsReportingEnabled,
-        // BuildConfig is generated into :composeApp, so :diagnostics is told what this build is
-        // rather than reading it.
-        BuildIdentity(
-            versionDisplay = BuildConfig.VERSION_DISPLAY,
-            appVersion = BuildConfig.APP_VERSION,
-            isRelease = BuildConfig.IS_RELEASE,
-            buildType = BuildConfig.BUILD_TYPE,
-            buildChannel = BuildConfig.BUILD_CHANNEL,
-        ),
-    )
-    CrashReporter.breadcrumb("Application started", category = "lifecycle")
-    // Every build says where the UI thread was stuck whenever it stops answering, and a release
-    // build sends the stall to Sentry -- see UiWatchdog and UiStallReporter. After the reporter is
-    // set up, so the first stall it counts can be sent.
-    UiWatchdog.start(uiStallReporter::budgetMs, uiStallReporter::answered, uiStallReporter::stalled)
-    // The same for the updater, which compares releases against this version.
-    UpdateChecker.initialize(UpdaterIdentity(appVersion = BuildConfig.APP_VERSION, isRelease = BuildConfig.IS_RELEASE))
-    // The installer a previous update ran is still in the temp directory: delete it asynchronously
-    // so filesystem scans on large %TEMP% directories never block UI launch.
-    Thread { deleteLeftoverUpdateInstallers() }.apply { isDaemon = true; name = "installer-cleanup" }.start()
-    // Which renderer was live is the first thing a GPU driver crash needs and the one thing the
-    // report never carried. "default" means the platform's own choice, which is not the same fact
-    // as any named API — a report from a machine on Direct3D-by-default and one pinned to it are
-    // different evidence. Set here rather than with the availability tags below: a render fault
-    // can arrive before those run. This is the API asked for; what the main window actually draws
-    // with is render.api.actual, set once it has drawn (MainWindow).
-    CrashReporter.setTag("render.api", System.getProperty("skiko.renderApi") ?: "default")
-    // GPU hardware tags are read via JNA/EnumDisplayDevices in background so main thread is not blocked.
-    Thread {
-        runCatching { CrashReporter.setConfigTags(GpuInfo.crashTags()) }
-    }.apply { isDaemon = true; name = "gpu-tags" }.start()
+    setupCrashReporter(startupSettings)
 
     if (shouldBundleDefaultBible(startupSettings.bibleSettings)) bundleDefaultBible(startupSettings)
+    launchTelemetryPing(startupSettings)
 
-    // Telemetry and usage stats are gathered and pinged asynchronously in the background.
-    Thread {
-        val pendingUsageEvents = LiveMapReporter.eventsToReport(startupSettings, UsageEvents.unreported())
-        val previousRun = UsageEvents.lastRun()
-        LiveMapReporter.pingOnOpen(
-            identity = appTelemetryIdentity,
-            installId = analyticsInstallId(startupSettings.analyticsReportingEnabled) { CrashReporter.installId() },
-            updateCheckInterval = startupSettings.updateCheckInterval,
-            setup = {
-                LiveMapReporter.setupFacts(
-                    startupSettings,
-                    screenCount = LiveMapReporter.detectScreenCount(),
-                    songCounts = LiveMapReporter.gatherSongCounts(startupSettings, ::bundledSongCount),
-                    sessionMinutes = previousRun.sessionMinutes,
-                    liveMinutes = previousRun.liveMinutes,
-                    liveStalls = previousRun.liveStalls,
-                    signageScreens = SignageHub.pairedScreensByPlatform(startupSettings.signageFolder().toPath()),
-                )
-            },
-            events = pendingUsageEvents,
-            onDelivered = {
-                UsageEvents.markReported(pendingUsageEvents)
-                if (!previousRun.isEmpty) UsageEvents.clearLastRun()
-            }
-        )
-    }.apply { isDaemon = true; name = "telemetry-ping" }.start()
-
-    // One camera enumeration at startup, so a capture that fails before any picker has been opened
-    // can still report what the machine had. A fifth of camera reports arrived carrying
-    // `camera.enumerator=not_run` — nothing had looked, because only a picker enumerates and the
-    // presenter restores a scene without one.
-    //
-    // Its own daemon thread, like the font warm-up above: this shells out to ffmpeg, and on Windows
-    // to PowerShell as well, so it must not be on the path that opens the window.
     Thread {
         runCatching { runBlocking { CameraDeviceCatalog.refresh() } }
     }.apply { isDaemon = true }.start()
@@ -348,57 +259,27 @@ fun main(args: Array<String>) {
         CrashReporter.reportException(throwable, context = "CoroutineExceptionHandler")
     }
 
-    if (offscreenWeb) {
-        CefManager.init(offscreen = true)
-        CrashReporter.setTag("jcef.available", CefManager.initialized.toString())
-        CrashReporter.setTag("web.render", "offscreen")
-        if (CefManager.macOsUnsupported) CrashReporter.setTag("jcef.macos_unsupported", "true")
-        if (CefManager.windowsUnsupported) CrashReporter.setTag("jcef.windows_unsupported", "true")
-    } else {
-        // Fast startup: initialize heavy Chromium CEF asynchronously in background so the main window opens immediately
-        Thread {
-            CefManager.init(offscreen = false)
-            CrashReporter.setTag("jcef.available", CefManager.initialized.toString())
-            CrashReporter.setTag("web.render", "windowed")
-            if (CefManager.macOsUnsupported) CrashReporter.setTag("jcef.macos_unsupported", "true")
-            if (CefManager.windowsUnsupported) CrashReporter.setTag("jcef.windows_unsupported", "true")
-        }.apply { isDaemon = true; name = "jcef-init" }.start()
-    }
-
+    initCef(offscreenWeb)
     io.github.vinceglb.filekit.FileKit.init(appId = "Apresenter")
-
     Thread { AutoStartManager.syncRegistration() }.apply { isDaemon = true }.start()
-
-    // Warm-up only, and the whole of it is optional: what it saves is the first font picker
-    // enumerating the machine's fonts on the UI thread. It is wrapped because everything in it goes
-    // through AWT's font stack, which raises an Error rather than an Exception when the platform's
-    // native font manager will not load — reported as a fatal crash from this thread even though
-    // the app itself carried on. See LiveMapReporter.detectScreenCount for the same lesson.
-    Thread {
-        runCatching {
-            LottieFonts.bundledFontResources().forEach { resource ->
-                LottieFonts::class.java.getResourceAsStream(resource)?.let {
-                    SlideFontRegistry.registerFontStream(it)
-                }
-            }
-            SlideFontRegistry.initialize()
-            SystemFonts.families()
-        }
-    }.apply { isDaemon = true }.start()
+    warmUpFontsInBackground()
 
     vlcCustomPath = startupSettings.projectionSettings.vlcPath
-    // Loading VLC takes a second or more on Windows; done here, off the event thread, the first
-    // composition that asks whether it is there and the first video opened find it loaded.
     warmVlcInBackground()
     FfmpegBinary.customPath = startupSettings.projectionSettings.ffmpegPath
 
     LottieRenderCache.ensureForFolder(
         startupSettings.streamingSettings.lowerThirdFolder,
-        startupSettings.atemSettings
+        startupSettings.atemSettings,
     )
 
     exitIfSystemFontsUnavailable(olderThanWindows10 = CefManager.windowsUnsupported)
-    runApplication(settingsManager, startupSettings, coroutineExceptionHandler, relaunchedByGuard = RELAUNCHED_ARGUMENT in args)
+    runApplication(
+        settingsManager,
+        startupSettings,
+        coroutineExceptionHandler,
+        relaunchedByGuard = RELAUNCHED_ARGUMENT in args,
+    )
 }
 
 /** Opens the windows, once [main] has done everything that comes before them. */

@@ -81,7 +81,7 @@ class LicenseContentTest {
     @Test
     fun `the title and prompt are shown`() = dialog {
         onNodeWithText("End User License Agreement (EULA)").assertExists()
-        onNodeWithText("Please read and accept the End User License Agreement to use Church Presenter.").assertExists()
+        onNodeWithText("Please read and accept the End User License Agreement to use Apresenter.").assertExists()
     }
 
     @Test

@@ -41,7 +41,7 @@ class ShareYourStoryContentTest {
 
     @Test
     fun `the ask is shown`() = dialog {
-        onNodeWithText("Has Church Presenter helped your church?").assertExists()
+        onNodeWithText("Has Apresenter helped your church?").assertExists()
         onNodeWithText("WE'D LOVE TO HEAR FROM YOU").assertExists()
     }
 
