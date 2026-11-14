@@ -275,9 +275,6 @@ internal fun SingleDisplayPreview(
     // stops drawing and nothing else changes.
     var expanded by remember { mutableStateOf(true) }
     val profiles = appSettings.projectionSettings.outputProfiles
-    val pickProfile: (String) -> Unit = { pickedId ->
-        onSettingsChange(withPreviewProfile(outputKind, screenIndex, pickedId))
-    }
     val showsProfileLabel = showsProfileLabel(profiles, rawAssignment.activeProfileId)
 
     Column(modifier = modifier) {
@@ -289,7 +286,9 @@ internal fun SingleDisplayPreview(
             onToggle = { expanded = !expanded },
             profiles = profiles,
             activeProfileId = rawAssignment.activeProfileId,
-            onPickProfile = pickProfile,
+            onPickProfile = { onSettingsChange(withPreviewProfile(outputKind, screenIndex, it)) },
+            busRole = busRole,
+            isLive = isLive,
         )
 
         if (expanded || !collapsible) {

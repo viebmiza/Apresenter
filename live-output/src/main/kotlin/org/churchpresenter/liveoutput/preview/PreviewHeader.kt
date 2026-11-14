@@ -55,6 +55,11 @@ import org.jetbrains.compose.resources.stringResource
 
 // The line above each preview: the output's name and mode, the fold caret and the profile picker.
 
+private val STATUS_PREVIEW_BG = Color(0xFF003816)
+private val STATUS_PREVIEW_TEXT = Color(0xFF00E676)
+private val STATUS_LIVE_BG = Color(0xFF400A0A)
+private val STATUS_LIVE_TEXT = Color(0xFFFF4D4D)
+
 /**
  * The row above one preview: the output's display mode, and a caret that folds the picture away.
  *
@@ -78,7 +83,19 @@ internal fun PreviewHeader(
     profiles: List<OutputProfile> = emptyList(),
     activeProfileId: String? = null,
     onPickProfile: (String) -> Unit = {},
+    busRole: BusRole? = null,
+    isLive: Boolean = false,
 ) {
+    val (statusBg, statusText, statusLabel) = when {
+        busRole == BusRole.PREVIEW -> Triple(STATUS_PREVIEW_BG, STATUS_PREVIEW_TEXT, "PRÉVIA")
+        busRole == BusRole.PROGRAM || isLive -> Triple(STATUS_LIVE_BG, STATUS_LIVE_TEXT, "AO VIVO")
+        else -> Triple(
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            MaterialTheme.colorScheme.onSurfaceVariant,
+            "STANDBY",
+        )
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -95,6 +112,23 @@ internal fun PreviewHeader(
             modifier = Modifier.size(14.dp).rotate(if (expanded) 0f else CARET_CLOSED_DEGREES),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Row(
+            modifier = Modifier
+                .clip(AppShape(4.dp))
+                .background(statusBg)
+                .padding(horizontal = 4.dp, vertical = 1.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Box(Modifier.size(5.dp).clip(CircleShape).background(statusText))
+            Text(
+                text = statusLabel,
+                fontSize = 8.5.sp,
+                fontWeight = FontWeight.Bold,
+                color = statusText,
+                letterSpacing = 0.3.sp,
+            )
+        }
         Text(
             text = modeLabel,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

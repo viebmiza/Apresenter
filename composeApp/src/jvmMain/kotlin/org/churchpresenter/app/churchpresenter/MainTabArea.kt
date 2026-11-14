@@ -42,12 +42,15 @@ import org.churchpresenter.sharedui.composables.ToggleMenuHeader
 import org.churchpresenter.sharedui.composables.ToggleMenuItem
 import org.churchpresenter.sharedui.composables.ToolbarKey
 import org.churchpresenter.sharedui.composables.ToolbarKeyStyle
+import org.churchpresenter.app.churchpresenter.tabs.TabCategory
+import org.churchpresenter.app.churchpresenter.tabs.TabCategoryBar
 import org.churchpresenter.app.churchpresenter.tabs.TabSection
 import org.churchpresenter.sharedui.models.Tabs
 import org.churchpresenter.app.churchpresenter.tabs.getStringName
 import org.churchpresenter.theme.AppShape
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import androidx.compose.runtime.LaunchedEffect
 
 private const val CONTENT_CROSSFADE_MS = 120
 private val TOOLBAR_KEY_SIZE = 40.dp
@@ -109,37 +112,72 @@ internal fun MainTabArea(
 
 @Composable
 private fun TabBar(tabBar: TabBarState, actions: TabBarActions) {
-    Row(
+    val activeTab = tabBar.visibleTabs.getOrNull(tabBar.selectedTabIndex) ?: Tabs.BIBLE
+    var selectedCategory by remember { mutableStateOf(TabCategory.categoryFor(activeTab)) }
+
+    LaunchedEffect(activeTab) {
+        if (!selectedCategory.matches(activeTab)) {
+            selectedCategory = TabCategory.categoryFor(activeTab)
+        }
+    }
+
+    val filteredTabs = remember(tabBar.visibleTabs, selectedCategory) {
+        val matches = tabBar.visibleTabs.filter { selectedCategory.matches(it) }
+        if (matches.isNotEmpty()) matches else tabBar.visibleTabs
+    }
+
+    val filteredIndex = remember(filteredTabs, activeTab) {
+        val idx = filteredTabs.indexOf(activeTab)
+        if (idx >= 0) idx else 0
+    }
+
+    Column(
         modifier = Modifier.fillMaxWidth()
             .clip(TAB_BAR_SHAPE)
             .background(MaterialTheme.colorScheme.surface),
-        verticalAlignment = Alignment.CenterVertically
     ) {
-        TabSection(
-            modifier = Modifier.weight(1f),
+        TabCategoryBar(
+            selectedCategory = selectedCategory,
+            onCategorySelected = { selectedCategory = it },
             visibleTabs = tabBar.visibleTabs,
-            selectedTabIndex = tabBar.selectedTabIndex,
-            labelStyle = tabBar.labelStyle,
-            labelMargin = tabBar.labelMargin,
-            onTabSelected = actions.onTabSelected
+            modifier = Modifier.fillMaxWidth(),
         )
-        TabVisibilityMenu(tabBar.hiddenTabs, actions.onToggleTabHidden)
-        ToolbarKey(
-            painter = rememberVectorPainter(Icons.Default.Wallpaper),
-            text = stringResource(Res.string.background),
-            onClick = actions.onShowBackgroundSettings,
-            style = ToolbarKeyStyle.PANEL_TOGGLE,
-            buttonSize = TOOLBAR_KEY_SIZE,
-            modifier = Modifier.guideTarget(GuideTargets.BACKGROUND_BUTTON),
-        )
-        ToolbarKey(
-            painter = painterResource(IconRes.drawable.ic_settings),
-            text = stringResource(Res.string.tooltip_settings),
-            onClick = actions.onShowSettings,
-            style = ToolbarKeyStyle.PANEL_TOGGLE,
-            buttonSize = TOOLBAR_KEY_SIZE,
-            modifier = Modifier.guideTarget(GuideTargets.SETTINGS_BUTTON),
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TabSection(
+                modifier = Modifier.weight(1f),
+                visibleTabs = filteredTabs,
+                selectedTabIndex = filteredIndex,
+                labelStyle = tabBar.labelStyle,
+                labelMargin = tabBar.labelMargin,
+                onTabSelected = { idxInFiltered ->
+                    val clickedTab = filteredTabs.getOrNull(idxInFiltered)
+                    if (clickedTab != null) {
+                        val realIndex = tabBar.visibleTabs.indexOf(clickedTab)
+                        if (realIndex >= 0) actions.onTabSelected(realIndex)
+                    }
+                },
+            )
+            TabVisibilityMenu(tabBar.hiddenTabs, actions.onToggleTabHidden)
+            ToolbarKey(
+                painter = rememberVectorPainter(Icons.Default.Wallpaper),
+                text = stringResource(Res.string.background),
+                onClick = actions.onShowBackgroundSettings,
+                style = ToolbarKeyStyle.PANEL_TOGGLE,
+                buttonSize = TOOLBAR_KEY_SIZE,
+                modifier = Modifier.guideTarget(GuideTargets.BACKGROUND_BUTTON),
+            )
+            ToolbarKey(
+                painter = painterResource(IconRes.drawable.ic_settings),
+                text = stringResource(Res.string.tooltip_settings),
+                onClick = actions.onShowSettings,
+                style = ToolbarKeyStyle.PANEL_TOGGLE,
+                buttonSize = TOOLBAR_KEY_SIZE,
+                modifier = Modifier.guideTarget(GuideTargets.SETTINGS_BUTTON),
+            )
+        }
     }
 }
 

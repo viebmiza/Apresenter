@@ -13,13 +13,8 @@ import org.churchpresenter.dialogs.ClearLayersMenuItems
 import org.churchpresenter.liveoutput.clearGroup
 import org.churchpresenter.liveoutput.clearLayer
 import org.churchpresenter.liveoutput.clearableLayers
-import org.churchpresenter.liveoutput.clearTextOnly
-import org.churchpresenter.liveoutput.restoreText
-import org.churchpresenter.liveoutput.textCleared
 import org.churchpresenter.strings.generated.resources.tooltip_clear_layers
 import androidx.compose.material.icons.outlined.LayersClear
-import androidx.compose.material.icons.outlined.FormatClear
-import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.material3.DropdownMenu
 import org.churchpresenter.liveoutput.setPropOn
 import org.churchpresenter.liveoutput.propsOnAir
@@ -59,15 +54,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import org.churchpresenter.icons.generated.resources.Res as IconRes
 import org.churchpresenter.strings.generated.resources.Res
-import org.churchpresenter.icons.generated.resources.ic_close
 import org.churchpresenter.strings.generated.resources.preview_take
-import org.churchpresenter.strings.generated.resources.tooltip_clear_display
 import org.churchpresenter.strings.generated.resources.tooltip_message
 import org.churchpresenter.strings.generated.resources.tooltip_preview_settings
-import org.churchpresenter.strings.generated.resources.tooltip_clear_text
-import org.churchpresenter.strings.generated.resources.tooltip_restore_text
 import org.churchpresenter.strings.generated.resources.profile_sets
 import org.churchpresenter.strings.generated.resources.tooltip_toggle_displays
 import org.churchpresenter.companionsurface.CompanionConnectionChipRow
@@ -75,6 +65,7 @@ import org.churchpresenter.liveoutput.preview.LivePreviewPanel
 import org.churchpresenter.liveoutput.preview.PreviewGroupsPopover
 import org.churchpresenter.liveoutput.preview.ProfileSetsPopover
 import org.churchpresenter.app.churchpresenter.composables.QuickBackgroundTray
+import org.churchpresenter.app.churchpresenter.composables.StudioMasterPanicBar
 import org.churchpresenter.sharedui.composables.ToolbarKey
 import org.churchpresenter.sharedui.composables.ToolbarKeyStyle
 import org.churchpresenter.sharedui.composables.TooltipIconButton
@@ -92,7 +83,6 @@ import org.churchpresenter.settings.ProjectionSettings
 import org.churchpresenter.settings.showsProfileSetsButton
 import org.churchpresenter.settings.QuickBackground
 import org.churchpresenter.settings.activeLayout
-import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.layout.size
 import org.churchpresenter.dialogs.LiveActionButton
@@ -334,55 +324,50 @@ internal fun SidebarButtons(
     onEditPreviewLayout: () -> Unit,
 ) {
     // Wraps rather than clips: the panel is resizable.
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        TooltipIconButton(
-            painter = rememberVectorPainter(Icons.Default.Monitor),
-            text = stringResource(Res.string.tooltip_toggle_displays),
-            onClick = { presenterManager.togglePresenterWindow() },
-            buttonSize = 36.dp,
-            modifier = Modifier.guideTarget(GuideTargets.TOGGLE_OUTPUTS),
-            iconTint = if (presenterManager.showPresenterWindow.value)
-                MaterialTheme.colorScheme.primary
-            else
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        StudioMasterPanicBar(
+            presenterManager = presenterManager,
+            onClearDisplay = onClearDisplay,
+            previewModeEnabled = appSettings.projectionSettings.previewModeEnabled,
         )
-        TooltipIconButton(
-            painter = painterResource(IconRes.drawable.ic_close),
-            text = stringResource(Res.string.tooltip_clear_display),
-            onClick = onClearDisplay,
-            buttonSize = 36.dp,
-            modifier = Modifier.guideTarget(GuideTargets.CLEAR_OUTPUT),
-            iconTint = MaterialTheme.colorScheme.error
-        )
-        PreviewSettingsButton(appSettings.projectionSettings, onEditPreviewLayout) { updated ->
-            onSettingsChange { s -> s.copy(projectionSettings = updated) }
-        }
-        ClearTextButton(presenterManager)
-        ClearLayersButton(presenterManager, appSettings, showControl.devMode, onSettingsChange)
-        if (appSettings.projectionSettings.showsProfileSetsButton()) {
-            ProfileSetsButton(appSettings.projectionSettings) { updated ->
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            TooltipIconButton(
+                painter = rememberVectorPainter(Icons.Default.Monitor),
+                text = stringResource(Res.string.tooltip_toggle_displays),
+                onClick = { presenterManager.togglePresenterWindow() },
+                buttonSize = 36.dp,
+                modifier = Modifier.guideTarget(GuideTargets.TOGGLE_OUTPUTS),
+                iconTint = if (presenterManager.showPresenterWindow.value)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+            )
+            PreviewSettingsButton(appSettings.projectionSettings, onEditPreviewLayout) { updated ->
                 onSettingsChange { s -> s.copy(projectionSettings = updated) }
             }
-        }
-    }
-    if (showControl.devMode) {
-        DevModeBox {
-            LiveToolStrip {
-                MessageButton(presenterManager, appSettings, onSettingsChange)
-                PropsButton(presenterManager, appSettings, onSettingsChange)
-                MacrosButton(appSettings, showControl, onSettingsChange)
-                LiveToolDivider()
-                PreviewModeToggle(appSettings.projectionSettings.previewModeEnabled) { on ->
-                    onSettingsChange { it.withPreviewMode(on) }
+            ClearLayersButton(presenterManager, appSettings, showControl.devMode, onSettingsChange)
+            if (appSettings.projectionSettings.showsProfileSetsButton()) {
+                ProfileSetsButton(appSettings.projectionSettings) { updated ->
+                    onSettingsChange { s -> s.copy(projectionSettings = updated) }
                 }
             }
-            if (appSettings.projectionSettings.previewModeEnabled) PreviewTakeButton(presenterManager)
         }
-    }
+        if (showControl.devMode) {
+            DevModeBox {
+                LiveToolStrip {
+                    MessageButton(presenterManager, appSettings, onSettingsChange)
+                    PropsButton(presenterManager, appSettings, onSettingsChange)
+                    MacrosButton(appSettings, showControl, onSettingsChange)
+                    LiveToolDivider()
+                    PreviewModeToggle(appSettings.projectionSettings.previewModeEnabled) { on ->
+                        onSettingsChange { it.withPreviewMode(on) }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -504,26 +489,6 @@ private fun ClearLayersButton(
 }
 
 internal const val CLEAR_LAYERS_BUTTON_TAG = "preview_clear_layers"
-
-/**
- * Beside the gear: clears the words on air -- a song, Bible verses, a question, a dictionary entry --
- * and leaves the background up.
- * While they are off the key stays pressed in, with the accent dot, and turns into a "show text"
- * key -- pressed again, it puts them back.
- */
-@Composable
-private fun ClearTextButton(presenterManager: PresenterManager) {
-    val cleared = presenterManager.textCleared
-    ToolbarKey(
-        painter = rememberVectorPainter(if (cleared) Icons.Outlined.TextFields else Icons.Outlined.FormatClear),
-        text = stringResource(if (cleared) Res.string.tooltip_restore_text else Res.string.tooltip_clear_text),
-        onClick = { if (cleared) presenterManager.restoreText() else presenterManager.clearTextOnly() },
-        style = ToolbarKeyStyle.PANEL_TOGGLE,
-        open = cleared,
-        buttonSize = 40.dp,
-        tint = if (cleared) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-    )
-}
 
 /** The gear beside the clear button: opens the editor for how the preview panel is arranged. */
 @Composable
