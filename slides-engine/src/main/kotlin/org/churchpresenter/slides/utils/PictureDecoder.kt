@@ -115,6 +115,27 @@ object PictureDecoder {
         null
     }
 
+    private data class CacheKey(
+        val path: String,
+        val lastModified: Long,
+        val maxWidth: Int,
+        val maxHeight: Int,
+        val cover: Boolean,
+    )
+
+    private val scaledCache = object : java.util.LinkedHashMap<CacheKey, Image>(32, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<CacheKey, Image>?): Boolean {
+            return size > 32
+        }
+    }
+    private val cacheLock = Any()
+
+    fun clearCache() {
+        synchronized(cacheLock) {
+            scaledCache.clear()
+        }
+    }
+
     /**
      * Decodes [file] and scales the result down to fit within [maxWidth]×[maxHeight], never
      * upscaling — an operator's own photo has no size cap the way a stock/Pexels download does, and
@@ -122,6 +143,9 @@ object PictureDecoder {
      * drawn is what turned "add a background" into a multi-second freeze (#549). The caller decides
      * what "fits" means: a presenter output passes its own pixel size, a grid thumbnail passes its
      * tile size.
+     *
+     * Cached by file path, timestamp, and target dimensions so repeated slide changes or song navigation
+     * with the same background run with 0ms decode overhead.
      *
      * The downscale itself is cheap relative to [decode] — decoding the full file already paid the
      * real cost — so this exists to bound what gets *held*, not to speed up the read.
@@ -131,6 +155,21 @@ object PictureDecoder {
      * than it is drawn, and upscaled back.
      */
     fun decodeScaled(file: File, maxWidth: Int, maxHeight: Int, cover: Boolean = false): Image {
+        val key = CacheKey(file.absolutePath, file.lastModified(), maxWidth, maxHeight, cover)
+        synchronized(cacheLock) {
+            val cached = scaledCache[key]
+            if (cached != null && !cached.isClosed) {
+                return cached
+            }
+        }
+        val scaled = doDecodeScaled(file, maxWidth, maxHeight, cover)
+        synchronized(cacheLock) {
+            scaledCache[key] = scaled
+        }
+        return scaled
+    }
+
+    private fun doDecodeScaled(file: File, maxWidth: Int, maxHeight: Int, cover: Boolean = false): Image {
         val original = decode(file)
         val widthScale = maxWidth.toFloat() / original.width
         val heightScale = maxHeight.toFloat() / original.height

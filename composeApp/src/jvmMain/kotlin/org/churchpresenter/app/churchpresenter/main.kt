@@ -343,11 +343,22 @@ fun main(args: Array<String>) {
         CrashReporter.reportException(throwable, context = "CoroutineExceptionHandler")
     }
 
-    CefManager.init(offscreen = offscreenWeb)
-    CrashReporter.setTag("jcef.available", CefManager.initialized.toString())
-    CrashReporter.setTag("web.render", if (CefManager.offscreen) "offscreen" else "windowed")
-    if (CefManager.macOsUnsupported) CrashReporter.setTag("jcef.macos_unsupported", "true")
-    if (CefManager.windowsUnsupported) CrashReporter.setTag("jcef.windows_unsupported", "true")
+    if (offscreenWeb) {
+        CefManager.init(offscreen = true)
+        CrashReporter.setTag("jcef.available", CefManager.initialized.toString())
+        CrashReporter.setTag("web.render", "offscreen")
+        if (CefManager.macOsUnsupported) CrashReporter.setTag("jcef.macos_unsupported", "true")
+        if (CefManager.windowsUnsupported) CrashReporter.setTag("jcef.windows_unsupported", "true")
+    } else {
+        // Fast startup: initialize heavy Chromium CEF asynchronously in background so the main window opens immediately
+        Thread {
+            CefManager.init(offscreen = false)
+            CrashReporter.setTag("jcef.available", CefManager.initialized.toString())
+            CrashReporter.setTag("web.render", "windowed")
+            if (CefManager.macOsUnsupported) CrashReporter.setTag("jcef.macos_unsupported", "true")
+            if (CefManager.windowsUnsupported) CrashReporter.setTag("jcef.windows_unsupported", "true")
+        }.apply { isDaemon = true; name = "jcef-init" }.start()
+    }
 
     io.github.vinceglb.filekit.FileKit.init(appId = "Apresenter")
 

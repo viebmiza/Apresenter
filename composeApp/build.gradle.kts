@@ -342,14 +342,16 @@ compose.desktop {
 
         jvmArgs(
             // Memory
-            "-Xms512m",
+            "-Xms768m",
             "-Xmx3072m",
-            // GC
+            // GC: Low-latency tuning for 60 FPS presentations without dropped frames
             "-XX:+UseG1GC",
             "-XX:+UnlockExperimentalVMOptions",
             "-XX:G1NewSizePercent=20",
             "-XX:G1ReservePercent=20",
-            "-XX:MaxGCPauseMillis=50",
+            "-XX:MaxGCPauseMillis=20",
+            "-XX:+ParallelRefProcEnabled",
+            "-XX:+AlwaysPreTouch",
             "-XX:+UseStringDeduplication",
             // Rendering hints (renderApi is set per-platform in the blocks below / jvmArgs above)
             "-Dawt.useSystemAAFontSettings=on",

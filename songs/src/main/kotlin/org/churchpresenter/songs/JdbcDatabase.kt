@@ -19,7 +19,17 @@ object JdbcDatabase {
     // Open connection (call once on app start)
     fun openConnection(path: String): Connection {
         Class.forName("org.sqlite.JDBC")
-        return DriverManager.getConnection("jdbc:sqlite:$path")
+        val conn = DriverManager.getConnection("jdbc:sqlite:$path")
+        runCatching {
+            conn.createStatement().use { stmt ->
+                stmt.execute("PRAGMA journal_mode = WAL;")
+                stmt.execute("PRAGMA synchronous = NORMAL;")
+                stmt.execute("PRAGMA temp_store = MEMORY;")
+                stmt.execute("PRAGMA cache_size = -32000;")
+                stmt.execute("PRAGMA mmap_size = 268435456;")
+            }
+        }
+        return conn
     }
 
     fun executeQuery(conn: Connection, sql: String): DatabaseResult {
